@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
+
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/daos"
@@ -12,8 +14,8 @@ import (
 
 // HandleAfterCompetitionUpdated deletes the matches and sets of a competition when the competition has been cancelled
 func HandleAfterCompetitionUpdated(updatedCompetition *models.Record, oldCompetition *models.Record, dao *daos.Dao) error {
-	matches := updatedCompetition.GetStringSlice(competitionMatchesName)
-	oldMatchIds := oldCompetition.GetStringSlice(competitionMatchesName)
+	matches := updatedCompetition.GetStringSlice(names.Fields.Competitions.Matches)
+	oldMatchIds := oldCompetition.GetStringSlice(names.Fields.Competitions.Matches)
 
 	numMatches := len(matches)
 	oldNumMatches := len(oldMatchIds)
@@ -22,28 +24,28 @@ func HandleAfterCompetitionUpdated(updatedCompetition *models.Record, oldCompeti
 		return nil
 	}
 
-	if err := dao.ExpandRecord(oldCompetition, []string{competitionMatchesName}, nil); len(err) != 0 {
-		return err[competitionMatchesName]
+	if err := dao.ExpandRecord(oldCompetition, []string{names.Fields.Competitions.Matches}, nil); len(err) != 0 {
+		return err[names.Fields.Competitions.Matches]
 	}
 
-	oldMatches := oldCompetition.ExpandedAll(competitionMatchesName)
+	oldMatches := oldCompetition.ExpandedAll(names.Fields.Competitions.Matches)
 
-	if err := dao.ExpandRecords(oldMatches, []string{matchDataSetsName}, nil); len(err) != 0 {
-		return err[matchDataSetsName]
+	if err := dao.ExpandRecords(oldMatches, []string{names.Fields.MatchData.Sets}, nil); len(err) != 0 {
+		return err[names.Fields.MatchData.Sets]
 	}
 
 	oldSetIds := make([]string, 0, 2*len(oldMatches))
 	for _, match := range oldMatches {
-		for _, set := range match.ExpandedAll(matchDataSetsName) {
+		for _, set := range match.ExpandedAll(names.Fields.MatchData.Sets) {
 			oldSetIds = append(oldSetIds, set.Id)
 		}
 	}
 
-	if err := DeleteRecordsById(matchDataName, oldMatchIds, dao); err != nil {
+	if err := DeleteRecordsById(names.Collections.MatchData, oldMatchIds, dao); err != nil {
 		return err
 	}
 
-	if err := DeleteRecordsById(matchSetsName, oldSetIds, dao); err != nil {
+	if err := DeleteRecordsById(names.Collections.MatchSets, oldSetIds, dao); err != nil {
 		return err
 	}
 
@@ -81,16 +83,16 @@ func PostCompetitionMatches(c echo.Context, dao *daos.Dao) error {
 	}
 
 	transactionError := dao.RunInTransaction(func(txDao *daos.Dao) error {
-		matchDataCollection, err := txDao.FindCollectionByNameOrId(matchDataName)
+		matchDataCollection, err := txDao.FindCollectionByNameOrId(names.Collections.MatchData)
 		if err != nil {
 			return err
 		}
-		competition, err := txDao.FindRecordById(competitionsName, competitionId)
+		competition, err := txDao.FindRecordById(names.Collections.Competitions, competitionId)
 		if err != nil {
 			return err
 		}
 
-		isCompetitionRunning := len(competition.GetStringSlice(competitionMatchesName)) != 0
+		isCompetitionRunning := len(competition.GetStringSlice(names.Fields.Competitions.Matches)) != 0
 
 		if isCompetitionRunning {
 			return errors.New("cannot start an already running competition")
@@ -108,7 +110,7 @@ func PostCompetitionMatches(c echo.Context, dao *daos.Dao) error {
 			newMatchIds = append(newMatchIds, newMatch.Id)
 		}
 
-		competition.Set(competitionMatchesName, newMatchIds)
+		competition.Set(names.Fields.Competitions.Matches, newMatchIds)
 
 		if err := txDao.SaveRecord(competition); err != nil {
 			return err

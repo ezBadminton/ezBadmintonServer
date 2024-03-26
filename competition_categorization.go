@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 
+	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
+
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 )
@@ -18,7 +20,7 @@ func HandleEnabledCategorization(ageGroupsEnabled bool, playingLevelsEnabled boo
 	}
 
 	return dao.RunInTransaction(func(txDao *daos.Dao) error {
-		competitions, fetchErr := FetchCollection(competitionsName, txDao)
+		competitions, fetchErr := FetchCollection(names.Collections.Competitions, txDao)
 		if fetchErr != nil {
 			return fetchErr
 		}
@@ -28,13 +30,23 @@ func HandleEnabledCategorization(ageGroupsEnabled bool, playingLevelsEnabled boo
 		}
 
 		if ageGroupsEnabled {
-			if err := addCategoryToCompetitions(competitions, ageGroupName, ageGroupsName, txDao); err != nil {
+			if err := addCategoryToCompetitions(
+				competitions,
+				names.Fields.Competitions.AgeGroup,
+				names.Collections.AgeGroups,
+				txDao,
+			); err != nil {
 				return err
 			}
 		}
 
 		if playingLevelsEnabled {
-			if err := addCategoryToCompetitions(competitions, playingLevelName, playingLevelsName, txDao); err != nil {
+			if err := addCategoryToCompetitions(
+				competitions,
+				names.Fields.Competitions.PlayingLevel,
+				names.Collections.PlayingLevels,
+				txDao,
+			); err != nil {
 				return err
 			}
 		}
@@ -60,14 +72,14 @@ func HandleDisabledCategorization(ageGroupsDisabled bool, playingLevelsDisabled 
 	remainingCategorization := ""
 
 	if !ageGroupsDisabled {
-		remainingCategorization = ageGroupName
+		remainingCategorization = names.Fields.Competitions.AgeGroup
 	}
 	if !playingLevelsDisabled {
-		remainingCategorization = playingLevelName
+		remainingCategorization = names.Fields.Competitions.PlayingLevel
 	}
 
 	return dao.RunInTransaction(func(txDao *daos.Dao) error {
-		competitions, fetchErr := FetchAndExpandCollection(competitionsName, txDao)
+		competitions, fetchErr := FetchAndExpandCollection(names.Collections.Competitions, txDao)
 		if fetchErr != nil {
 			return fetchErr
 		}
@@ -75,10 +87,10 @@ func HandleDisabledCategorization(ageGroupsDisabled bool, playingLevelsDisabled 
 		var mergeGroups [][]*models.Record = GroupCompetitions(competitions, remainingCategorization)
 
 		if ageGroupsDisabled {
-			removeCategoryFromCompetitions(competitions, ageGroupName)
+			removeCategoryFromCompetitions(competitions, names.Fields.Competitions.AgeGroup)
 		}
 		if playingLevelsDisabled {
-			removeCategoryFromCompetitions(competitions, playingLevelName)
+			removeCategoryFromCompetitions(competitions, names.Fields.Competitions.PlayingLevel)
 		}
 
 		if err := ProcessRecords(competitions, txDao.SaveRecord); err != nil {
@@ -102,12 +114,12 @@ func HandleDisabledCategorization(ageGroupsDisabled bool, playingLevelsDisabled 
 // into the competitions of the replacement category.
 func HandleDeletedCategory(deletedCategory *models.Record, replacementCategoryId string, dao *daos.Dao) error {
 	return dao.RunInTransaction(func(txDao *daos.Dao) error {
-		competitions, fetchErr := FetchAndExpandCollection(competitionsName, txDao)
+		competitions, fetchErr := FetchAndExpandCollection(names.Collections.Competitions, txDao)
 		if fetchErr != nil {
 			return fetchErr
 		}
 
-		tournamentQuery := txDao.RecordQuery(tournamentsName).Limit(1)
+		tournamentQuery := txDao.RecordQuery(names.Collections.Tournaments).Limit(1)
 
 		var tournament *models.Record = &models.Record{}
 		if err := tournamentQuery.One(tournament); err != nil {
@@ -272,8 +284,8 @@ func GroupCompetitions(competitions []*models.Record, categorization string) [][
 // Returns the group that the given competition belongs to.
 // By giving a categorization of "playingLevel" or "ageGroup" the group will also adhere to that.
 func GroupOfCompetition(competition *models.Record, categorization string) CompetitionGroup {
-	genderCategory := competition.GetString(genderCategoryName)
-	teamSize := competition.GetInt(teamSizeName)
+	genderCategory := competition.GetString(names.Fields.Competitions.GenderCategory)
+	teamSize := competition.GetInt(names.Fields.Competitions.TeamSize)
 
 	var competitionType string
 	if teamSize == 1 {
@@ -311,16 +323,16 @@ func getMergeTarget(competitions []*models.Record) *models.Record {
 
 	// Test if there is a standout competition that is the single one that has
 	// a registrations list, a draw, seeds or tournament mode settings
-	if singleOne := GetSingle(competitions, registrationsName); singleOne != nil {
+	if singleOne := GetSingle(competitions, names.Fields.Competitions.Registrations); singleOne != nil {
 		return singleOne
 	}
-	if singleOne := GetSingle(competitions, drawName); singleOne != nil {
+	if singleOne := GetSingle(competitions, names.Fields.Competitions.Draw); singleOne != nil {
 		return singleOne
 	}
-	if singleOne := GetSingle(competitions, seedsName); singleOne != nil {
+	if singleOne := GetSingle(competitions, names.Fields.Competitions.Seeds); singleOne != nil {
 		return singleOne
 	}
-	if singleOne := GetSingle(competitions, tournamentModeSettingsName); singleOne != nil {
+	if singleOne := GetSingle(competitions, names.Fields.Competitions.TournamentModeSettings); singleOne != nil {
 		return singleOne
 	}
 
@@ -335,7 +347,7 @@ func mergeRegistrations(
 	competitions []*models.Record,
 	mergeTarget *models.Record,
 ) ([]*models.Record, []*models.Record, []*models.Record) {
-	var allTeams []*models.Record = mergeTarget.ExpandedAll(registrationsName)
+	var allTeams []*models.Record = mergeTarget.ExpandedAll(names.Fields.Competitions.Registrations)
 
 	adoptedTeams := []*models.Record{}
 	newTeams := []*models.Record{}
@@ -347,7 +359,7 @@ func mergeRegistrations(
 
 	for _, competition := range competitions {
 		if competition != mergeTarget {
-			allTeams = append(allTeams, competition.ExpandedAll(registrationsName)...)
+			allTeams = append(allTeams, competition.ExpandedAll(names.Fields.Competitions.Registrations)...)
 		}
 	}
 
@@ -363,7 +375,7 @@ func mergeRegistrations(
 
 	for _, team := range allTeams {
 		unadoptedTeamSet[team] = struct{}{}
-		for _, player := range team.ExpandedAll(teamPlayersName) {
+		for _, player := range team.ExpandedAll(names.Fields.Teams.Players) {
 			unadoptedPlayerSet[player] = struct{}{}
 		}
 	}
@@ -372,7 +384,7 @@ func mergeRegistrations(
 	// cause a player to be registered twice
 	for _, team := range allTeams {
 		alreadyAdopted := false
-		for _, player := range team.ExpandedAll(teamPlayersName) {
+		for _, player := range team.ExpandedAll(names.Fields.Teams.Players) {
 			if _, isAdopted := adoptedPlayerSet[player]; isAdopted {
 				alreadyAdopted = true
 				break
@@ -385,7 +397,7 @@ func mergeRegistrations(
 
 		adoptedTeams = append(adoptedTeams, team)
 		delete(unadoptedTeamSet, team)
-		for _, player := range team.ExpandedAll(teamPlayersName) {
+		for _, player := range team.ExpandedAll(names.Fields.Teams.Players) {
 			adoptedPlayerSet[player] = struct{}{}
 			delete(unadoptedPlayerSet, player)
 		}
@@ -427,7 +439,7 @@ func mergeCompetitionGroup(mergeGroup []*models.Record, mergeTarget *models.Reco
 		for _, team := range newTeams {
 			updatedRegistrations = append(updatedRegistrations, team.Id)
 		}
-		mergeTarget.Set(registrationsName, updatedRegistrations)
+		mergeTarget.Set(names.Fields.Competitions.Registrations, updatedRegistrations)
 
 		if err := txDao.SaveRecord(mergeTarget); err != nil {
 			return err
@@ -444,10 +456,10 @@ func mergeCompetitionGroup(mergeGroup []*models.Record, mergeTarget *models.Reco
 // Either "ageGroup" or "playingLevel"
 func getTypeOfCategory(category *models.Record) string {
 	switch category.Collection().Name {
-	case playingLevelsName:
-		return playingLevelName
-	case ageGroupsName:
-		return ageGroupName
+	case names.Collections.PlayingLevels:
+		return names.Fields.Competitions.PlayingLevel
+	case names.Collections.AgeGroups:
+		return names.Fields.Competitions.AgeGroup
 	}
 
 	return ""
@@ -457,10 +469,10 @@ func getTypeOfCategory(category *models.Record) string {
 // Either "useAgeGroups" or "usePlayingLevels"
 func getOptionNameOfCategory(category *models.Record) string {
 	switch category.Collection().Name {
-	case playingLevelsName:
-		return usePlayingLevelsName
-	case ageGroupsName:
-		return useAgeGroupsName
+	case names.Collections.PlayingLevels:
+		return names.Fields.Tournaments.UsePlayingLevels
+	case names.Collections.AgeGroups:
+		return names.Fields.Tournaments.UseAgeGroups
 	}
 
 	return ""

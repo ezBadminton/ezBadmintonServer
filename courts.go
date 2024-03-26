@@ -1,6 +1,8 @@
 package main
 
 import (
+	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
+
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
@@ -12,8 +14,8 @@ func HandleBeforeGymnasiumDelete(deletedGym *models.Record, dao *daos.Dao) error
 		courtsOfGym := make([]*models.Record, 0, 6)
 
 		err := txDao.
-			RecordQuery(courtsName).
-			AndWhere(dbx.HashExp{courtGymnasiumName: deletedGym.Id}).
+			RecordQuery(names.Collections.Courts).
+			AndWhere(dbx.HashExp{names.Fields.Courts.Gymnasium: deletedGym.Id}).
 			All(&courtsOfGym)
 
 		if err != nil {
@@ -25,7 +27,7 @@ func HandleBeforeGymnasiumDelete(deletedGym *models.Record, dao *daos.Dao) error
 			courtIds = append(courtIds, court.Id)
 		}
 
-		if err := DeleteRecordsById(courtsName, courtIds, txDao); err != nil {
+		if err := DeleteRecordsById(names.Collections.Courts, courtIds, txDao); err != nil {
 			return err
 		}
 

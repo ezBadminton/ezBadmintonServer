@@ -17,7 +17,7 @@ func FetchCollection(collectionName string, dao *daos.Dao) ([]*models.Record, er
 }
 
 func FetchAndExpandCollection(collectionName string, dao *daos.Dao) ([]*models.Record, error) {
-	competitions, fetchErr := FetchCollection(competitionsName, dao)
+	competitions, fetchErr := FetchCollection(collectionName, dao)
 	if fetchErr != nil {
 		return nil, fetchErr
 	}

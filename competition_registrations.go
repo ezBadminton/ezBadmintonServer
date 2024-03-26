@@ -1,6 +1,8 @@
 package main
 
 import (
+	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
+
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 )
@@ -8,8 +10,8 @@ import (
 // HandleDeletedCompetition deletes the registered teams of a competition that is about to be deleted
 func HandleDeletedCompetition(deletedCompetition *models.Record, dao *daos.Dao) error {
 	return dao.RunInTransaction(func(txDao *daos.Dao) error {
-		if err := txDao.ExpandRecord(deletedCompetition, []string{registrationsName}, nil); len(err) != 0 {
-			return err[registrationsName]
+		if err := txDao.ExpandRecord(deletedCompetition, []string{names.Fields.Competitions.Registrations}, nil); len(err) != 0 {
+			return err[names.Fields.Competitions.Registrations]
 		}
 
 		if err := DeleteRegistrationsOfCompetition(deletedCompetition, txDao); err != nil {
@@ -28,7 +30,7 @@ func HandleCreatedTeam(createdTeam *models.Record, competitionId string, dao *da
 	}
 
 	return dao.RunInTransaction(func(txDao *daos.Dao) error {
-		competition, err := txDao.FindRecordById(competitionsName, competitionId)
+		competition, err := txDao.FindRecordById(names.Collections.Competitions, competitionId)
 		if err != nil {
 			return err
 		}
@@ -38,11 +40,11 @@ func HandleCreatedTeam(createdTeam *models.Record, competitionId string, dao *da
 		}
 
 		newRegistrations := append(
-			competition.GetStringSlice(registrationsName),
+			competition.GetStringSlice(names.Fields.Competitions.Registrations),
 			createdTeam.Id,
 		)
 
-		competition.Set(registrationsName, newRegistrations)
+		competition.Set(names.Fields.Competitions.Registrations, newRegistrations)
 
 		if err := txDao.SaveRecord(competition); err != nil {
 			return err
@@ -56,18 +58,18 @@ func HandleCreatedTeam(createdTeam *models.Record, competitionId string, dao *da
 // and deletes it. Other updates are cascaded to the competition that the team
 // is registered for.
 func HandleAfterUpdatedTeam(updatedTeamModel models.Model, dao *daos.Dao) error {
-	updatedTeam, fetchErr := dao.FindRecordById(teamsName, updatedTeamModel.GetId())
+	updatedTeam, fetchErr := dao.FindRecordById(names.Collections.Teams, updatedTeamModel.GetId())
 
 	if fetchErr != nil {
 		return fetchErr
 	}
 
-	if len(updatedTeam.GetStringSlice(teamPlayersName)) == 0 {
+	if len(updatedTeam.GetStringSlice(names.Fields.Teams.Players)) == 0 {
 		if err := dao.DeleteRecord(updatedTeam); err != nil {
 			return err
 		}
 	} else {
-		competitions, err := FindReverseMultiRelations(updatedTeam.Id, competitionsName, registrationsName, dao)
+		competitions, err := FindReverseMultiRelations(updatedTeam.Id, names.Collections.Competitions, names.Fields.Competitions.Registrations, dao)
 		if err != nil {
 			return err
 		}
@@ -85,7 +87,7 @@ func HandleAfterUpdatedTeam(updatedTeamModel models.Model, dao *daos.Dao) error 
 // size requires.
 // Also deletes double registrations that emerge from the update.
 func HandleUpdatedTeam(updatedTeam *models.Record, dao *daos.Dao) error {
-	teamSize := len(updatedTeam.GetStringSlice(teamPlayersName))
+	teamSize := len(updatedTeam.GetStringSlice(names.Fields.Teams.Players))
 
 	// Empty teams get deleted anyways
 	if teamSize == 0 {
@@ -106,13 +108,13 @@ func HandleUpdatedTeam(updatedTeam *models.Record, dao *daos.Dao) error {
 			return err
 		}
 
-		competitionTeamSize := competition.GetInt(teamSizeName)
+		competitionTeamSize := competition.GetInt(names.Fields.Competitions.TeamSize)
 
 		if teamSize == competitionTeamSize {
 			return nil
 		}
 
-		draw := competition.GetStringSlice(drawName)
+		draw := competition.GetStringSlice(names.Fields.Competitions.Draw)
 
 		indexOfTeam := -1
 
@@ -129,7 +131,7 @@ func HandleUpdatedTeam(updatedTeam *models.Record, dao *daos.Dao) error {
 
 		newDraw := append(draw[:indexOfTeam], draw[indexOfTeam+1:]...)
 
-		competition.Set(drawName, newDraw)
+		competition.Set(names.Fields.Competitions.Draw, newDraw)
 
 		if err := txDao.SaveRecord(competition); err != nil {
 			return err
@@ -158,7 +160,7 @@ func DeleteCompetitionAndTeams(competition *models.Record, dao *daos.Dao) error 
 }
 
 func DeleteRegistrationsOfCompetition(competition *models.Record, dao *daos.Dao) error {
-	registrations := competition.ExpandedAll(registrationsName)
+	registrations := competition.ExpandedAll(names.Fields.Competitions.Registrations)
 
 	if err := ProcessRecords(registrations, dao.DeleteRecord); err != nil {
 		return err
@@ -169,10 +171,10 @@ func DeleteRegistrationsOfCompetition(competition *models.Record, dao *daos.Dao)
 
 // Deletes teams that are registered to the competition and contain a member of the given team
 func deleteDoubleRegistrations(team *models.Record, competition *models.Record, dao *daos.Dao) error {
-	if err := dao.ExpandRecord(competition, []string{registrationsName}, nil); len(err) != 0 {
-		return err[registrationsName]
+	if err := dao.ExpandRecord(competition, []string{names.Fields.Competitions.Registrations}, nil); len(err) != 0 {
+		return err[names.Fields.Competitions.Registrations]
 	}
-	registeredTeams := competition.ExpandedAll(registrationsName)
+	registeredTeams := competition.ExpandedAll(names.Fields.Competitions.Registrations)
 
 	doubleRegisteredTeams := findDoubleRegisteredTeams(registeredTeams, team)
 
@@ -181,7 +183,7 @@ func deleteDoubleRegistrations(team *models.Record, competition *models.Record, 
 	}
 
 	if len(doubleRegisteredTeams) != 0 {
-		updatedCompetition, err := dao.FindRecordById(competitionsName, competition.Id)
+		updatedCompetition, err := dao.FindRecordById(names.Collections.Competitions, competition.Id)
 		if err != nil {
 			return err
 		}
@@ -192,7 +194,7 @@ func deleteDoubleRegistrations(team *models.Record, competition *models.Record, 
 }
 
 func findCompetitionOfTeam(teamId string, dao *daos.Dao) (*models.Record, error) {
-	reverseRelations, err := FindReverseMultiRelations(teamId, competitionsName, registrationsName, dao)
+	reverseRelations, err := FindReverseMultiRelations(teamId, names.Collections.Competitions, names.Fields.Competitions.Registrations, dao)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +207,7 @@ func findCompetitionOfTeam(teamId string, dao *daos.Dao) (*models.Record, error)
 }
 
 func findDoubleRegisteredTeams(teams []*models.Record, newTeam *models.Record) []*models.Record {
-	newTeamMemberIds := newTeam.GetStringSlice(teamPlayersName)
+	newTeamMemberIds := newTeam.GetStringSlice(names.Fields.Teams.Players)
 
 	doubleRegisteredTeams := make([]*models.Record, 0, 1)
 
@@ -223,7 +225,7 @@ func findDoubleRegisteredTeams(teams []*models.Record, newTeam *models.Record) [
 }
 
 func doTeamMembersOverlap(memberIds []string, team *models.Record) bool {
-	for _, teamMemberId := range team.GetStringSlice(teamPlayersName) {
+	for _, teamMemberId := range team.GetStringSlice(names.Fields.Teams.Players) {
 		for _, memberId := range memberIds {
 			if teamMemberId == memberId {
 				return true

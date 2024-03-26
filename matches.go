@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 
+	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
+
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/daos"
@@ -49,25 +51,25 @@ func PutMatchResult(c echo.Context, dao *daos.Dao) error {
 	}
 
 	transactionError := dao.RunInTransaction(func(txDao *daos.Dao) error {
-		matchSetCollection, err := txDao.FindCollectionByNameOrId(matchSetsName)
+		matchSetCollection, err := txDao.FindCollectionByNameOrId(names.Collections.MatchSets)
 		if err != nil {
 			return err
 		}
-		match, err := txDao.FindRecordById(matchDataName, matchId)
+		match, err := txDao.FindRecordById(names.Collections.MatchData, matchId)
 		if err != nil {
 			return err
 		}
 
-		txDao.ExpandRecord(match, []string{matchDataSetsName}, nil)
-		oldSets := match.ExpandedAll(matchDataSetsName)
+		txDao.ExpandRecord(match, []string{names.Fields.MatchData.Sets}, nil)
+		oldSets := match.ExpandedAll(names.Fields.MatchData.Sets)
 
 		newSetIds := make([]string, 0, 2)
 
 		for i := 0; i < numScores; i += 2 {
 			newSet := models.NewRecord(matchSetCollection)
 
-			newSet.Set(matchSetPoints1Name, resultArray[i])
-			newSet.Set(matchSetPoints2Name, resultArray[i+1])
+			newSet.Set(names.Fields.MatchSets.Team1Points, resultArray[i])
+			newSet.Set(names.Fields.MatchSets.Team2Points, resultArray[i+1])
 
 			if err := txDao.SaveRecord(newSet); err != nil {
 				return err
@@ -76,8 +78,8 @@ func PutMatchResult(c echo.Context, dao *daos.Dao) error {
 			newSetIds = append(newSetIds, newSet.Id)
 		}
 
-		match.Set(matchEndTimeName, endTime)
-		match.Set(matchDataSetsName, newSetIds)
+		match.Set(names.Fields.MatchData.EndTime, endTime)
+		match.Set(names.Fields.MatchData.Sets, newSetIds)
 		if err := txDao.SaveRecord(match); err != nil {
 			return err
 		}
@@ -98,8 +100,8 @@ func PutMatchResult(c echo.Context, dao *daos.Dao) error {
 
 // HandleAfterUpdatedMatch deletes the match's sets if they have been removed from the match
 func HandleAfterUpdatedMatch(updatedMatch *models.Record, oldMatch *models.Record, dao *daos.Dao) error {
-	updatedSetIds := updatedMatch.GetStringSlice(matchDataSetsName)
-	oldSetIds := oldMatch.GetStringSlice(matchDataSetsName)
+	updatedSetIds := updatedMatch.GetStringSlice(names.Fields.MatchData.Sets)
+	oldSetIds := oldMatch.GetStringSlice(names.Fields.MatchData.Sets)
 
 	numUpdatedSets := len(updatedSetIds)
 	numOldSets := len(oldSetIds)
@@ -108,7 +110,7 @@ func HandleAfterUpdatedMatch(updatedMatch *models.Record, oldMatch *models.Recor
 		return nil
 	}
 
-	if err := DeleteRecordsById(matchSetsName, oldSetIds, dao); err != nil {
+	if err := DeleteRecordsById(names.Collections.MatchSets, oldSetIds, dao); err != nil {
 		return err
 	}
 

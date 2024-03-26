@@ -1,5 +1,6 @@
 pb_data
 launch.json
 *.exe
+ezBadmintonServer*
 go.mod
 go.sum
