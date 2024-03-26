@@ -93,7 +93,7 @@ func RegisterHooks(app *pocketbase.PocketBase) {
 	})
 
 	// Register all relation update cascades
-	app.OnAfterBootstrap().Add(func(_ *core.BootstrapEvent) error {
+	app.OnBeforeServe().Add(func(_ *core.ServeEvent) error {
 		RegisterRelationUpdateCascade(names.Collections.Competitions, names.Fields.Competitions.PlayingLevel, app)
 		RegisterRelationUpdateCascade(names.Collections.Competitions, names.Fields.Competitions.Matches, app)
 		RegisterRelationUpdateCascade(names.Collections.Competitions, names.Fields.Competitions.TieBreakers, app)
