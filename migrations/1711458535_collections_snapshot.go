@@ -864,7 +864,7 @@ func init() {
 				"indexes": [],
 				"listRule": null,
 				"viewRule": null,
-				"createRule": null,
+				"createRule": "",
 				"updateRule": null,
 				"deleteRule": null,
 				"options": {
