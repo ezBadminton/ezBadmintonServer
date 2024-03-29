@@ -1103,7 +1103,7 @@ func init() {
 					{
 						"system": false,
 						"id": "8vzehtdb",
-						"name": "qualificationsPerGroup",
+						"name": "numQualifications",
 						"type": "number",
 						"required": false,
 						"presentable": false,
