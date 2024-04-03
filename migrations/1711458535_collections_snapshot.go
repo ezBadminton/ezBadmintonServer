@@ -1074,6 +1074,23 @@ func init() {
 					},
 					{
 						"system": false,
+						"id": "hztepfsc",
+						"name": "knockOutMode",
+						"type": "select",
+						"required": false,
+						"presentable": false,
+						"unique": false,
+						"options": {
+							"maxSelect": 1,
+							"values": [
+								"single",
+								"double",
+								"consolation"
+							]
+						}
+					},
+					{
+						"system": false,
 						"id": "4agzgctg",
 						"name": "passes",
 						"type": "number",
