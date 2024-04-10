@@ -170,7 +170,8 @@ func HandleDeletedCategory(deletedCategory *models.Record, replacementCategoryId
 		competitionsToMerge = append(competitionsToMerge, competitionsOfReplacement...)
 		competitionsToMerge = append(competitionsToMerge, competitionsOfDeleted...)
 
-		var mergeGroups [][]*models.Record = GroupCompetitions(competitionsToMerge, "")
+		categorizationType := getTypeOfCategory(replacementCategory)
+		var mergeGroups [][]*models.Record = GroupCompetitions(competitionsToMerge, categorizationType)
 
 		for _, group := range mergeGroups {
 			if err := mergeCategoryReplacement(group, replacementCategory, txDao); err != nil {
