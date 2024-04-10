@@ -170,8 +170,8 @@ func HandleDeletedCategory(deletedCategory *models.Record, replacementCategoryId
 		competitionsToMerge = append(competitionsToMerge, competitionsOfReplacement...)
 		competitionsToMerge = append(competitionsToMerge, competitionsOfDeleted...)
 
-		categorizationType := getTypeOfCategory(replacementCategory)
-		var mergeGroups [][]*models.Record = GroupCompetitions(competitionsToMerge, categorizationType)
+		otherCategorization := getInvertedTypeOfCategory(replacementCategory)
+		var mergeGroups [][]*models.Record = GroupCompetitions(competitionsToMerge, otherCategorization)
 
 		for _, group := range mergeGroups {
 			if err := mergeCategoryReplacement(group, replacementCategory, txDao); err != nil {
@@ -461,6 +461,19 @@ func getTypeOfCategory(category *models.Record) string {
 		return names.Fields.Competitions.PlayingLevel
 	case names.Collections.AgeGroups:
 		return names.Fields.Competitions.AgeGroup
+	}
+
+	return ""
+}
+
+// Returns the oppositre ("ageGroup" or "playingLevel") of
+// what the given category is.
+func getInvertedTypeOfCategory(category *models.Record) string {
+	switch category.Collection().Name {
+	case names.Collections.PlayingLevels:
+		return names.Fields.Competitions.AgeGroup
+	case names.Collections.AgeGroups:
+		return names.Fields.Competitions.PlayingLevel
 	}
 
 	return ""
