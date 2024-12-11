@@ -231,12 +231,9 @@ func addCategoryToCompetitions(
 	dao core.App,
 ) error {
 	collectionFetch := dao.RecordQuery(categoryCollectionName).Limit(1)
-	var firstCategory *core.Record
+	firstCategory := core.Record{}
 	if err := collectionFetch.One(&firstCategory); err != nil {
 		return err
-	}
-	if firstCategory == nil {
-		return errors.New("there is no category to add")
 	}
 
 	for _, competition := range competitions {
