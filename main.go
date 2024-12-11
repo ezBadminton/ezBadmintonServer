@@ -18,17 +18,17 @@ func main() {
 		&watchClient,
 		"client-exit",
 		false,
-		"the server terminates itself when the client exits. Only works when the server is a child process of the client.",
+		"with this option the server terminates itself when the client exits. Only works when the server is a child process of the client.",
 	)
 
 	RegisterHooks(app)
 	RegisterRoutes(app)
 
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {
 			watchers.WatchClientForExit()
 		}
-		return nil
+		return e.Next()
 	})
 
 	if err := app.Start(); err != nil {

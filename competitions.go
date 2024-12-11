@@ -6,14 +6,11 @@ import (
 
 	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
 
-	"github.com/labstack/echo/v5"
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // HandleAfterCompetitionUpdated deletes the matches and sets of a competition when the competition has been cancelled
-func HandleAfterCompetitionUpdated(updatedCompetition *models.Record, oldCompetition *models.Record, dao *daos.Dao) error {
+func HandleAfterCompetitionUpdated(updatedCompetition *core.Record, oldCompetition *core.Record, dao core.App) error {
 	matches := updatedCompetition.GetStringSlice(names.Fields.Competitions.Matches)
 	oldMatchIds := oldCompetition.GetStringSlice(names.Fields.Competitions.Matches)
 
@@ -41,11 +38,11 @@ func HandleAfterCompetitionUpdated(updatedCompetition *models.Record, oldCompeti
 		}
 	}
 
-	if err := DeleteRecordsById(names.Collections.MatchData, oldMatchIds, dao); err != nil {
+	if err := DeleteModelsById(names.Collections.MatchData, oldMatchIds, dao); err != nil {
 		return err
 	}
 
-	if err := DeleteRecordsById(names.Collections.MatchSets, oldSetIds, dao); err != nil {
+	if err := DeleteModelsById(names.Collections.MatchSets, oldSetIds, dao); err != nil {
 		return err
 	}
 
@@ -55,14 +52,19 @@ func HandleAfterCompetitionUpdated(updatedCompetition *models.Record, oldCompeti
 // PostCompetitionMatches handles POST requests to the /api/ezbadminton/competitions route.
 // It creates the given amount of MatchData records and assigns them to the competition.
 // This starts the competition.
-func PostCompetitionMatches(c echo.Context, dao *daos.Dao) error {
-	body := apis.RequestInfo(c).Data
+func PostCompetitionMatches(e *core.RequestEvent, dao core.App) error {
+	info, err := e.RequestInfo()
+	if err != nil {
+		return e.NoContent(http.StatusBadRequest)
+	}
+
+	body := info.Body
 
 	competitionIdData, competitionIdExists := body["competition"]
 	numMatchesData, numMatchesExists := body["numMatches"]
 
 	if !competitionIdExists || !numMatchesExists {
-		return c.NoContent(http.StatusBadRequest)
+		return e.NoContent(http.StatusBadRequest)
 	}
 
 	var competitionId string
@@ -72,17 +74,17 @@ func PostCompetitionMatches(c echo.Context, dao *daos.Dao) error {
 	case string:
 		competitionId = val
 	default:
-		return c.NoContent(http.StatusBadRequest)
+		return e.NoContent(http.StatusBadRequest)
 	}
 
 	switch val := numMatchesData.(type) {
 	case float64:
 		numMatches = int(val)
 	default:
-		return c.NoContent(http.StatusBadRequest)
+		return e.NoContent(http.StatusBadRequest)
 	}
 
-	transactionError := dao.RunInTransaction(func(txDao *daos.Dao) error {
+	transactionError := dao.RunInTransaction(func(txDao core.App) error {
 		matchDataCollection, err := txDao.FindCollectionByNameOrId(names.Collections.MatchData)
 		if err != nil {
 			return err
@@ -101,9 +103,9 @@ func PostCompetitionMatches(c echo.Context, dao *daos.Dao) error {
 		newMatchIds := make([]string, 0, numMatches)
 
 		for i := 0; i < numMatches; i += 1 {
-			newMatch := models.NewRecord(matchDataCollection)
+			newMatch := core.NewRecord(matchDataCollection)
 
-			if err := txDao.SaveRecord(newMatch); err != nil {
+			if err := txDao.Save(newMatch); err != nil {
 				return err
 			}
 
@@ -112,7 +114,7 @@ func PostCompetitionMatches(c echo.Context, dao *daos.Dao) error {
 
 		competition.Set(names.Fields.Competitions.Matches, newMatchIds)
 
-		if err := txDao.SaveRecord(competition); err != nil {
+		if err := txDao.Save(competition); err != nil {
 			return err
 		}
 
@@ -120,7 +122,7 @@ func PostCompetitionMatches(c echo.Context, dao *daos.Dao) error {
 	})
 
 	if transactionError != nil {
-		return c.NoContent(http.StatusInternalServerError)
+		return e.NoContent(http.StatusInternalServerError)
 	}
 
 	return nil

@@ -4,9 +4,7 @@ import (
 	"errors"
 
 	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
-
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // HandleEnabledCategorization adds a category (age group or playing level) that has been enabled
@@ -14,12 +12,12 @@ import (
 // All competitions are put into the same category. It is undetermined which category that is.
 // For example to enable the age group categorization at least one AgeGroup record has to be in the
 // age group collection. When no competitions are present, categorizations can always be enabled.
-func HandleEnabledCategorization(ageGroupsEnabled bool, playingLevelsEnabled bool, dao *daos.Dao) error {
+func HandleEnabledCategorization(ageGroupsEnabled bool, playingLevelsEnabled bool, dao core.App) error {
 	if !ageGroupsEnabled && !playingLevelsEnabled {
 		return nil
 	}
 
-	return dao.RunInTransaction(func(txDao *daos.Dao) error {
+	return dao.RunInTransaction(func(txDao core.App) error {
 		competitions, fetchErr := FetchCollection(names.Collections.Competitions, txDao)
 		if fetchErr != nil {
 			return fetchErr
@@ -51,7 +49,7 @@ func HandleEnabledCategorization(ageGroupsEnabled bool, playingLevelsEnabled boo
 			}
 		}
 
-		if err := ProcessRecords(competitions, txDao.SaveRecord); err != nil {
+		if err := ProcessAsModels(competitions, txDao.Save); err != nil {
 			return err
 		}
 
@@ -64,7 +62,7 @@ func HandleEnabledCategorization(ageGroupsEnabled bool, playingLevelsEnabled boo
 // from all competitions. It also merges competitions that were previously categorized into one.
 // For example when the age group categorization becomes disabled and there exist n men's singles
 // competitions in n different age groups, then those are merged.
-func HandleDisabledCategorization(ageGroupsDisabled bool, playingLevelsDisabled bool, dao *daos.Dao) error {
+func HandleDisabledCategorization(ageGroupsDisabled bool, playingLevelsDisabled bool, dao core.App) error {
 	if !ageGroupsDisabled && !playingLevelsDisabled {
 		return nil
 	}
@@ -78,13 +76,13 @@ func HandleDisabledCategorization(ageGroupsDisabled bool, playingLevelsDisabled 
 		remainingCategorization = names.Fields.Competitions.PlayingLevel
 	}
 
-	return dao.RunInTransaction(func(txDao *daos.Dao) error {
+	return dao.RunInTransaction(func(txDao core.App) error {
 		competitions, fetchErr := FetchAndExpandCollection(names.Collections.Competitions, txDao)
 		if fetchErr != nil {
 			return fetchErr
 		}
 
-		var mergeGroups [][]*models.Record = GroupCompetitions(competitions, remainingCategorization)
+		var mergeGroups [][]*core.Record = GroupCompetitions(competitions, remainingCategorization)
 
 		if ageGroupsDisabled {
 			removeCategoryFromCompetitions(competitions, names.Fields.Competitions.AgeGroup)
@@ -93,12 +91,12 @@ func HandleDisabledCategorization(ageGroupsDisabled bool, playingLevelsDisabled 
 			removeCategoryFromCompetitions(competitions, names.Fields.Competitions.PlayingLevel)
 		}
 
-		if err := ProcessRecords(competitions, txDao.SaveRecord); err != nil {
+		if err := ProcessAsModels(competitions, txDao.Save); err != nil {
 			return err
 		}
 
 		for _, group := range mergeGroups {
-			var mergeTarget *models.Record = getMergeTarget(group)
+			var mergeTarget *core.Record = getMergeTarget(group)
 
 			if err := mergeCompetitionGroup(group, mergeTarget, txDao); err != nil {
 				return nil
@@ -112,8 +110,8 @@ func HandleDisabledCategorization(ageGroupsDisabled bool, playingLevelsDisabled 
 // HandleDeletedCategory processes the competitions that are in a category that is about to be deleted.
 // If the replacementCategoryId is not an empty string the competition's registration lists are merged
 // into the competitions of the replacement category.
-func HandleDeletedCategory(deletedCategory *models.Record, replacementCategoryId string, dao *daos.Dao) error {
-	return dao.RunInTransaction(func(txDao *daos.Dao) error {
+func HandleDeletedCategory(deletedCategory *core.Record, replacementCategoryId string, dao core.App) error {
+	return dao.RunInTransaction(func(txDao core.App) error {
 		competitions, fetchErr := FetchAndExpandCollection(names.Collections.Competitions, txDao)
 		if fetchErr != nil {
 			return fetchErr
@@ -121,7 +119,7 @@ func HandleDeletedCategory(deletedCategory *models.Record, replacementCategoryId
 
 		tournamentQuery := txDao.RecordQuery(names.Collections.Tournaments).Limit(1)
 
-		var tournament *models.Record = &models.Record{}
+		var tournament *core.Record = &core.Record{}
 		if err := tournamentQuery.One(tournament); err != nil {
 			return err
 		}
@@ -141,14 +139,14 @@ func HandleDeletedCategory(deletedCategory *models.Record, replacementCategoryId
 		if len(categories) == 1 {
 			// Deleting the last category disables the categorization
 			tournament.Set(categorizationOptionName, false)
-			txDao.SaveRecord(tournament)
+			txDao.Save(tournament)
 			return nil
 		}
 
 		competitionsOfDeleted := GetCompetitionsOfCategory(competitions, deletedCategory)
 
 		if replacementCategoryId == "" {
-			if err := ProcessRecords(competitionsOfDeleted, func(competition *models.Record) error {
+			if err := ProcessAsRecords(competitionsOfDeleted, func(competition *core.Record) error {
 				return DeleteCompetitionAndTeams(competition, txDao)
 			}); err != nil {
 				return err
@@ -166,12 +164,12 @@ func HandleDeletedCategory(deletedCategory *models.Record, replacementCategoryId
 
 		competitionsOfReplacement := GetCompetitionsOfCategory(competitions, replacementCategory)
 
-		competitionsToMerge := make([]*models.Record, 0, len(competitionsOfDeleted)+len(competitionsOfReplacement))
+		competitionsToMerge := make([]*core.Record, 0, len(competitionsOfDeleted)+len(competitionsOfReplacement))
 		competitionsToMerge = append(competitionsToMerge, competitionsOfReplacement...)
 		competitionsToMerge = append(competitionsToMerge, competitionsOfDeleted...)
 
 		otherCategorization := getInvertedTypeOfCategory(replacementCategory)
-		var mergeGroups [][]*models.Record = GroupCompetitions(competitionsToMerge, otherCategorization)
+		var mergeGroups [][]*core.Record = GroupCompetitions(competitionsToMerge, otherCategorization)
 
 		for _, group := range mergeGroups {
 			if err := mergeCategoryReplacement(group, replacementCategory, txDao); err != nil {
@@ -183,7 +181,7 @@ func HandleDeletedCategory(deletedCategory *models.Record, replacementCategoryId
 	})
 }
 
-func mergeCategoryReplacement(mergeGroup []*models.Record, replacementCategory *models.Record, dao *daos.Dao) error {
+func mergeCategoryReplacement(mergeGroup []*core.Record, replacementCategory *core.Record, dao core.App) error {
 	mergeTarget := mergeGroup[0]
 
 	if len(mergeGroup) == 1 {
@@ -191,7 +189,7 @@ func mergeCategoryReplacement(mergeGroup []*models.Record, replacementCategory *
 
 		mergeTarget.Set(categoryType, replacementCategory.Id)
 
-		if err := dao.SaveRecord(mergeTarget); err != nil {
+		if err := dao.Save(mergeTarget); err != nil {
 			return err
 		}
 
@@ -205,13 +203,13 @@ func mergeCategoryReplacement(mergeGroup []*models.Record, replacementCategory *
 }
 
 // Deletes the competitions that have been merged into the merge target
-func deleteMergedCompetitions(mergeGroup []*models.Record, mergeTarget *models.Record, txDao *daos.Dao) error {
+func deleteMergedCompetitions(mergeGroup []*core.Record, mergeTarget *core.Record, txDao core.App) error {
 	for _, competition := range mergeGroup {
 		if competition == mergeTarget {
 			continue
 		}
 
-		if err := txDao.DeleteRecord(competition); err != nil {
+		if err := txDao.Delete(competition); err != nil {
 			return err
 		}
 	}
@@ -220,20 +218,20 @@ func deleteMergedCompetitions(mergeGroup []*models.Record, mergeTarget *models.R
 }
 
 // Remove the given category ("ageGroup" or "playingLevel") from the competitions
-func removeCategoryFromCompetitions(competitions []*models.Record, category string) {
+func removeCategoryFromCompetitions(competitions []*core.Record, category string) {
 	for _, competition := range competitions {
 		competition.Set(category, nil)
 	}
 }
 
 func addCategoryToCompetitions(
-	competitions []*models.Record,
+	competitions []*core.Record,
 	category string,
 	categoryCollectionName string,
-	dao *daos.Dao,
+	dao core.App,
 ) error {
 	collectionFetch := dao.RecordQuery(categoryCollectionName).Limit(1)
-	var firstCategory *models.Record
+	var firstCategory *core.Record
 	if err := collectionFetch.One(&firstCategory); err != nil {
 		return err
 	}
@@ -260,21 +258,21 @@ type CompetitionGroup struct {
 // Groups the given competitions into those of the same discipline
 // and optionally of the the category in the given categorization ("ageGroup" or "playingLevel").
 // Leave the categorization string empty to not take category into account.
-func GroupCompetitions(competitions []*models.Record, categorization string) [][]*models.Record {
-	disciplineMap := make(map[CompetitionGroup][]*models.Record)
+func GroupCompetitions(competitions []*core.Record, categorization string) [][]*core.Record {
+	disciplineMap := make(map[CompetitionGroup][]*core.Record)
 
 	for _, competition := range competitions {
 		category := GroupOfCompetition(competition, categorization)
 
 		_, exists := disciplineMap[category]
 		if !exists {
-			disciplineMap[category] = make([]*models.Record, 0, 3)
+			disciplineMap[category] = make([]*core.Record, 0, 3)
 		}
 
 		disciplineMap[category] = append(disciplineMap[category], competition)
 	}
 
-	competitionGroups := make([][]*models.Record, 0, len(disciplineMap))
+	competitionGroups := make([][]*core.Record, 0, len(disciplineMap))
 	for _, group := range disciplineMap {
 		competitionGroups = append(competitionGroups, group)
 	}
@@ -284,7 +282,7 @@ func GroupCompetitions(competitions []*models.Record, categorization string) [][
 
 // Returns the group that the given competition belongs to.
 // By giving a categorization of "playingLevel" or "ageGroup" the group will also adhere to that.
-func GroupOfCompetition(competition *models.Record, categorization string) CompetitionGroup {
+func GroupOfCompetition(competition *core.Record, categorization string) CompetitionGroup {
 	genderCategory := competition.GetString(names.Fields.Competitions.GenderCategory)
 	teamSize := competition.GetInt(names.Fields.Competitions.TeamSize)
 
@@ -297,7 +295,7 @@ func GroupOfCompetition(competition *models.Record, categorization string) Compe
 		competitionType = "doubles"
 	}
 
-	var categoryRecord *models.Record = competition.ExpandedOne(categorization)
+	var categoryRecord *core.Record = competition.ExpandedOne(categorization)
 	var category string
 	switch categoryRecord {
 	case nil:
@@ -317,7 +315,7 @@ func GroupOfCompetition(competition *models.Record, categorization string) Compe
 
 // Returns the one competition in a group of competitions that the others should
 // be merged into.
-func getMergeTarget(competitions []*models.Record) *models.Record {
+func getMergeTarget(competitions []*core.Record) *core.Record {
 	if len(competitions) == 1 {
 		return competitions[0]
 	}
@@ -345,14 +343,14 @@ func getMergeTarget(competitions []*models.Record) *models.Record {
 // 2. List of teams that need to newly created
 // 3. List of teams that need to be deleted
 func mergeRegistrations(
-	competitions []*models.Record,
-	mergeTarget *models.Record,
-) ([]*models.Record, []*models.Record, []*models.Record) {
-	var allTeams []*models.Record = mergeTarget.ExpandedAll(names.Fields.Competitions.Registrations)
+	competitions []*core.Record,
+	mergeTarget *core.Record,
+) ([]*core.Record, []*core.Record, []*core.Record) {
+	var allTeams []*core.Record = mergeTarget.ExpandedAll(names.Fields.Competitions.Registrations)
 
-	adoptedTeams := []*models.Record{}
-	newTeams := []*models.Record{}
-	deletedTeams := []*models.Record{}
+	adoptedTeams := []*core.Record{}
+	newTeams := []*core.Record{}
+	deletedTeams := []*core.Record{}
 
 	if len(allTeams) == 0 {
 		return adoptedTeams, newTeams, deletedTeams
@@ -369,10 +367,10 @@ func mergeRegistrations(
 	}
 
 	// Initially all teams and players are unadopted
-	unadoptedTeamSet := make(map[*models.Record]struct{}, len(allTeams))
+	unadoptedTeamSet := make(map[*core.Record]struct{}, len(allTeams))
 
-	unadoptedPlayerSet := make(map[*models.Record]struct{}, len(allTeams))
-	adoptedPlayerSet := make(map[*models.Record]struct{}, len(allTeams))
+	unadoptedPlayerSet := make(map[*core.Record]struct{}, len(allTeams))
+	adoptedPlayerSet := make(map[*core.Record]struct{}, len(allTeams))
 
 	for _, team := range allTeams {
 		unadoptedTeamSet[team] = struct{}{}
@@ -406,10 +404,10 @@ func mergeRegistrations(
 
 	// Second pass: Create a new team for each player that was not adopted
 	// in the first pass.
-	var teamCollection *models.Collection = allTeams[0].Collection()
+	var teamCollection *core.Collection = allTeams[0].Collection()
 	for player := range unadoptedPlayerSet {
-		newTeam := models.NewRecord(teamCollection)
-		newTeam.Set("players", []*models.Record{player})
+		newTeam := core.NewRecord(teamCollection)
+		newTeam.Set("players", []*core.Record{player})
 		newTeams = append(newTeams, newTeam)
 	}
 
@@ -421,15 +419,15 @@ func mergeRegistrations(
 	return adoptedTeams, newTeams, deletedTeams
 }
 
-func mergeCompetitionGroup(mergeGroup []*models.Record, mergeTarget *models.Record, dao *daos.Dao) error {
-	return dao.RunInTransaction(func(txDao *daos.Dao) error {
+func mergeCompetitionGroup(mergeGroup []*core.Record, mergeTarget *core.Record, dao core.App) error {
+	return dao.RunInTransaction(func(txDao core.App) error {
 
-		var adoptedTeams, newTeams, deletedTeams []*models.Record = mergeRegistrations(mergeGroup, mergeTarget)
+		var adoptedTeams, newTeams, deletedTeams []*core.Record = mergeRegistrations(mergeGroup, mergeTarget)
 
-		if err := ProcessRecords(newTeams, txDao.SaveRecord); err != nil {
+		if err := ProcessAsModels(newTeams, txDao.Save); err != nil {
 			return err
 		}
-		if err := ProcessRecords(deletedTeams, txDao.DeleteRecord); err != nil {
+		if err := ProcessAsModels(deletedTeams, txDao.Delete); err != nil {
 			return err
 		}
 
@@ -442,7 +440,7 @@ func mergeCompetitionGroup(mergeGroup []*models.Record, mergeTarget *models.Reco
 		}
 		mergeTarget.Set(names.Fields.Competitions.Registrations, updatedRegistrations)
 
-		if err := txDao.SaveRecord(mergeTarget); err != nil {
+		if err := txDao.Save(mergeTarget); err != nil {
 			return err
 		}
 		if err := deleteMergedCompetitions(mergeGroup, mergeTarget, txDao); err != nil {
@@ -455,7 +453,7 @@ func mergeCompetitionGroup(mergeGroup []*models.Record, mergeTarget *models.Reco
 
 // Returns what type of category the given model represents.
 // Either "ageGroup" or "playingLevel"
-func getTypeOfCategory(category *models.Record) string {
+func getTypeOfCategory(category *core.Record) string {
 	switch category.Collection().Name {
 	case names.Collections.PlayingLevels:
 		return names.Fields.Competitions.PlayingLevel
@@ -468,7 +466,7 @@ func getTypeOfCategory(category *models.Record) string {
 
 // Returns the oppositre ("ageGroup" or "playingLevel") of
 // what the given category is.
-func getInvertedTypeOfCategory(category *models.Record) string {
+func getInvertedTypeOfCategory(category *core.Record) string {
 	switch category.Collection().Name {
 	case names.Collections.PlayingLevels:
 		return names.Fields.Competitions.AgeGroup
@@ -481,7 +479,7 @@ func getInvertedTypeOfCategory(category *models.Record) string {
 
 // Returns what the name of the option for the category the given model represents.
 // Either "useAgeGroups" or "usePlayingLevels"
-func getOptionNameOfCategory(category *models.Record) string {
+func getOptionNameOfCategory(category *core.Record) string {
 	switch category.Collection().Name {
 	case names.Collections.PlayingLevels:
 		return names.Fields.Tournaments.UsePlayingLevels
@@ -492,8 +490,8 @@ func getOptionNameOfCategory(category *models.Record) string {
 	return ""
 }
 
-func GetCompetitionsOfCategory(competitions []*models.Record, category *models.Record) []*models.Record {
-	competitionsOfCategory := make([]*models.Record, 0, 2)
+func GetCompetitionsOfCategory(competitions []*core.Record, category *core.Record) []*core.Record {
+	competitionsOfCategory := make([]*core.Record, 0, 2)
 
 	var categoryType string = getTypeOfCategory(category)
 

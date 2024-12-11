@@ -6,18 +6,17 @@ import (
 
 	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
 
-	"github.com/labstack/echo/v5"
-	"github.com/pocketbase/pocketbase/daos"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // GetTournamentOrganizerExists handles GET requests to the /api/ezbadminton/tournament_organizer/exists route.
 // It returns a JSON object with the "OrganizerUserExists" field telling wether a
 // tournament organizer user is already registered or not.
-func GetTournamentOrganizerExists(c echo.Context, dao *daos.Dao) error {
+func GetTournamentOrganizerExists(e *core.RequestEvent, dao core.App) error {
 	exists, err := tournamentOrganizerExists(dao)
 
 	if err != nil {
-		return c.NoContent(http.StatusInternalServerError)
+		return e.NoContent(http.StatusInternalServerError)
 	}
 
 	response := struct {
@@ -26,10 +25,10 @@ func GetTournamentOrganizerExists(c echo.Context, dao *daos.Dao) error {
 		OrganizerUserExists: exists,
 	}
 
-	return c.JSON(http.StatusOK, response)
+	return e.JSON(http.StatusOK, response)
 }
 
-func HandleBeforeTournamentOrganizerCreate(dao *daos.Dao) error {
+func HandleBeforeTournamentOrganizerCreate(dao core.App) error {
 	exists, err := tournamentOrganizerExists(dao)
 	if err != nil {
 		return err
@@ -43,7 +42,7 @@ func HandleBeforeTournamentOrganizerCreate(dao *daos.Dao) error {
 }
 
 // Returns wether a tournament organizer user exists
-func tournamentOrganizerExists(dao *daos.Dao) (bool, error) {
+func tournamentOrganizerExists(dao core.App) (bool, error) {
 	var count int
 
 	err := dao.DB().NewQuery("SELECT COUNT(*) FROM " + names.Collections.TournamentOrganizer).Row(&count)

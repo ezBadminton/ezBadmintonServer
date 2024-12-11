@@ -4,14 +4,13 @@ import (
 	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
 
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // HandleBeforeGymnasiumDelete deletes the courts of a gymnasium before the gymnasium is deleted
-func HandleBeforeGymnasiumDelete(deletedGym *models.Record, dao *daos.Dao) error {
-	return dao.RunInTransaction(func(txDao *daos.Dao) error {
-		courtsOfGym := make([]*models.Record, 0, 6)
+func HandleBeforeGymnasiumDelete(deletedGym *core.Record, dao core.App) error {
+	return dao.RunInTransaction(func(txDao core.App) error {
+		courtsOfGym := make([]*core.Record, 0, 6)
 
 		err := txDao.
 			RecordQuery(names.Collections.Courts).
@@ -27,7 +26,7 @@ func HandleBeforeGymnasiumDelete(deletedGym *models.Record, dao *daos.Dao) error
 			courtIds = append(courtIds, court.Id)
 		}
 
-		if err := DeleteRecordsById(names.Collections.Courts, courtIds, txDao); err != nil {
+		if err := DeleteModelsById(names.Collections.Courts, courtIds, txDao); err != nil {
 			return err
 		}
 

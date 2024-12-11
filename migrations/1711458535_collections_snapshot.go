@@ -1,1267 +1,2445 @@
 package migrations
 
 import (
-	"encoding/json"
-
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/daos"
+	"github.com/pocketbase/pocketbase/core"
 	m "github.com/pocketbase/pocketbase/migrations"
-	"github.com/pocketbase/pocketbase/models"
 )
 
 func init() {
-	m.Register(func(db dbx.Builder) error {
+	m.Register(func(app core.App) error {
 		jsonData := `[
 			{
-				"id": "_pb_users_auth_",
-				"created": "2023-05-03 13:58:52.695Z",
-				"updated": "2023-05-03 15:42:26.970Z",
-				"name": "users",
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text455797646",
+						"max": 0,
+						"min": 0,
+						"name": "collectionRef",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text127846527",
+						"max": 0,
+						"min": 0,
+						"name": "recordRef",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1582905952",
+						"max": 0,
+						"min": 0,
+						"name": "method",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_2279338944",
+				"indexes": [
+					"CREATE INDEX ` + "`" + `idx_mfas_collectionRef_recordRef` + "`" + ` ON ` + "`" + `_mfas` + "`" + ` (collectionRef,recordRef)"
+				],
+				"listRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId",
+				"name": "_mfas",
+				"system": true,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId"
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text455797646",
+						"max": 0,
+						"min": 0,
+						"name": "collectionRef",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text127846527",
+						"max": 0,
+						"min": 0,
+						"name": "recordRef",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cost": 8,
+						"hidden": true,
+						"id": "password901924565",
+						"max": 0,
+						"min": 0,
+						"name": "password",
+						"pattern": "",
+						"presentable": false,
+						"required": true,
+						"system": true,
+						"type": "password"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": true,
+						"id": "text3866985172",
+						"max": 0,
+						"min": 0,
+						"name": "sentTo",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_1638494021",
+				"indexes": [
+					"CREATE INDEX ` + "`" + `idx_otps_collectionRef_recordRef` + "`" + ` ON ` + "`" + `_otps` + "`" + ` (collectionRef, recordRef)"
+				],
+				"listRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId",
+				"name": "_otps",
+				"system": true,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId"
+			},
+			{
+				"createRule": null,
+				"deleteRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text455797646",
+						"max": 0,
+						"min": 0,
+						"name": "collectionRef",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text127846527",
+						"max": 0,
+						"min": 0,
+						"name": "recordRef",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text2462348188",
+						"max": 0,
+						"min": 0,
+						"name": "provider",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1044722854",
+						"max": 0,
+						"min": 0,
+						"name": "providerId",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_2281828961",
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_externalAuths_record_provider` + "`" + ` ON ` + "`" + `_externalAuths` + "`" + ` (collectionRef, recordRef, provider)",
+					"CREATE UNIQUE INDEX ` + "`" + `idx_externalAuths_collection_provider` + "`" + ` ON ` + "`" + `_externalAuths` + "`" + ` (collectionRef, provider, providerId)"
+				],
+				"listRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId",
+				"name": "_externalAuths",
+				"system": true,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId"
+			},
+			{
+				"createRule": null,
+				"deleteRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text455797646",
+						"max": 0,
+						"min": 0,
+						"name": "collectionRef",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text127846527",
+						"max": 0,
+						"min": 0,
+						"name": "recordRef",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text4228609354",
+						"max": 0,
+						"min": 0,
+						"name": "fingerprint",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_4275539003",
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_authOrigins_unique_pairs` + "`" + ` ON ` + "`" + `_authOrigins` + "`" + ` (collectionRef, recordRef, fingerprint)"
+				],
+				"listRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId",
+				"name": "_authOrigins",
+				"system": true,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId"
+			},
+			{
+				"authAlert": {
+					"emailTemplate": {
+						"body": "<p>Hello,</p>\n<p>We noticed a login to your {APP_NAME} account from a new location.</p>\n<p>If this was you, you may disregard this email.</p>\n<p><strong>If this wasn't you, you should immediately change your {APP_NAME} account password to revoke access from all other locations.</strong></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+						"subject": "Login from a new location"
+					},
+					"enabled": true
+				},
+				"authRule": "",
+				"authToken": {
+					"duration": 1209600
+				},
+				"confirmEmailChangeTemplate": {
+					"body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Confirm your {APP_NAME} new email address"
+				},
+				"createRule": null,
+				"deleteRule": null,
+				"emailChangeToken": {
+					"duration": 1800
+				},
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cost": 0,
+						"hidden": true,
+						"id": "password901924565",
+						"max": 0,
+						"min": 8,
+						"name": "password",
+						"pattern": "",
+						"presentable": false,
+						"required": true,
+						"system": true,
+						"type": "password"
+					},
+					{
+						"autogeneratePattern": "[a-zA-Z0-9]{50}",
+						"hidden": true,
+						"id": "text2504183744",
+						"max": 60,
+						"min": 30,
+						"name": "tokenKey",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"exceptDomains": null,
+						"hidden": false,
+						"id": "email3885137012",
+						"name": "email",
+						"onlyDomains": null,
+						"presentable": false,
+						"required": true,
+						"system": true,
+						"type": "email"
+					},
+					{
+						"hidden": false,
+						"id": "bool1547992806",
+						"name": "emailVisibility",
+						"presentable": false,
+						"required": false,
+						"system": true,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "bool256245529",
+						"name": "verified",
+						"presentable": false,
+						"required": false,
+						"system": true,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": true,
+						"type": "autodate"
+					}
+				],
+				"fileToken": {
+					"duration": 120
+				},
+				"id": "pbc_3142635823",
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_pbc_3142635823` + "`" + ` ON ` + "`" + `_superusers` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
+					"CREATE UNIQUE INDEX ` + "`" + `idx_email_pbc_3142635823` + "`" + ` ON ` + "`" + `_superusers` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
+				],
+				"listRule": null,
+				"manageRule": null,
+				"mfa": {
+					"duration": 1800,
+					"enabled": false,
+					"rule": ""
+				},
+				"name": "_superusers",
+				"oauth2": {
+					"enabled": false,
+					"mappedFields": {
+						"avatarURL": "",
+						"id": "",
+						"name": "",
+						"username": ""
+					}
+				},
+				"otp": {
+					"duration": 180,
+					"emailTemplate": {
+						"body": "<p>Hello,</p>\n<p>Your one-time password is: <strong>{OTP}</strong></p>\n<p><i>If you didn't ask for the one-time password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+						"subject": "OTP for {APP_NAME}"
+					},
+					"enabled": false,
+					"length": 8
+				},
+				"passwordAuth": {
+					"enabled": true,
+					"identityFields": [
+						"email"
+					]
+				},
+				"passwordResetToken": {
+					"duration": 1800
+				},
+				"resetPasswordTemplate": {
+					"body": "<p>Hello,</p>\n<p>Click on the button below to reset your password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-password-reset/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Reset your {APP_NAME} password"
+				},
+				"system": true,
 				"type": "auth",
-				"system": false,
-				"schema": [
-					{
-						"system": false,
-						"id": "users_name",
-						"name": "name",
-						"type": "text",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
-					}
-				],
-				"indexes": [],
-				"listRule": "id = @request.auth.id",
-				"viewRule": "id = @request.auth.id",
+				"updateRule": null,
+				"verificationTemplate": {
+					"body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Click on the button below to verify your email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Verify</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Verify your {APP_NAME} email"
+				},
+				"verificationToken": {
+					"duration": 259200
+				},
+				"viewRule": null
+			},
+			{
+				"authAlert": {
+					"emailTemplate": {
+						"body": "<p>Hello,</p>\n<p>We noticed a login to your {APP_NAME} account from a new location.</p>\n<p>If this was you, you may disregard this email.</p>\n<p><strong>If this wasn't you, you should immediately change your {APP_NAME} account password to revoke access from all other locations.</strong></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+						"subject": "Login from a new location"
+					},
+					"enabled": true
+				},
+				"authRule": "",
+				"authToken": {
+					"duration": 1209600
+				},
+				"confirmEmailChangeTemplate": {
+					"body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Confirm your {APP_NAME} new email address"
+				},
 				"createRule": "",
-				"updateRule": "id = @request.auth.id",
 				"deleteRule": "id = @request.auth.id",
-				"options": {
-					"allowEmailAuth": true,
-					"allowOAuth2Auth": true,
-					"allowUsernameAuth": true,
-					"exceptEmailDomains": null,
-					"manageRule": null,
-					"minPasswordLength": 8,
-					"onlyEmailDomains": null,
-					"onlyVerified": false,
-					"requireEmail": false
-				}
-			},
-			{
-				"id": "2z10pbo7szq8uls",
-				"created": "2023-05-03 15:21:23.332Z",
-				"updated": "2024-03-26 13:05:44.817Z",
-				"name": "playing_levels",
-				"type": "base",
-				"system": false,
-				"schema": [
+				"emailChangeToken": {
+					"duration": 1800
+				},
+				"fields": [
 					{
-						"system": false,
-						"id": "ttoom0cv",
-						"name": "name",
-						"type": "text",
-						"required": false,
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
 					},
 					{
-						"system": false,
-						"id": "fusz5bpd",
-						"name": "index",
-						"type": "number",
-						"required": false,
+						"cost": 10,
+						"hidden": true,
+						"id": "password901924565",
+						"max": 0,
+						"min": 8,
+						"name": "password",
+						"pattern": "",
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": true,
+						"system": true,
+						"type": "password"
+					},
+					{
+						"autogeneratePattern": "[a-zA-Z0-9_]{50}",
+						"hidden": true,
+						"id": "text2504183744",
+						"max": 60,
+						"min": 30,
+						"name": "tokenKey",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"exceptDomains": null,
+						"hidden": false,
+						"id": "email3885137012",
+						"name": "email",
+						"onlyDomains": null,
+						"presentable": false,
+						"required": false,
+						"system": true,
+						"type": "email"
+					},
+					{
+						"hidden": false,
+						"id": "bool1547992806",
+						"name": "emailVisibility",
+						"presentable": false,
+						"required": false,
+						"system": true,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "bool256245529",
+						"name": "verified",
+						"presentable": false,
+						"required": false,
+						"system": true,
+						"type": "bool"
+					},
+					{
+						"autogeneratePattern": "users[0-9]{6}",
+						"hidden": false,
+						"id": "text4166911607",
+						"max": 150,
+						"min": 3,
+						"name": "username",
+						"pattern": "^[\\w][\\w\\.\\-]*$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1579384326",
+						"max": 0,
+						"min": 0,
+						"name": "name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
 					}
 				],
-				"indexes": [],
-				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
-				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
+				"fileToken": {
+					"duration": 120
+				},
+				"id": "_pb_users_auth_",
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `__pb_users_auth__username_idx` + "`" + ` ON ` + "`" + `users` + "`" + ` (username COLLATE NOCASE)",
+					"CREATE UNIQUE INDEX ` + "`" + `__pb_users_auth__email_idx` + "`" + ` ON ` + "`" + `users` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''",
+					"CREATE UNIQUE INDEX ` + "`" + `__pb_users_auth__tokenKey_idx` + "`" + ` ON ` + "`" + `users` + "`" + ` (` + "`" + `tokenKey` + "`" + `)"
+				],
+				"listRule": "id = @request.auth.id",
+				"manageRule": null,
+				"mfa": {
+					"duration": 1800,
+					"enabled": false,
+					"rule": ""
+				},
+				"name": "users",
+				"oauth2": {
+					"enabled": false,
+					"mappedFields": {
+						"avatarURL": "",
+						"id": "",
+						"name": "",
+						"username": "username"
+					}
+				},
+				"otp": {
+					"duration": 180,
+					"emailTemplate": {
+						"body": "<p>Hello,</p>\n<p>Your one-time password is: <strong>{OTP}</strong></p>\n<p><i>If you didn't ask for the one-time password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+						"subject": "OTP for {APP_NAME}"
+					},
+					"enabled": false,
+					"length": 8
+				},
+				"passwordAuth": {
+					"enabled": true,
+					"identityFields": [
+						"email",
+						"username"
+					]
+				},
+				"passwordResetToken": {
+					"duration": 1800
+				},
+				"resetPasswordTemplate": {
+					"body": "<p>Hello,</p>\n<p>Click on the button below to reset your password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-password-reset/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Reset your {APP_NAME} password"
+				},
+				"system": false,
+				"type": "auth",
+				"updateRule": "id = @request.auth.id",
+				"verificationTemplate": {
+					"body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Click on the button below to verify your email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Verify</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Verify your {APP_NAME} email"
+				},
+				"verificationToken": {
+					"duration": 604800
+				},
+				"viewRule": "id = @request.auth.id"
 			},
 			{
-				"id": "pv9k4urq0k1cmlu",
-				"created": "2023-05-03 15:21:56.473Z",
-				"updated": "2024-03-26 13:04:40.091Z",
-				"name": "clubs",
-				"type": "base",
-				"system": false,
-				"schema": [
+				"authAlert": {
+					"emailTemplate": {
+						"body": "<p>Hello,</p>\n<p>We noticed a login to your {APP_NAME} account from a new location.</p>\n<p>If this was you, you may disregard this email.</p>\n<p><strong>If this wasn't you, you should immediately change your {APP_NAME} account password to revoke access from all other locations.</strong></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+						"subject": "Login from a new location"
+					},
+					"enabled": true
+				},
+				"authRule": "",
+				"authToken": {
+					"duration": 1209600
+				},
+				"confirmEmailChangeTemplate": {
+					"body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Confirm your {APP_NAME} new email address"
+				},
+				"createRule": null,
+				"deleteRule": null,
+				"emailChangeToken": {
+					"duration": 1800
+				},
+				"fields": [
 					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cost": 10,
+						"hidden": true,
+						"id": "password901924565",
+						"max": 0,
+						"min": 5,
+						"name": "password",
+						"pattern": "",
+						"presentable": false,
+						"required": true,
+						"system": true,
+						"type": "password"
+					},
+					{
+						"autogeneratePattern": "[a-zA-Z0-9_]{50}",
+						"hidden": true,
+						"id": "text2504183744",
+						"max": 60,
+						"min": 30,
+						"name": "tokenKey",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"exceptDomains": null,
+						"hidden": false,
+						"id": "email3885137012",
+						"name": "email",
+						"onlyDomains": null,
+						"presentable": false,
+						"required": false,
+						"system": true,
+						"type": "email"
+					},
+					{
+						"hidden": false,
+						"id": "bool1547992806",
+						"name": "emailVisibility",
+						"presentable": false,
+						"required": false,
+						"system": true,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "bool256245529",
+						"name": "verified",
+						"presentable": false,
+						"required": false,
+						"system": true,
+						"type": "bool"
+					},
+					{
+						"autogeneratePattern": "users[0-9]{6}",
+						"hidden": false,
+						"id": "text4166911607",
+						"max": 150,
+						"min": 3,
+						"name": "username",
+						"pattern": "^[\\w][\\w\\.\\-]*$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
 						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"fileToken": {
+					"duration": 120
+				},
+				"id": "ezgnh50u37m74hc",
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `_ezgnh50u37m74hc_username_idx` + "`" + ` ON ` + "`" + `tournament_organizer` + "`" + ` (username COLLATE NOCASE)",
+					"CREATE UNIQUE INDEX ` + "`" + `_ezgnh50u37m74hc_email_idx` + "`" + ` ON ` + "`" + `tournament_organizer` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''",
+					"CREATE UNIQUE INDEX ` + "`" + `_ezgnh50u37m74hc_tokenKey_idx` + "`" + ` ON ` + "`" + `tournament_organizer` + "`" + ` (` + "`" + `tokenKey` + "`" + `)"
+				],
+				"listRule": null,
+				"manageRule": null,
+				"mfa": {
+					"duration": 1800,
+					"enabled": false,
+					"rule": ""
+				},
+				"name": "tournament_organizer",
+				"oauth2": {
+					"enabled": false,
+					"mappedFields": {
+						"avatarURL": "",
+						"id": "",
+						"name": "",
+						"username": "username"
+					}
+				},
+				"otp": {
+					"duration": 180,
+					"emailTemplate": {
+						"body": "<p>Hello,</p>\n<p>Your one-time password is: <strong>{OTP}</strong></p>\n<p><i>If you didn't ask for the one-time password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+						"subject": "OTP for {APP_NAME}"
+					},
+					"enabled": false,
+					"length": 8
+				},
+				"passwordAuth": {
+					"enabled": true,
+					"identityFields": [
+						"username"
+					]
+				},
+				"passwordResetToken": {
+					"duration": 1800
+				},
+				"resetPasswordTemplate": {
+					"body": "<p>Hello,</p>\n<p>Click on the button below to reset your password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-password-reset/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Reset your {APP_NAME} password"
+				},
+				"system": false,
+				"type": "auth",
+				"updateRule": null,
+				"verificationTemplate": {
+					"body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Click on the button below to verify your email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Verify</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+					"subject": "Verify your {APP_NAME} email"
+				},
+				"verificationToken": {
+					"duration": 604800
+				},
+				"viewRule": null
+			},
+			{
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "3simhxz8",
+						"max": null,
+						"min": null,
+						"name": "age",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "rgspvmhi",
+						"maxSelect": 1,
+						"name": "type",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"over",
+							"under"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "25ej3p66dvflsof",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "age_groups",
+				"system": false,
+				"type": "base",
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
 						"id": "fgvy8m6q",
+						"max": 0,
+						"min": 0,
 						"name": "name",
-						"type": "text",
-						"required": false,
+						"pattern": "",
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
 					}
 				],
+				"id": "pv9k4urq0k1cmlu",
 				"indexes": [],
 				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
+				"name": "clubs",
+				"system": false,
+				"type": "base",
 				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
+				"viewRule": "@request.auth.id != \"\""
 			},
 			{
-				"id": "qdgmvu6tof46nwd",
-				"created": "2023-05-03 15:23:40.763Z",
-				"updated": "2024-03-26 13:05:37.618Z",
-				"name": "players",
-				"type": "base",
-				"system": false,
-				"schema": [
-					{
-						"system": false,
-						"id": "htf3qrnh",
-						"name": "firstName",
-						"type": "text",
-						"required": true,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
-					},
-					{
-						"system": false,
-						"id": "3nxbaf5d",
-						"name": "lastName",
-						"type": "text",
-						"required": true,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
-					},
-					{
-						"system": false,
-						"id": "1xaqf016",
-						"name": "notes",
-						"type": "text",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
-					},
-					{
-						"system": false,
-						"id": "wdqg1c2b",
-						"name": "status",
-						"type": "select",
-						"required": true,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"maxSelect": 1,
-							"values": [
-								"notAttending",
-								"attending",
-								"injured",
-								"forfeited",
-								"disqualified"
-							]
-						}
-					},
-					{
-						"system": false,
-						"id": "3g6uchnu",
-						"name": "club",
-						"type": "relation",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "pv9k4urq0k1cmlu",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": 1,
-							"displayFields": []
-						}
-					}
-				],
-				"indexes": [],
-				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
 				"createRule": "@request.auth.id != \"\"",
-				"updateRule": "@request.auth.id != \"\"",
 				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
-			},
-			{
-				"id": "xq7lqom9imfoxlx",
-				"created": "2023-05-03 15:25:26.590Z",
-				"updated": "2024-03-26 13:04:49.936Z",
-				"name": "competitions",
-				"type": "base",
-				"system": false,
-				"schema": [
+				"fields": [
 					{
-						"system": false,
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
 						"id": "bz0r6hux",
+						"max": null,
+						"min": null,
 						"name": "teamSize",
-						"type": "number",
-						"required": true,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": true,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "mzcn647e",
+						"maxSelect": 1,
 						"name": "genderCategory",
-						"type": "select",
-						"required": true,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"maxSelect": 1,
-							"values": [
-								"female",
-								"male",
-								"mixed",
-								"any"
-							]
-						}
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"female",
+							"male",
+							"mixed",
+							"any"
+						]
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "25ej3p66dvflsof",
+						"hidden": false,
 						"id": "sjdif5s5",
+						"maxSelect": 1,
+						"minSelect": 0,
 						"name": "ageGroup",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "25ej3p66dvflsof",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": 1,
-							"displayFields": []
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "2z10pbo7szq8uls",
+						"hidden": false,
 						"id": "vw8iepaf",
+						"maxSelect": 1,
+						"minSelect": 0,
 						"name": "playingLevel",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "2z10pbo7szq8uls",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": 1,
-							"displayFields": []
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "rvbyk7qe1ac5r5d",
+						"hidden": false,
 						"id": "vcxdr13t",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
 						"name": "registrations",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "rvbyk7qe1ac5r5d",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": []
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "plqd8h814nig6ab",
+						"hidden": false,
 						"id": "juj3jvkt",
+						"maxSelect": 1,
+						"minSelect": 0,
 						"name": "tournamentModeSettings",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "plqd8h814nig6ab",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": 1,
-							"displayFields": []
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "rvbyk7qe1ac5r5d",
+						"hidden": false,
 						"id": "r3k3bgq3",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
 						"name": "seeds",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "rvbyk7qe1ac5r5d",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": []
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "rvbyk7qe1ac5r5d",
+						"hidden": false,
 						"id": "a7bpvobq",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
 						"name": "draw",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "rvbyk7qe1ac5r5d",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": []
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "acp4mh96d5gjfgn",
+						"hidden": false,
 						"id": "endvbim6",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
 						"name": "matches",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "acp4mh96d5gjfgn",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": null
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "n1ajffmo0whdfm4",
+						"hidden": false,
 						"id": "vmj1xdzz",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
 						"name": "tieBreakers",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "n1ajffmo0whdfm4",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": null
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "rphgvzxq",
+						"max": null,
+						"min": null,
 						"name": "rngSeed",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
 					}
 				],
+				"id": "xq7lqom9imfoxlx",
 				"indexes": [],
 				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
+				"name": "competitions",
+				"system": false,
+				"type": "base",
 				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
+				"viewRule": "@request.auth.id != \"\""
 			},
 			{
-				"id": "vzoa6n7gmcfcwfn",
-				"created": "2023-05-03 15:28:39.844Z",
-				"updated": "2024-03-26 13:05:29.380Z",
-				"name": "player_follows",
-				"type": "base",
-				"system": false,
-				"schema": [
-					{
-						"system": false,
-						"id": "d2pedulj",
-						"name": "user",
-						"type": "relation",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "_pb_users_auth_",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": 1,
-							"displayFields": []
-						}
-					},
-					{
-						"system": false,
-						"id": "bvte5sjz",
-						"name": "player",
-						"type": "relation",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "qdgmvu6tof46nwd",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": 1,
-							"displayFields": []
-						}
-					},
-					{
-						"system": false,
-						"id": "hdvkxtuf",
-						"name": "subscriptions",
-						"type": "select",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"maxSelect": 2,
-							"values": [
-								"callOuts",
-								"results"
-							]
-						}
-					}
-				],
-				"indexes": [],
-				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
 				"createRule": "@request.auth.id != \"\"",
-				"updateRule": "@request.auth.id != \"\"",
 				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
-			},
-			{
-				"id": "rvbyk7qe1ac5r5d",
-				"created": "2023-05-03 15:30:23.644Z",
-				"updated": "2024-03-26 13:05:51.684Z",
-				"name": "teams",
-				"type": "base",
-				"system": false,
-				"schema": [
+				"fields": [
 					{
-						"system": false,
-						"id": "0wto0qlf",
-						"name": "players",
-						"type": "relation",
-						"required": false,
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "qdgmvu6tof46nwd",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": []
-						}
-					},
-					{
-						"system": false,
-						"id": "bb00m8cs",
-						"name": "resigned",
-						"type": "bool",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {}
-					}
-				],
-				"indexes": [],
-				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
-				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
-			},
-			{
-				"id": "1lafq4a6mjxsbip",
-				"created": "2023-05-03 15:35:42.814Z",
-				"updated": "2024-03-26 13:05:06.077Z",
-				"name": "gymnasiums",
-				"type": "base",
-				"system": false,
-				"schema": [
-					{
-						"system": false,
-						"id": "nfn99esk",
-						"name": "name",
-						"type": "text",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
-					},
-					{
-						"system": false,
-						"id": "kn9y35ln",
-						"name": "directions",
-						"type": "editor",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"convertUrls": false
-						}
-					},
-					{
-						"system": false,
-						"id": "zwjbzagg",
-						"name": "rows",
-						"type": "number",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
-					},
-					{
-						"system": false,
-						"id": "ywguxnvl",
-						"name": "columns",
-						"type": "number",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
-					}
-				],
-				"indexes": [],
-				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
-				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
-			},
-			{
-				"id": "1q6094tmbeif68j",
-				"created": "2023-05-03 15:36:46.109Z",
-				"updated": "2024-03-26 13:04:57.723Z",
-				"name": "courts",
-				"type": "base",
-				"system": false,
-				"schema": [
-					{
-						"system": false,
-						"id": "xv2qlej5",
-						"name": "gymnasium",
-						"type": "relation",
+						"primaryKey": true,
 						"required": true,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "1lafq4a6mjxsbip",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": 1,
-							"displayFields": []
-						}
+						"system": true,
+						"type": "text"
 					},
 					{
+						"cascadeDelete": false,
+						"collectionId": "1lafq4a6mjxsbip",
+						"hidden": false,
+						"id": "xv2qlej5",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "gymnasium",
+						"presentable": false,
+						"required": true,
 						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
 						"id": "ykbe84ja",
+						"max": 0,
+						"min": 0,
 						"name": "name",
-						"type": "text",
-						"required": false,
+						"pattern": "",
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "epekugmf",
+						"max": null,
+						"min": null,
 						"name": "positionX",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "pfpczfml",
+						"max": null,
+						"min": null,
 						"name": "positionY",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "ylhcxoir",
 						"name": "isActive",
-						"type": "bool",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {}
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
 					}
 				],
+				"id": "1q6094tmbeif68j",
 				"indexes": [],
 				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
+				"name": "courts",
+				"system": false,
+				"type": "base",
 				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
+				"viewRule": "@request.auth.id != \"\""
 			},
 			{
-				"id": "acp4mh96d5gjfgn",
-				"created": "2023-05-03 15:39:25.226Z",
-				"updated": "2024-03-26 13:05:12.117Z",
-				"name": "match_data",
-				"type": "base",
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "nfn99esk",
+						"max": 0,
+						"min": 0,
+						"name": "name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"convertURLs": false,
+						"hidden": false,
+						"id": "kn9y35ln",
+						"maxSize": 0,
+						"name": "directions",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "editor"
+					},
+					{
+						"hidden": false,
+						"id": "zwjbzagg",
+						"max": null,
+						"min": null,
+						"name": "rows",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "ywguxnvl",
+						"max": null,
+						"min": null,
+						"name": "columns",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "1lafq4a6mjxsbip",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "gymnasiums",
 				"system": false,
-				"schema": [
+				"type": "base",
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
 					{
-						"system": false,
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "k2bk1bc253yap4e",
+						"hidden": false,
 						"id": "6lcaaass",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
 						"name": "sets",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "k2bk1bc253yap4e",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": null
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "1q6094tmbeif68j",
+						"hidden": false,
 						"id": "98y5sqfa",
+						"maxSelect": 1,
+						"minSelect": 0,
 						"name": "court",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "1q6094tmbeif68j",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": 1,
-							"displayFields": []
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"cascadeDelete": false,
+						"collectionId": "rvbyk7qe1ac5r5d",
+						"hidden": false,
 						"id": "v1wmkn9j",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
 						"name": "withdrawnTeams",
-						"type": "relation",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "rvbyk7qe1ac5r5d",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": null
-						}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "dwx5bqia",
+						"max": "",
+						"min": "",
 						"name": "startTime",
-						"type": "date",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": "",
-							"max": ""
-						}
+						"required": false,
+						"system": false,
+						"type": "date"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "iiyyhrsm",
+						"max": "",
+						"min": "",
 						"name": "courtAssignmentTime",
-						"type": "date",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": "",
-							"max": ""
-						}
+						"required": false,
+						"system": false,
+						"type": "date"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "jeh4sbka",
+						"max": "",
+						"min": "",
 						"name": "endTime",
-						"type": "date",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": "",
-							"max": ""
-						}
+						"required": false,
+						"system": false,
+						"type": "date"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "wrep7bmf",
+						"maxSelect": 1,
+						"maxSize": 5242880,
+						"mimeTypes": null,
 						"name": "resultCard",
-						"type": "file",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"mimeTypes": [],
-							"thumbs": [],
-							"maxSelect": 1,
-							"maxSize": 5242880,
-							"protected": false
-						}
+						"protected": false,
+						"required": false,
+						"system": false,
+						"thumbs": null,
+						"type": "file"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "9wyx0weh",
 						"name": "gameSheetPrinted",
-						"type": "bool",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {}
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
 					}
 				],
+				"id": "acp4mh96d5gjfgn",
 				"indexes": [],
 				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
+				"name": "match_data",
+				"system": false,
+				"type": "base",
 				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
+				"viewRule": "@request.auth.id != \"\""
 			},
 			{
-				"id": "k2bk1bc253yap4e",
-				"created": "2023-05-03 15:41:09.129Z",
-				"updated": "2024-03-26 13:05:20.332Z",
-				"name": "match_sets",
-				"type": "base",
-				"system": false,
-				"schema": [
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
 					{
-						"system": false,
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
 						"id": "aw1dtot7",
+						"max": null,
+						"min": null,
 						"name": "team1Points",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "9ctgpkyk",
+						"max": null,
+						"min": null,
 						"name": "team2Points",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
-					}
-				],
-				"indexes": [],
-				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
-				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
-			},
-			{
-				"id": "ezgnh50u37m74hc",
-				"created": "2023-05-04 15:30:31.979Z",
-				"updated": "2023-05-06 10:46:17.798Z",
-				"name": "tournament_organizer",
-				"type": "auth",
-				"system": false,
-				"schema": [],
-				"indexes": [],
-				"listRule": null,
-				"viewRule": null,
-				"createRule": "",
-				"updateRule": null,
-				"deleteRule": null,
-				"options": {
-					"allowEmailAuth": false,
-					"allowOAuth2Auth": false,
-					"allowUsernameAuth": true,
-					"exceptEmailDomains": null,
-					"manageRule": null,
-					"minPasswordLength": 5,
-					"onlyEmailDomains": null,
-					"onlyVerified": false,
-					"requireEmail": false
-				}
-			},
-			{
-				"id": "25ej3p66dvflsof",
-				"created": "2023-05-24 17:11:25.945Z",
-				"updated": "2024-03-26 13:04:22.463Z",
-				"name": "age_groups",
-				"type": "base",
-				"system": false,
-				"schema": [
-					{
+						"required": false,
 						"system": false,
-						"id": "3simhxz8",
-						"name": "age",
-						"type": "number",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"type": "number"
 					},
 					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
 						"system": false,
-						"id": "rgspvmhi",
-						"name": "type",
-						"type": "select",
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "k2bk1bc253yap4e",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "match_sets",
+				"system": false,
+				"type": "base",
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
 						"required": true,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"maxSelect": 1,
-							"values": [
-								"over",
-								"under"
-							]
-						}
-					}
-				],
-				"indexes": [],
-				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
-				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
-			},
-			{
-				"id": "ikvf45sbv9bccb2",
-				"created": "2023-06-21 15:09:24.693Z",
-				"updated": "2024-03-26 13:06:16.713Z",
-				"name": "tournaments",
-				"type": "base",
-				"system": false,
-				"schema": [
-					{
-						"system": false,
-						"id": "0hxt4uz5",
-						"name": "title",
-						"type": "text",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"pattern": ""
-						}
+						"system": true,
+						"type": "text"
 					},
 					{
-						"system": false,
-						"id": "1vsznmxg",
-						"name": "useAgeGroups",
-						"type": "bool",
-						"required": false,
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "d2pedulj",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "user",
 						"presentable": false,
-						"unique": false,
-						"options": {}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
-						"id": "bbkvrgd8",
-						"name": "usePlayingLevels",
-						"type": "bool",
-						"required": false,
+						"cascadeDelete": false,
+						"collectionId": "qdgmvu6tof46nwd",
+						"hidden": false,
+						"id": "bvte5sjz",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "player",
 						"presentable": false,
-						"unique": false,
-						"options": {}
+						"required": false,
+						"system": false,
+						"type": "relation"
 					},
 					{
-						"system": false,
-						"id": "wj28qnti",
-						"name": "dontReprintGameSheets",
-						"type": "bool",
-						"required": false,
+						"hidden": false,
+						"id": "hdvkxtuf",
+						"maxSelect": 2,
+						"name": "subscriptions",
 						"presentable": false,
-						"unique": false,
-						"options": {}
-					},
-					{
-						"system": false,
-						"id": "7mei215l",
-						"name": "printQrCodes",
-						"type": "bool",
 						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {}
-					},
-					{
 						"system": false,
-						"id": "4plm5f8q",
-						"name": "playerRestTime",
-						"type": "number",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
-					},
-					{
-						"system": false,
-						"id": "ea0rngxn",
-						"name": "queueMode",
 						"type": "select",
-						"required": true,
+						"values": [
+							"callOuts",
+							"results"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"maxSelect": 1,
-							"values": [
-								"manual",
-								"autoCourtAssignment",
-								"auto"
-							]
-						}
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
 					}
 				],
+				"id": "vzoa6n7gmcfcwfn",
 				"indexes": [],
 				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
+				"name": "player_follows",
+				"system": false,
+				"type": "base",
 				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
+				"viewRule": "@request.auth.id != \"\""
 			},
 			{
-				"id": "plqd8h814nig6ab",
-				"created": "2023-09-03 16:16:19.153Z",
-				"updated": "2024-03-26 13:06:07.728Z",
-				"name": "tournament_mode_settings",
-				"type": "base",
-				"system": false,
-				"schema": [
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
 					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "htf3qrnh",
+						"max": 0,
+						"min": 0,
+						"name": "firstName",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
 						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "3nxbaf5d",
+						"max": 0,
+						"min": 0,
+						"name": "lastName",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "1xaqf016",
+						"max": 0,
+						"min": 0,
+						"name": "notes",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "wdqg1c2b",
+						"maxSelect": 1,
+						"name": "status",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"notAttending",
+							"attending",
+							"injured",
+							"forfeited",
+							"disqualified"
+						]
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pv9k4urq0k1cmlu",
+						"hidden": false,
+						"id": "3g6uchnu",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "club",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "qdgmvu6tof46nwd",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "players",
+				"system": false,
+				"type": "base",
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "ttoom0cv",
+						"max": 0,
+						"min": 0,
+						"name": "name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "fusz5bpd",
+						"max": null,
+						"min": null,
+						"name": "index",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "2z10pbo7szq8uls",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "playing_levels",
+				"system": false,
+				"type": "base",
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "qdgmvu6tof46nwd",
+						"hidden": false,
+						"id": "0wto0qlf",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
+						"name": "players",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "bb00m8cs",
+						"name": "resigned",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "rvbyk7qe1ac5r5d",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "teams",
+				"system": false,
+				"type": "base",
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "rvbyk7qe1ac5r5d",
+						"hidden": false,
+						"id": "ijfxliiy",
+						"maxSelect": 2147483647,
+						"minSelect": 0,
+						"name": "tieBreakerRanking",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "n1ajffmo0whdfm4",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "tie_breakers",
+				"system": false,
+				"type": "base",
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
 						"id": "vzwahdnn",
+						"maxSelect": 1,
 						"name": "type",
-						"type": "select",
-						"required": true,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"maxSelect": 1,
-							"values": [
-								"RoundRobin",
-								"SingleElimination",
-								"GroupKnockout",
-								"DoubleElimination",
-								"SingleEliminationWithConsolation"
-							]
-						}
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"RoundRobin",
+							"SingleElimination",
+							"GroupKnockout",
+							"DoubleElimination",
+							"SingleEliminationWithConsolation"
+						]
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "exwn93lz",
+						"maxSelect": 1,
 						"name": "seedingMode",
-						"type": "select",
+						"presentable": false,
 						"required": true,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"maxSelect": 1,
-							"values": [
-								"random",
-								"single",
-								"tiered"
-							]
-						}
-					},
-					{
 						"system": false,
-						"id": "hztepfsc",
-						"name": "knockOutMode",
 						"type": "select",
-						"required": false,
-						"presentable": false,
-						"unique": false,
-						"options": {
-							"maxSelect": 1,
-							"values": [
-								"single",
-								"double",
-								"consolation"
-							]
-						}
+						"values": [
+							"random",
+							"single",
+							"tiered"
+						]
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "4agzgctg",
+						"max": null,
+						"min": null,
 						"name": "passes",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "pyp8cf3i",
+						"max": null,
+						"min": null,
 						"name": "numGroups",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "8vzehtdb",
-						"name": "numQualifications",
-						"type": "number",
-						"required": false,
+						"max": null,
+						"min": null,
+						"name": "qualificationsPerGroup",
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "7bxj9ern",
+						"max": null,
+						"min": null,
 						"name": "numConsolationRounds",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "9lxglqfe",
+						"max": null,
+						"min": null,
 						"name": "placesToPlayOut",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "htkszfx3",
+						"max": null,
+						"min": null,
 						"name": "winningPoints",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "mlwhvwny",
+						"max": null,
+						"min": null,
 						"name": "winningSets",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "qjece1gs",
+						"max": null,
+						"min": null,
 						"name": "maxPoints",
-						"type": "number",
-						"required": false,
+						"onlyInt": false,
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"min": null,
-							"max": null,
-							"noDecimal": false
-						}
+						"required": false,
+						"system": false,
+						"type": "number"
 					},
 					{
-						"system": false,
+						"hidden": false,
 						"id": "uruqy6s8",
 						"name": "twoPointMargin",
-						"type": "bool",
-						"required": false,
 						"presentable": false,
-						"unique": false,
-						"options": {}
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
 					}
 				],
+				"id": "plqd8h814nig6ab",
 				"indexes": [],
 				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
+				"name": "tournament_mode_settings",
+				"system": false,
+				"type": "base",
 				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
+				"viewRule": "@request.auth.id != \"\""
 			},
 			{
-				"id": "n1ajffmo0whdfm4",
-				"created": "2023-12-12 19:16:40.115Z",
-				"updated": "2024-03-26 13:05:59.391Z",
-				"name": "tie_breakers",
-				"type": "base",
-				"system": false,
-				"schema": [
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
+				"fields": [
 					{
-						"system": false,
-						"id": "ijfxliiy",
-						"name": "tieBreakerRanking",
-						"type": "relation",
-						"required": false,
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
 						"presentable": false,
-						"unique": false,
-						"options": {
-							"collectionId": "rvbyk7qe1ac5r5d",
-							"cascadeDelete": false,
-							"minSelect": null,
-							"maxSelect": null,
-							"displayFields": null
-						}
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "0hxt4uz5",
+						"max": 0,
+						"min": 0,
+						"name": "title",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "1vsznmxg",
+						"name": "useAgeGroups",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "bbkvrgd8",
+						"name": "usePlayingLevels",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "wj28qnti",
+						"name": "dontReprintGameSheets",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "7mei215l",
+						"name": "printQrCodes",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "4plm5f8q",
+						"max": null,
+						"min": null,
+						"name": "playerRestTime",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "ea0rngxn",
+						"maxSelect": 1,
+						"name": "queueMode",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"manual",
+							"autoCourtAssignment",
+							"auto"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
 					}
 				],
+				"id": "ikvf45sbv9bccb2",
 				"indexes": [],
 				"listRule": "@request.auth.id != \"\"",
-				"viewRule": "@request.auth.id != \"\"",
-				"createRule": "@request.auth.id != \"\"",
+				"name": "tournaments",
+				"system": false,
+				"type": "base",
 				"updateRule": "@request.auth.id != \"\"",
-				"deleteRule": "@request.auth.id != \"\"",
-				"options": {}
+				"viewRule": "@request.auth.id != \"\""
 			}
 		]`
 
-		collections := []*models.Collection{}
-		if err := json.Unmarshal([]byte(jsonData), &collections); err != nil {
-			return err
-		}
-
-		return daos.New(db).ImportCollections(collections, true, nil)
-	}, func(db dbx.Builder) error {
+		return app.ImportCollectionsByMarshaledJSON([]byte(jsonData), false)
+	}, func(app core.App) error {
 		return nil
 	})
 }

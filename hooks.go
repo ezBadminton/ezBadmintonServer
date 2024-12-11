@@ -5,63 +5,91 @@ import (
 
 	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
 
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 )
 
 func RegisterHooks(app *pocketbase.PocketBase) {
 
-	app.OnRecordBeforeUpdateRequest(names.Collections.Tournaments).Add(func(e *core.RecordUpdateEvent) error {
-		return OnTournamentSettingsUpdate(e.Record.OriginalCopy(), e.Record, app.Dao())
+	app.OnRecordUpdateRequest(names.Collections.Tournaments).BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := OnTournamentSettingsUpdate(e.Record.Original(), e.Record, app); err != nil {
+			return err
+		}
+		return e.Next()
 	})
 
-	app.OnRecordBeforeDeleteRequest(names.Collections.PlayingLevels, names.Collections.AgeGroups).Add(func(e *core.RecordDeleteEvent) error {
-		replacementCategoryId := e.HttpContext.QueryParamDefault("replacement", "")
+	app.OnRecordDeleteRequest(names.Collections.PlayingLevels, names.Collections.AgeGroups).BindFunc(func(e *core.RecordRequestEvent) error {
+		replacementCategoryId := e.Request.URL.Query().Get("replacement")
 
-		return HandleDeletedCategory(e.Record, replacementCategoryId, app.Dao())
+		if err := HandleDeletedCategory(e.Record, replacementCategoryId, app); err != nil {
+			return err
+		}
+		return e.Next()
 	})
 
-	app.OnRecordBeforeDeleteRequest(names.Collections.Competitions).Add(func(e *core.RecordDeleteEvent) error {
-		return HandleDeletedCompetition(e.Record, app.Dao())
+	app.OnRecordDeleteRequest(names.Collections.Competitions).BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := HandleDeletedCompetition(e.Record, app); err != nil {
+			return err
+		}
+		return e.Next()
 	})
 
-	app.OnRecordBeforeUpdateRequest(names.Collections.Teams).Add(func(e *core.RecordUpdateEvent) error {
-		return HandleUpdatedTeam(e.Record, app.Dao())
+	app.OnRecordUpdateRequest(names.Collections.Teams).BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := HandleUpdatedTeam(e.Record, app); err != nil {
+			return err
+		}
+		return e.Next()
 	})
 
-	app.OnRecordAfterCreateRequest(names.Collections.Teams).Add(func(e *core.RecordCreateEvent) error {
-		competitionId := e.HttpContext.QueryParamDefault("competition", "")
+	app.OnRecordCreateRequest(names.Collections.Teams).BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := e.Next(); err != nil {
+			return err
+		}
 
-		return HandleCreatedTeam(e.Record, competitionId, app.Dao())
+		competitionId := e.Request.URL.Query().Get("competition")
+
+		return HandleCreatedTeam(e.Record, competitionId, app)
 	})
 
-	app.OnRecordAfterUpdateRequest(names.Collections.Competitions).Add(func(e *core.RecordUpdateEvent) error {
-		return HandleAfterCompetitionUpdated(e.Record, e.Record.OriginalCopy(), app.Dao())
+	app.OnRecordUpdateRequest(names.Collections.Competitions).BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := e.Next(); err != nil {
+			return nil
+		}
+		return HandleAfterCompetitionUpdated(e.Record, e.Record.Original(), app)
 	})
 
-	app.OnRecordAfterUpdateRequest(names.Collections.MatchData).Add(func(e *core.RecordUpdateEvent) error {
-		return HandleAfterUpdatedMatch(e.Record, e.Record.OriginalCopy(), app.Dao())
+	app.OnRecordUpdateRequest(names.Collections.MatchData).BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := e.Next(); err != nil {
+			return err
+		}
+		return HandleAfterUpdatedMatch(e.Record, e.Record.Original(), app)
 	})
 
-	app.OnRecordBeforeDeleteRequest(names.Collections.Gymnasiums).Add(func(e *core.RecordDeleteEvent) error {
-		return HandleBeforeGymnasiumDelete(e.Record, app.Dao())
+	app.OnRecordDeleteRequest(names.Collections.Gymnasiums).BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := HandleBeforeGymnasiumDelete(e.Record, app); err != nil {
+			return err
+		}
+		return e.Next()
 	})
 
-	app.OnRecordBeforeCreateRequest(names.Collections.TournamentOrganizer).Add(func(e *core.RecordCreateEvent) error {
-		return HandleBeforeTournamentOrganizerCreate(app.Dao())
+	app.OnRecordCreateRequest(names.Collections.TournamentOrganizer).BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := HandleBeforeTournamentOrganizerCreate(app); err != nil {
+			return err
+		}
+		return e.Next()
 	})
 
-	app.OnModelAfterUpdate(names.Collections.Teams).Add(func(e *core.ModelEvent) error {
-		return HandleAfterUpdatedTeam(e.Model, app.Dao())
+	app.OnRecordUpdate(names.Collections.Teams).BindFunc(func(e *core.RecordEvent) error {
+		if err := e.Next(); err != nil {
+			return err
+		}
+		return HandleAfterUpdatedTeam(e.Record, app)
 	})
 
 	// Register all relation update cascades
-	app.OnBeforeServe().Add(func(_ *core.ServeEvent) error {
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		RegisterRelationUpdateCascade(names.Collections.Competitions, names.Fields.Competitions.PlayingLevel, app)
 		RegisterRelationUpdateCascade(names.Collections.Competitions, names.Fields.Competitions.Matches, app)
 		RegisterRelationUpdateCascade(names.Collections.Competitions, names.Fields.Competitions.TieBreakers, app)
@@ -75,7 +103,7 @@ func RegisterHooks(app *pocketbase.PocketBase) {
 
 		RegisterRelationUpdateCascade(names.Collections.Courts, names.Fields.Courts.Gymnasium, app)
 
-		return nil
+		return e.Next()
 	})
 
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
@@ -87,32 +115,29 @@ func RegisterHooks(app *pocketbase.PocketBase) {
 }
 
 func RegisterRoutes(app *pocketbase.PocketBase) {
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		e.Router.PUT(
 			fmt.Sprintf("/api/ezbadminton/%s", names.Collections.MatchSets),
-			func(c echo.Context) error { return PutMatchResult(c, app.Dao()) },
-			apis.ActivityLogger(app),
-			apis.RequireRecordAuth(),
-		)
+			func(e *core.RequestEvent) error {
+				return PutMatchResult(e, app)
+			},
+		).Bind(apis.RequireAuth())
 
 		e.Router.POST(
 			fmt.Sprintf("/api/ezbadminton/%s", names.Collections.Competitions),
-			func(c echo.Context) error { return PostCompetitionMatches(c, app.Dao()) },
-			apis.ActivityLogger(app),
-			apis.RequireRecordAuth(),
-		)
+			func(e *core.RequestEvent) error { return PostCompetitionMatches(e, app) },
+		).Bind(apis.RequireAuth())
 
 		e.Router.GET(
 			fmt.Sprintf("/api/ezbadminton/%s/exists", names.Collections.TournamentOrganizer),
-			func(c echo.Context) error { return GetTournamentOrganizerExists(c, app.Dao()) },
-			apis.ActivityLogger(app),
+			func(e *core.RequestEvent) error { return GetTournamentOrganizerExists(e, app) },
 		)
 
-		return nil
+		return e.Next()
 	})
 }
 
-func OnTournamentSettingsUpdate(old *models.Record, updated *models.Record, dao *daos.Dao) error {
+func OnTournamentSettingsUpdate(old *core.Record, updated *core.Record, dao core.App) error {
 	oldUseAgeGroups := old.GetBool(names.Fields.Tournaments.UseAgeGroups)
 	updatedUseAgeGroups := updated.GetBool(names.Fields.Tournaments.UseAgeGroups)
 
