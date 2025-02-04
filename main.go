@@ -21,8 +21,8 @@ func main() {
 		"with this option the server terminates itself when the client exits. Only works when the server is a child process of the client.",
 	)
 
-	RegisterHooks(app)
-	RegisterRoutes(app)
+	//RegisterHooks(app)
+	//RegisterRoutes(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {

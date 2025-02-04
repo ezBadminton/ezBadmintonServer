@@ -1,7 +1,8 @@
 package migrations
 
 import (
-	names "github.com/ezBadminton/ezBadmintonServer/schema_names"
+	"github.com/ezBadminton/ezBadmintonServer/collection"
+	. "github.com/ezBadminton/ezBadmintonServer/generated"
 
 	"github.com/pocketbase/pocketbase/core"
 	m "github.com/pocketbase/pocketbase/migrations"
@@ -9,17 +10,19 @@ import (
 
 func init() {
 	m.Register(func(app core.App) error {
-		tournamentCollection, err := app.FindCollectionByNameOrId(names.Collections.Tournaments)
+		cName := collection.Names[collection.Tournaments]
+		tournamentCollection, err := app.FindCollectionByNameOrId(cName)
 		if err != nil {
 			return err
 		}
 
-		tournament := core.NewRecord(tournamentCollection)
-		tournament.Set(names.Fields.Tournaments.Title, "The Tournament")
-		tournament.Set(names.Fields.Tournaments.DontReprintGameSheets, true)
-		tournament.Set(names.Fields.Tournaments.PrintQrCodes, true)
-		tournament.Set(names.Fields.Tournaments.PlayerRestTime, 20)
-		tournament.Set(names.Fields.Tournaments.QueueMode, "manual")
+		tournament := Tournament{}
+		tournament.SetProxyRecord(core.NewRecord(tournamentCollection))
+		tournament.SetTitle("TheTournament")
+		tournament.SetDontReprintGameSheets(true)
+		tournament.SetPrintQrCodes(true)
+		tournament.SetPlayerRestTime(20)
+		tournament.SetQueueMode(Manual)
 
 		return app.Save(tournament)
 	}, func(app core.App) error {
