@@ -2,10 +2,11 @@ package collection
 
 import "github.com/ezBadminton/ezBadmintonServer/generated"
 
-type Enum int
+// Enumeration of all collections
+type CEnum int
 
 const (
-	TournamentOrganizers Enum = iota
+	TournamentOrganizers CEnum = iota
 	AgeGroups
 	Clubs
 	Competitions
@@ -21,7 +22,7 @@ const (
 	Tournaments
 )
 
-var Names = map[Enum]string{
+var Names = map[CEnum]string{
 	TournamentOrganizers:   "tournament_organizer",
 	AgeGroups:              "age_groups",
 	Clubs:                  "clubs",
@@ -38,8 +39,43 @@ var Names = map[Enum]string{
 	Tournaments:            "tournaments",
 }
 
+type relation struct {
+	collection CEnum
+	isMulti    bool
+}
+
+var Relations = map[CEnum]map[string]relation{
+	Competitions: {
+		"ageGroup":               {AgeGroups, false},
+		"playingLevel":           {PlayingLevels, false},
+		"registrations":          {Teams, true},
+		"tournamentModeSettings": {TournamentModeSettings, false},
+		"seeds":                  {Teams, true},
+		"draw":                   {Teams, true},
+		"matches":                {MatchData, true},
+		"tieBreakers":            {TieBreakers, true},
+	},
+	Courts: {
+		"gymnasium": {Gymnasiums, false},
+	},
+	MatchData: {
+		"sets":           {MatchSets, true},
+		"court":          {Courts, false},
+		"withdrawnTeams": {Teams, true},
+	},
+	Players: {
+		"club": {Clubs, false},
+	},
+	Teams: {
+		"players": {Players, true},
+	},
+	TieBreakers: {
+		"tieBreakerRanking": {Teams, true},
+	},
+}
+
 // Returns the collection that a proxy or slice slice of proxies belongs to
-func FromProxy(s any) Enum {
+func FromProxy(s any) CEnum {
 	switch s.(type) {
 	case *generated.TournamentOrganizer, []*generated.TournamentOrganizer, RecordList[*generated.TournamentOrganizer]:
 		return TournamentOrganizers
