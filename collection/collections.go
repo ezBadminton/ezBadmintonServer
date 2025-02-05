@@ -2,49 +2,31 @@ package collection
 
 import "github.com/ezBadminton/ezBadmintonServer/generated"
 
-// Enumeration of all collections
-type CEnum int
-
+// Collection names
 const (
-	TournamentOrganizers CEnum = iota
-	AgeGroups
-	Clubs
-	Competitions
-	Courts
-	Gymnasiums
-	MatchData
-	MatchSets
-	Players
-	PlayingLevels
-	Teams
-	TieBreakers
-	TournamentModeSettings
-	Tournaments
+	TournamentOrganizers   = "tournament_organizer"
+	AgeGroups              = "age_groups"
+	Clubs                  = "clubs"
+	Competitions           = "competitions"
+	Courts                 = "courts"
+	Gymnasiums             = "gymnasiums"
+	MatchData              = "match_data"
+	MatchSets              = "match_sets"
+	Players                = "players"
+	PlayingLevels          = "playing_levels"
+	Teams                  = "teams"
+	TieBreakers            = "tie_breakers"
+	TournamentModeSettings = "tournament_mode_settings"
+	Tournaments            = "tournaments"
 )
 
-var Names = map[CEnum]string{
-	TournamentOrganizers:   "tournament_organizer",
-	AgeGroups:              "age_groups",
-	Clubs:                  "clubs",
-	Competitions:           "competitions",
-	Courts:                 "courts",
-	Gymnasiums:             "gymnasiums",
-	MatchData:              "match_data",
-	MatchSets:              "match_sets",
-	Players:                "players",
-	PlayingLevels:          "playing_levels",
-	Teams:                  "teams",
-	TieBreakers:            "tie_breakers",
-	TournamentModeSettings: "tournament_mode_settings",
-	Tournaments:            "tournaments",
-}
-
 type relation struct {
-	collection CEnum
-	isMulti    bool
+	cName   string
+	isMulti bool
 }
 
-var Relations = map[CEnum]map[string]relation{
+// collection name -> field name -> relation
+var Relations = map[string]map[string]relation{
 	Competitions: {
 		"ageGroup":               {AgeGroups, false},
 		"playingLevel":           {PlayingLevels, false},
@@ -74,8 +56,8 @@ var Relations = map[CEnum]map[string]relation{
 	},
 }
 
-// Returns the collection that a proxy or slice slice of proxies belongs to
-func FromProxy(s any) CEnum {
+// Returns the collection name that a proxy or slice slice of proxies belongs to
+func FromProxy(s any) string {
 	switch s.(type) {
 	case *generated.TournamentOrganizer, []*generated.TournamentOrganizer, RecordList[*generated.TournamentOrganizer]:
 		return TournamentOrganizers

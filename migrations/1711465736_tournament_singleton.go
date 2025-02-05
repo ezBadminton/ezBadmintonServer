@@ -10,8 +10,7 @@ import (
 
 func init() {
 	m.Register(func(app core.App) error {
-		cName := collection.Names[collection.Tournaments]
-		tournamentCollection, err := app.FindCollectionByNameOrId(cName)
+		tournamentCollection, err := app.FindCollectionByNameOrId(collection.Tournaments)
 		if err != nil {
 			return err
 		}
