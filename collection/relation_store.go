@@ -20,8 +20,7 @@ func newRelationStore() *RelationStore {
 	}
 }
 
-func (r *RelationStore) ExpandRelations(records ...core.RecordProxy) error {
-	collectionName := CollectionNameFromProxy(records)
+func (r *RelationStore) ExpandRelations(collectionName string, records ...core.RecordProxy) error {
 	relations := Relations[collectionName]
 
 	for _, record := range records {
@@ -99,6 +98,10 @@ func (r *RelationStore) expandRecordRelations(records []core.RecordProxy, relate
 func (r *RelationStore) expandSingleRelation(record core.RecordProxy, proxyRelations map[string]any, relatedStore RecordStore, relatedFieldName string) error {
 	pRecord := record.ProxyRecord()
 	relatedId := pRecord.GetString(relatedFieldName)
+	if relatedId == "" {
+		return nil
+	}
+
 	relatedRecord, ok := relatedStore.FindRecord(relatedId)
 	if !ok {
 		return errors.New("the related record is not in the store")

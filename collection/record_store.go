@@ -144,7 +144,7 @@ func initStore[P core.RecordProxy](app core.App) error {
 func initRelations() error {
 	for _, store := range stores {
 		records := store.RecordList()
-		if err := relationStore.ExpandRelations(records...); err != nil {
+		if err := relationStore.ExpandRelations(store.CollectionName(), records...); err != nil {
 			return err
 		}
 	}
@@ -174,7 +174,7 @@ func (s *BaseRecordStore[P]) Created(record *core.Record) error {
 
 	s.Store.Set(record.Id, proxy)
 	s.recordList = append(s.recordList, proxy)
-	if err := relationStore.ExpandRelations(proxy); err != nil {
+	if err := relationStore.ExpandRelations(s.collectionName, proxy); err != nil {
 		return err
 	}
 
@@ -188,7 +188,7 @@ func (s *BaseRecordStore[P]) Updated(record *core.Record) error {
 	}
 
 	*proxy.ProxyRecord() = *record
-	if err := relationStore.ExpandRelations(proxy); err != nil {
+	if err := relationStore.ExpandRelations(s.collectionName, proxy); err != nil {
 		return err
 	}
 
