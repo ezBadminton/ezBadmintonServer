@@ -1,6 +1,9 @@
 package collection
 
-import "github.com/ezBadminton/ezBadmintonServer/generated"
+import (
+	"github.com/ezBadminton/ezBadmintonServer/generated"
+	"github.com/pocketbase/pocketbase/core"
+)
 
 // Collection names
 const (
@@ -20,74 +23,110 @@ const (
 	Tournaments            = "tournaments"
 )
 
-type relation struct {
-	cName   string
-	isMulti bool
+type relationField struct {
+	fieldName string
+	isMulti   bool
 }
 
-// collection name -> field name -> relation
-var Relations = map[string]map[string]relation{
+// collection name -> related collection name -> relation fields
+var Relations = map[string]map[string][]relationField{
 	Competitions: {
-		"ageGroup":               {AgeGroups, false},
-		"playingLevel":           {PlayingLevels, false},
-		"registrations":          {Teams, true},
-		"tournamentModeSettings": {TournamentModeSettings, false},
-		"seeds":                  {Teams, true},
-		"draw":                   {Teams, true},
-		"matches":                {MatchData, true},
-		"tieBreakers":            {TieBreakers, true},
+		AgeGroups:     {{"ageGroup", false}},
+		PlayingLevels: {{"playingLevel", false}},
+		Teams: {
+			{"registrations", true},
+			{"seeds", true},
+			{"draw", true},
+		},
+		TournamentModeSettings: {{"tournamentModeSettings", false}},
+		MatchData:              {{"matches", true}},
+		TieBreakers:            {{"tieBreakers", true}},
 	},
 	Courts: {
-		"gymnasium": {Gymnasiums, false},
+		Gymnasiums: {{"gymnasium", false}},
 	},
 	MatchData: {
-		"sets":           {MatchSets, true},
-		"court":          {Courts, false},
-		"withdrawnTeams": {Teams, true},
+		MatchSets: {{"sets", true}},
+		Courts:    {{"courts", false}},
+		Teams:     {{"withdrawnTeams", true}},
 	},
 	Players: {
-		"club": {Clubs, false},
+		Clubs: {{"club", false}},
 	},
 	Teams: {
-		"players": {Players, true},
+		Players: {{"players", true}},
 	},
 	TieBreakers: {
-		"tieBreakerRanking": {Teams, true},
+		Teams: {{"tieBreakerRanking", true}},
 	},
 }
 
 // Returns the collection name that a proxy or slice slice of proxies belongs to
-func FromProxy(s any) string {
+func CollectionNameFromProxy(s any) string {
 	switch s.(type) {
-	case *generated.TournamentOrganizer, []*generated.TournamentOrganizer, RecordList[*generated.TournamentOrganizer]:
+	case *generated.TournamentOrganizer, []*generated.TournamentOrganizer:
 		return TournamentOrganizers
-	case *generated.AgeGroup, []*generated.AgeGroup, RecordList[*generated.AgeGroup]:
+	case *generated.AgeGroup, []*generated.AgeGroup:
 		return AgeGroups
-	case *generated.Club, []*generated.Club, RecordList[*generated.Club]:
+	case *generated.Club, []*generated.Club:
 		return Clubs
-	case *generated.Competition, []*generated.Competition, RecordList[*generated.Competition]:
+	case *generated.Competition, []*generated.Competition:
 		return Competitions
-	case *generated.Court, []*generated.Court, RecordList[*generated.Court]:
+	case *generated.Court, []*generated.Court:
 		return Courts
-	case *generated.Gymnasium, []*generated.Gymnasium, RecordList[*generated.Gymnasium]:
+	case *generated.Gymnasium, []*generated.Gymnasium:
 		return Gymnasiums
-	case *generated.MatchData, []*generated.MatchData, RecordList[*generated.MatchData]:
+	case *generated.MatchData, []*generated.MatchData:
 		return MatchData
-	case *generated.MatchSet, []*generated.MatchSet, RecordList[*generated.MatchSet]:
+	case *generated.MatchSet, []*generated.MatchSet:
 		return MatchSets
-	case *generated.Player, []*generated.Player, RecordList[*generated.Player]:
+	case *generated.Player, []*generated.Player:
 		return Players
-	case *generated.PlayingLevel, []*generated.PlayingLevel, RecordList[*generated.PlayingLevel]:
+	case *generated.PlayingLevel, []*generated.PlayingLevel:
 		return PlayingLevels
-	case *generated.Team, []*generated.Team, RecordList[*generated.Team]:
+	case *generated.Team, []*generated.Team:
 		return Teams
-	case *generated.TieBreaker, []*generated.TieBreaker, RecordList[*generated.TieBreaker]:
+	case *generated.TieBreaker, []*generated.TieBreaker:
 		return TieBreakers
-	case *generated.TournamentModeSettings, []*generated.TournamentModeSettings, RecordList[*generated.TournamentModeSettings]:
+	case *generated.TournamentModeSettings, []*generated.TournamentModeSettings:
 		return TournamentModeSettings
-	case *generated.Tournament, []*generated.Tournament, RecordList[*generated.Tournament]:
+	case *generated.Tournament, []*generated.Tournament:
 		return Tournaments
 	}
 
 	panic("Unknown proxy type")
+}
+
+func NewProxy(collectionName string) core.RecordProxy {
+	switch collectionName {
+	case "tournament_organizer":
+		return &generated.TournamentOrganizer{}
+	case "age_groups":
+		return &generated.AgeGroup{}
+	case "clubs":
+		return &generated.Club{}
+	case "competitions":
+		return &generated.Competition{}
+	case "courts":
+		return &generated.Court{}
+	case "gymnasiums":
+		return &generated.Gymnasium{}
+	case "match_data":
+		return &generated.MatchData{}
+	case "match_sets":
+		return &generated.MatchSet{}
+	case "players":
+		return &generated.Player{}
+	case "playing_levels":
+		return &generated.PlayingLevel{}
+	case "teams":
+		return &generated.Team{}
+	case "tie_breakers":
+		return &generated.TieBreaker{}
+	case "tournament_mode_settings":
+		return &generated.TournamentModeSettings{}
+	case "tournaments":
+		return &generated.Tournament{}
+	}
+	return nil
 }
