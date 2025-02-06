@@ -130,3 +130,14 @@ func NewProxy(collectionName string) core.RecordProxy {
 	}
 	return nil
 }
+
+func fetchCollection[P core.RecordProxy](app core.App) ([]P, error) {
+	records := make([]P, 0)
+	collectionName := CollectionNameFromProxy(records)
+	query := app.RecordQuery(collectionName)
+
+	if err := query.All(&records); err != nil {
+		return nil, err
+	}
+	return records, nil
+}

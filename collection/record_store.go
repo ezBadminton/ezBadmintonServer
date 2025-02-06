@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 
+	g "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/store"
 )
@@ -24,6 +25,76 @@ func FindRecordStore(collectionName string) (RecordStore, error) {
 	return store, nil
 }
 
+func InitStores(app core.App) error {
+	if err := initStore[*g.TournamentOrganizer](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.AgeGroup](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.Club](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.Competition](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.Court](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.Gymnasium](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.MatchData](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.MatchSet](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.Player](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.PlayingLevel](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.Team](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.TieBreaker](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.TournamentModeSettings](app); err != nil {
+		return err
+	}
+	if err := initStore[*g.Tournament](app); err != nil {
+		return err
+	}
+
+	if err := initRelations(); err != nil {
+		return err
+	}
+
+	app.OnRecordAfterCreateSuccess().BindFunc(createStoreHook(RecordStore.Created))
+	app.OnRecordAfterUpdateSuccess().BindFunc(createStoreHook(RecordStore.Updated))
+	app.OnRecordAfterDeleteSuccess().BindFunc(createStoreHook(RecordStore.Deleted))
+
+	return nil
+}
+
+func createStoreHook(handler func(RecordStore, *core.Record) error) func(*core.RecordEvent) error {
+	return func(e *core.RecordEvent) error {
+		collectionName := e.Record.Collection().Name
+		store, err := FindRecordStore(collectionName)
+		if err != nil {
+			return err
+		}
+		if err = handler(store, e.Record); err != nil {
+			return err
+		}
+
+		return e.Next()
+	}
+}
+
 type RecordStore interface {
 	FindRecord(id string) (core.RecordProxy, bool)
 	RecordList() []core.RecordProxy
@@ -40,7 +111,12 @@ type BaseRecordStore[P core.RecordProxy] struct {
 	collectionName string
 }
 
-func InitStore[P core.RecordProxy](records []P) error {
+func initStore[P core.RecordProxy](app core.App) error {
+	records, err := fetchCollection[P](app)
+	if err != nil {
+		return err
+	}
+
 	collectionName := CollectionNameFromProxy(records)
 	_, ok := stores[collectionName]
 	if ok {
@@ -65,7 +141,7 @@ func InitStore[P core.RecordProxy](records []P) error {
 
 // This has to be called after all stores have been initialized
 // Expands all relations using the stored records so no duplicates exist
-func InitRelations() error {
+func initRelations() error {
 	for _, store := range stores {
 		records := store.RecordList()
 		if err := relationStore.ExpandRelations(records...); err != nil {
