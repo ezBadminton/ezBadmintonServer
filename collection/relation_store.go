@@ -40,6 +40,18 @@ func (r *RelationStore) ExpandRelations(collectionName string, records ...core.R
 	return nil
 }
 
+func ListRelationParents(record *core.Record) []*core.Record {
+	relMap, ok := relationStore.reverseRelations[record.Id]
+	if !ok {
+		return nil
+	}
+	parents := make([]*core.Record, 0, len(relMap))
+	for r := range relMap {
+		parents = append(parents, r)
+	}
+	return parents
+}
+
 // Remove the record from all its relation parents
 func (r *RelationStore) RemoveFromRelations(record *core.Record) {
 	r.resetReverseRelations(record)

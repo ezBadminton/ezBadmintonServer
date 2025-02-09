@@ -169,8 +169,7 @@ func (s *BaseRecordStore[P]) CollectionName() string {
 }
 
 func (s *BaseRecordStore[P]) Created(record *core.Record) error {
-	var proxy P = NewProxy(s.collectionName).(P)
-	proxy.SetProxyRecord(record)
+	proxy, _ := Wrap[P](record)
 
 	s.Store.Set(record.Id, proxy)
 	s.recordList = append(s.recordList, proxy)

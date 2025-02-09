@@ -1,6 +1,8 @@
 package collection
 
 import (
+	"errors"
+
 	"github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -47,7 +49,7 @@ var Relations = map[string]map[string][]relationField{
 	},
 	MatchData: {
 		MatchSets: {{"sets", true}},
-		Courts:    {{"courts", false}},
+		Courts:    {{"court", false}},
 		Teams:     {{"withdrawnTeams", true}},
 	},
 	Players: {
@@ -61,7 +63,7 @@ var Relations = map[string]map[string][]relationField{
 	},
 }
 
-// Returns the collection name that a proxy or slice slice of proxies belongs to
+// Returns the collection name that a proxy or slice of proxies belongs to
 func CollectionNameFromProxy(s any) string {
 	switch s.(type) {
 	case *generated.TournamentOrganizer, []*generated.TournamentOrganizer:
@@ -97,38 +99,85 @@ func CollectionNameFromProxy(s any) string {
 	panic("Unknown proxy type")
 }
 
-func NewProxy(collectionName string) core.RecordProxy {
+// Creates a new proxy (without underlying record) for the given
+// collectionName
+func NewProxyFromCollectionName(collectionName string) core.RecordProxy {
 	switch collectionName {
-	case "tournament_organizer":
+	case TournamentOrganizers:
 		return &generated.TournamentOrganizer{}
-	case "age_groups":
+	case AgeGroups:
 		return &generated.AgeGroup{}
-	case "clubs":
+	case Clubs:
 		return &generated.Club{}
-	case "competitions":
+	case Competitions:
 		return &generated.Competition{}
-	case "courts":
+	case Courts:
 		return &generated.Court{}
-	case "gymnasiums":
+	case Gymnasiums:
 		return &generated.Gymnasium{}
-	case "match_data":
+	case MatchData:
 		return &generated.MatchData{}
-	case "match_sets":
+	case MatchSets:
 		return &generated.MatchSet{}
-	case "players":
+	case Players:
 		return &generated.Player{}
-	case "playing_levels":
+	case PlayingLevels:
 		return &generated.PlayingLevel{}
-	case "teams":
+	case Teams:
 		return &generated.Team{}
-	case "tie_breakers":
+	case TieBreakers:
 		return &generated.TieBreaker{}
-	case "tournament_mode_settings":
+	case TournamentModeSettings:
 		return &generated.TournamentModeSettings{}
-	case "tournaments":
+	case Tournaments:
 		return &generated.Tournament{}
 	}
 	return nil
+}
+
+// Creates a new record and wraps it in a new proxy
+func NewProxy[P core.RecordProxy](app core.App) (P, error) {
+	var p P
+	collectionName := CollectionNameFromProxy(p)
+	p = NewProxyFromCollectionName(collectionName).(P)
+
+	collection, err := app.FindCachedCollectionByNameOrId(collectionName)
+	if err != nil {
+		return p, err
+	}
+
+	record := core.NewRecord(collection)
+	p.SetProxyRecord(record)
+	return p, nil
+}
+
+// Wraps a record in a newly created proxy
+func Wrap[P core.RecordProxy](record *core.Record) (P, error) {
+	var p P
+	collectionName := record.Collection().Name
+	p, ok := NewProxyFromCollectionName(collectionName).(P)
+	if !ok {
+		return p, errors.New("the generic proxy type is not from the collection of the given record.")
+	}
+	p.SetProxyRecord(record)
+	return p, nil
+}
+
+// Finds the stored proxy of a record
+func FindProxy[P core.RecordProxy](record *core.Record) (P, error) {
+	var p P
+	collectionName := record.Collection().Name
+	store, err := FindRecordStore(collectionName)
+	if err != nil {
+		return p, err
+	}
+
+	found, ok := store.FindRecord(record.Id)
+	if !ok {
+		return p, errors.New("the record has no stored proxy")
+	}
+
+	return found.(P), nil
 }
 
 func fetchCollection[P core.RecordProxy](app core.App) ([]P, error) {

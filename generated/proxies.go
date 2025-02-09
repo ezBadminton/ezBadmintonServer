@@ -174,6 +174,7 @@ func (p *Player) Club() *Club {
 }
 
 func (p *Player) SetClub(club *Club) {
+	p.Record.Set("club", club.Id)
 	e := p.Expand()
 	e["club"] = club.Record
 	p.SetExpand(e)
@@ -246,6 +247,7 @@ func (p *Competition) AgeGroup() *AgeGroup {
 }
 
 func (p *Competition) SetAgeGroup(ageGroup *AgeGroup) {
+	p.Record.Set("ageGroup", ageGroup.Id)
 	e := p.Expand()
 	e["ageGroup"] = ageGroup.Record
 	p.SetExpand(e)
@@ -261,6 +263,7 @@ func (p *Competition) PlayingLevel() *PlayingLevel {
 }
 
 func (p *Competition) SetPlayingLevel(playingLevel *PlayingLevel) {
+	p.Record.Set("playingLevel", playingLevel.Id)
 	e := p.Expand()
 	e["playingLevel"] = playingLevel.Record
 	p.SetExpand(e)
@@ -278,9 +281,12 @@ func (p *Competition) Registrations() []*Team {
 
 func (p *Competition) SetRegistrations(registrations []*Team) {
 	records := make([]*core.Record, len(registrations))
+	ids := make([]string, len(registrations))
 	for i, r := range registrations {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("registrations", ids)
 	e := p.Expand()
 	e["registrations"] = records
 	p.SetExpand(e)
@@ -296,6 +302,7 @@ func (p *Competition) TournamentModeSettings() *TournamentModeSettings {
 }
 
 func (p *Competition) SetTournamentModeSettings(tournamentModeSettings *TournamentModeSettings) {
+	p.Record.Set("tournamentModeSettings", tournamentModeSettings.Id)
 	e := p.Expand()
 	e["tournamentModeSettings"] = tournamentModeSettings.Record
 	p.SetExpand(e)
@@ -313,9 +320,12 @@ func (p *Competition) Seeds() []*Team {
 
 func (p *Competition) SetSeeds(seeds []*Team) {
 	records := make([]*core.Record, len(seeds))
+	ids := make([]string, len(seeds))
 	for i, r := range seeds {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("seeds", ids)
 	e := p.Expand()
 	e["seeds"] = records
 	p.SetExpand(e)
@@ -333,9 +343,12 @@ func (p *Competition) Draw() []*Team {
 
 func (p *Competition) SetDraw(draw []*Team) {
 	records := make([]*core.Record, len(draw))
+	ids := make([]string, len(draw))
 	for i, r := range draw {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("draw", ids)
 	e := p.Expand()
 	e["draw"] = records
 	p.SetExpand(e)
@@ -353,9 +366,12 @@ func (p *Competition) Matches() []*MatchData {
 
 func (p *Competition) SetMatches(matches []*MatchData) {
 	records := make([]*core.Record, len(matches))
+	ids := make([]string, len(matches))
 	for i, r := range matches {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("matches", ids)
 	e := p.Expand()
 	e["matches"] = records
 	p.SetExpand(e)
@@ -373,9 +389,12 @@ func (p *Competition) TieBreakers() []*TieBreaker {
 
 func (p *Competition) SetTieBreakers(tieBreakers []*TieBreaker) {
 	records := make([]*core.Record, len(tieBreakers))
+	ids := make([]string, len(tieBreakers))
 	for i, r := range tieBreakers {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("tieBreakers", ids)
 	e := p.Expand()
 	e["tieBreakers"] = records
 	p.SetExpand(e)
@@ -421,9 +440,12 @@ func (p *Team) Players() []*Player {
 
 func (p *Team) SetPlayers(players []*Player) {
 	records := make([]*core.Record, len(players))
+	ids := make([]string, len(players))
 	for i, r := range players {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("players", ids)
 	e := p.Expand()
 	e["players"] = records
 	p.SetExpand(e)
@@ -519,6 +541,7 @@ func (p *Court) Gymnasium() *Gymnasium {
 }
 
 func (p *Court) SetGymnasium(gymnasium *Gymnasium) {
+	p.Record.Set("gymnasium", gymnasium.Id)
 	e := p.Expand()
 	e["gymnasium"] = gymnasium.Record
 	p.SetExpand(e)
@@ -588,9 +611,12 @@ func (p *MatchData) Sets() []*MatchSet {
 
 func (p *MatchData) SetSets(sets []*MatchSet) {
 	records := make([]*core.Record, len(sets))
+	ids := make([]string, len(sets))
 	for i, r := range sets {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("sets", ids)
 	e := p.Expand()
 	e["sets"] = records
 	p.SetExpand(e)
@@ -606,6 +632,7 @@ func (p *MatchData) Court() *Court {
 }
 
 func (p *MatchData) SetCourt(court *Court) {
+	p.Record.Set("court", court.Id)
 	e := p.Expand()
 	e["court"] = court.Record
 	p.SetExpand(e)
@@ -623,9 +650,12 @@ func (p *MatchData) WithdrawnTeams() []*Team {
 
 func (p *MatchData) SetWithdrawnTeams(withdrawnTeams []*Team) {
 	records := make([]*core.Record, len(withdrawnTeams))
+	ids := make([]string, len(withdrawnTeams))
 	for i, r := range withdrawnTeams {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("withdrawnTeams", ids)
 	e := p.Expand()
 	e["withdrawnTeams"] = records
 	p.SetExpand(e)
@@ -1096,9 +1126,12 @@ func (p *TieBreaker) TieBreakerRanking() []*Team {
 
 func (p *TieBreaker) SetTieBreakerRanking(tieBreakerRanking []*Team) {
 	records := make([]*core.Record, len(tieBreakerRanking))
+	ids := make([]string, len(tieBreakerRanking))
 	for i, r := range tieBreakerRanking {
 		records[i] = r.Record
+		ids[i] = r.Record.Id
 	}
+	p.Record.Set("tieBreakerRanking", ids)
 	e := p.Expand()
 	e["tieBreakerRanking"] = records
 	p.SetExpand(e)
