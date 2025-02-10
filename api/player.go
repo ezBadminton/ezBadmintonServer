@@ -62,7 +62,7 @@ func OnPlayerClubChange(e *core.RecordEvent) error {
 	}
 
 	if deleteOldClub {
-		if err := e.App.Delete(oldClub.Record); err != nil {
+		if err := e.App.Delete(oldClub); err != nil {
 			return err
 		}
 	}
