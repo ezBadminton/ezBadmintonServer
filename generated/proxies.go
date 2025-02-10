@@ -10,6 +10,10 @@ type Users struct {
 	core.BaseRecordProxy
 }
 
+func (p *Users) CollectionName() string {
+	return "users"
+}
+
 func (p *Users) Name() string {
 	return p.GetString("name")
 }
@@ -46,6 +50,10 @@ type PlayingLevel struct {
 	core.BaseRecordProxy
 }
 
+func (p *PlayingLevel) CollectionName() string {
+	return "playing_levels"
+}
+
 func (p *PlayingLevel) Name() string {
 	return p.GetString("name")
 }
@@ -80,6 +88,10 @@ func (p *PlayingLevel) SetUpdated(updated types.DateTime) {
 
 type Club struct {
 	core.BaseRecordProxy
+}
+
+func (p *Club) CollectionName() string {
+	return "clubs"
 }
 
 func (p *Club) Name() string {
@@ -121,6 +133,10 @@ var zzPlayerStatusSelectIotaMap = map[PlayerStatus]string{0: "notAttending", 1: 
 
 type Player struct {
 	core.BaseRecordProxy
+}
+
+func (p *Player) CollectionName() string {
+	return "players"
 }
 
 func (p *Player) FirstName() string {
@@ -210,6 +226,10 @@ var zzGenderCategorySelectIotaMap = map[GenderCategory]string{0: "female", 1: "m
 
 type Competition struct {
 	core.BaseRecordProxy
+}
+
+func (p *Competition) CollectionName() string {
+	return "competitions"
 }
 
 func (p *Competition) TeamSize() float64 {
@@ -428,6 +448,10 @@ type Team struct {
 	core.BaseRecordProxy
 }
 
+func (p *Team) CollectionName() string {
+	return "teams"
+}
+
 func (p *Team) Players() []*Player {
 	rels := p.ExpandedAll("players")
 	proxies := make([]*Player, len(rels))
@@ -477,6 +501,10 @@ func (p *Team) SetUpdated(updated types.DateTime) {
 
 type Gymnasium struct {
 	core.BaseRecordProxy
+}
+
+func (p *Gymnasium) CollectionName() string {
+	return "gymnasiums"
 }
 
 func (p *Gymnasium) Name() string {
@@ -529,6 +557,10 @@ func (p *Gymnasium) SetUpdated(updated types.DateTime) {
 
 type Court struct {
 	core.BaseRecordProxy
+}
+
+func (p *Court) CollectionName() string {
+	return "courts"
 }
 
 func (p *Court) Gymnasium() *Gymnasium {
@@ -597,6 +629,10 @@ func (p *Court) SetUpdated(updated types.DateTime) {
 
 type MatchData struct {
 	core.BaseRecordProxy
+}
+
+func (p *MatchData) CollectionName() string {
+	return "match_data"
 }
 
 func (p *MatchData) Sets() []*MatchSet {
@@ -721,6 +757,10 @@ type MatchSet struct {
 	core.BaseRecordProxy
 }
 
+func (p *MatchSet) CollectionName() string {
+	return "match_sets"
+}
+
 func (p *MatchSet) Team1Points() float64 {
 	return p.GetFloat("team1Points")
 }
@@ -755,6 +795,10 @@ func (p *MatchSet) SetUpdated(updated types.DateTime) {
 
 type TournamentOrganizer struct {
 	core.BaseRecordProxy
+}
+
+func (p *TournamentOrganizer) CollectionName() string {
+	return "tournament_organizer"
 }
 
 func (p *TournamentOrganizer) Username() string {
@@ -793,6 +837,10 @@ var zzAgeGroupTypeSelectIotaMap = map[AgeGroupType]string{0: "over", 1: "under"}
 
 type AgeGroup struct {
 	core.BaseRecordProxy
+}
+
+func (p *AgeGroup) CollectionName() string {
+	return "age_groups"
 }
 
 func (p *AgeGroup) Age() float64 {
@@ -849,6 +897,10 @@ var zzQueueModeSelectIotaMap = map[QueueMode]string{0: "manual", 1: "autoCourtAs
 
 type Tournament struct {
 	core.BaseRecordProxy
+}
+
+func (p *Tournament) CollectionName() string {
+	return "tournaments"
 }
 
 func (p *Tournament) Title() string {
@@ -969,6 +1021,10 @@ var zzKnockOutModeSelectIotaMap = map[KnockOutMode]string{0: "single", 1: "doubl
 
 type TournamentModeSettings struct {
 	core.BaseRecordProxy
+}
+
+func (p *TournamentModeSettings) CollectionName() string {
+	return "tournament_mode_settings"
 }
 
 func (p *TournamentModeSettings) Type() TournamentType {
@@ -1112,6 +1168,10 @@ func (p *TournamentModeSettings) SetUpdated(updated types.DateTime) {
 
 type TieBreaker struct {
 	core.BaseRecordProxy
+}
+
+func (p *TieBreaker) CollectionName() string {
+	return "tie_breakers"
 }
 
 func (p *TieBreaker) TieBreakerRanking() []*Team {

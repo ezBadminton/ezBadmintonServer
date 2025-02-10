@@ -37,6 +37,7 @@ package pb_schema
 import "github.com/pocketbase/pocketbase/tools/types"
 
 type Users struct {
+	// collection-name: users
 	// system: id
 	Id string
 	// system: password
@@ -56,6 +57,7 @@ type Users struct {
 }
 
 type PlayingLevel struct {
+	// collection-name: playing_levels
 	// system: id
 	Id      string
 	name    string
@@ -65,6 +67,7 @@ type PlayingLevel struct {
 }
 
 type Club struct {
+	// collection-name: clubs
 	// system: id
 	Id      string
 	name    string
@@ -73,6 +76,7 @@ type Club struct {
 }
 
 type Player struct {
+	// collection-name: players
 	// system: id
 	Id        string
 	firstName string
@@ -86,6 +90,7 @@ type Player struct {
 }
 
 type Competition struct {
+	// collection-name: competitions
 	// system: id
 	Id       string
 	teamSize float64
@@ -105,6 +110,7 @@ type Competition struct {
 }
 
 type Team struct {
+	// collection-name: teams
 	// system: id
 	Id       string
 	players  []*Player
@@ -114,6 +120,7 @@ type Team struct {
 }
 
 type Gymnasium struct {
+	// collection-name: gymnasiums
 	// system: id
 	Id         string
 	name       string
@@ -125,6 +132,7 @@ type Gymnasium struct {
 }
 
 type Court struct {
+	// collection-name: courts
 	// system: id
 	Id        string
 	gymnasium *Gymnasium
@@ -137,6 +145,7 @@ type Court struct {
 }
 
 type MatchData struct {
+	// collection-name: match_data
 	// system: id
 	Id                  string
 	sets                []*MatchSet
@@ -152,6 +161,7 @@ type MatchData struct {
 }
 
 type MatchSet struct {
+	// collection-name: match_sets
 	// system: id
 	Id          string
 	team1Points float64
@@ -161,6 +171,7 @@ type MatchSet struct {
 }
 
 type TournamentOrganizer struct {
+	// collection-name: tournament_organizer
 	// system: id
 	Id string
 	// system: password
@@ -179,6 +190,7 @@ type TournamentOrganizer struct {
 }
 
 type AgeGroup struct {
+	// collection-name: age_groups
 	// system: id
 	Id  string
 	age float64
@@ -189,6 +201,7 @@ type AgeGroup struct {
 }
 
 type Tournament struct {
+	// collection-name: tournaments
 	// system: id
 	Id                    string
 	title                 string
@@ -204,6 +217,7 @@ type Tournament struct {
 }
 
 type TournamentModeSettings struct {
+	// collection-name: tournament_mode_settings
 	// system: id
 	Id string
 	// select: TournamentType(RoundRobin, SingleElimination, GroupKnockout, DoubleElimination, SingleEliminationWithConsolation)
@@ -226,6 +240,7 @@ type TournamentModeSettings struct {
 }
 
 type TieBreaker struct {
+	// collection-name: tie_breakers
 	// system: id
 	Id                string
 	tieBreakerRanking []*Team

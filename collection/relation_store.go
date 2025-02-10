@@ -20,7 +20,9 @@ func newRelationStore() *RelationStore {
 	}
 }
 
-func (r *RelationStore) ExpandRelations(collectionName string, records ...core.RecordProxy) error {
+func ExpandRelations[PP ProxyP[P], P Proxy](records ...PP) error {
+	r := relationStore
+	collectionName := PP.CollectionName(nil)
 	relations := Relations[collectionName]
 
 	for _, record := range records {
@@ -28,12 +30,12 @@ func (r *RelationStore) ExpandRelations(collectionName string, records ...core.R
 	}
 
 	for relatedCollectionName, relatedFields := range relations {
-		relatedStore, err := FindRecordStore(relatedCollectionName)
+		relatedStore, err := FindRecordStoreByCollectionName(relatedCollectionName)
 		if err != nil {
 			return err
 		}
 
-		if err := r.expandRecordRelations(records, relatedStore, relatedFields); err != nil {
+		if err := expandRecordRelations(records, relatedStore, relatedFields); err != nil {
 			return err
 		}
 	}
@@ -86,7 +88,8 @@ func (r *RelationStore) resetReverseRelations(record *core.Record) {
 	}
 }
 
-func (r *RelationStore) expandRecordRelations(records []core.RecordProxy, relatedStore RecordStore, relatedFields []relationField) error {
+func expandRecordRelations[PP ProxyP[P], P Proxy](records []PP, relatedStore RecordStore, relatedFields []relationField) error {
+	r := relationStore
 	for _, record := range records {
 		proxyRelations := make(map[string]any)
 
