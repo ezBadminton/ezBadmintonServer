@@ -4,7 +4,7 @@ go 1.23.5
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/pocketbase/pocketbase v0.25.0
+	github.com/pocketbase/pocketbase v0.25.2
 )
 
 require (
