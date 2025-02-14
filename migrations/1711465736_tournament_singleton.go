@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"github.com/ezBadminton/ezBadmintonServer/collection"
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -10,7 +9,8 @@ import (
 
 func init() {
 	m.Register(func(app core.App) error {
-		tournamentCollection, err := app.FindCollectionByNameOrId(collection.Tournaments)
+		cName := CName[Tournament]()
+		tournamentCollection, err := app.FindCollectionByNameOrId(cName)
 		if err != nil {
 			return err
 		}

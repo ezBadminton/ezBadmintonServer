@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 
+	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -88,17 +89,17 @@ func (r *RelationStore) resetReverseRelations(record *core.Record) {
 	}
 }
 
-func expandRecordRelations[PP ProxyP[P], P Proxy](records []PP, relatedStore RecordStore, relatedFields []relationField) error {
+func expandRecordRelations[PP ProxyP[P], P Proxy](records []PP, relatedStore RecordStore, relatedFields []RelationField) error {
 	r := relationStore
 	for _, record := range records {
 		proxyRelations := make(map[string]any)
 
 		for _, relatedField := range relatedFields {
 			var err error
-			if relatedField.isMulti {
-				err = r.expandMultiRelation(record, proxyRelations, relatedStore, relatedField.fieldName)
+			if relatedField.IsMulti {
+				err = r.expandMultiRelation(record, proxyRelations, relatedStore, relatedField.FieldName)
 			} else {
-				err = r.expandSingleRelation(record, proxyRelations, relatedStore, relatedField.fieldName)
+				err = r.expandSingleRelation(record, proxyRelations, relatedStore, relatedField.FieldName)
 			}
 			if err != nil {
 				return err

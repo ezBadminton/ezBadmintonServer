@@ -4,7 +4,7 @@ import (
 	"errors"
 	"slices"
 
-	g "github.com/ezBadminton/ezBadmintonServer/generated"
+	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/store"
 )
@@ -39,46 +39,46 @@ func FindRecordStoreByCollectionName(collectionName string) (RecordStore, error)
 }
 
 func InitStores(app core.App) error {
-	if err := initStore[g.TournamentOrganizer](app); err != nil {
+	if err := initStore[TournamentOrganizer](app); err != nil {
 		return err
 	}
-	if err := initStore[g.AgeGroup](app); err != nil {
+	if err := initStore[AgeGroup](app); err != nil {
 		return err
 	}
-	if err := initStore[g.Club](app); err != nil {
+	if err := initStore[Club](app); err != nil {
 		return err
 	}
-	if err := initStore[g.Competition](app); err != nil {
+	if err := initStore[Competition](app); err != nil {
 		return err
 	}
-	if err := initStore[g.Court](app); err != nil {
+	if err := initStore[Court](app); err != nil {
 		return err
 	}
-	if err := initStore[g.Gymnasium](app); err != nil {
+	if err := initStore[Gymnasium](app); err != nil {
 		return err
 	}
-	if err := initStore[g.MatchData](app); err != nil {
+	if err := initStore[MatchData](app); err != nil {
 		return err
 	}
-	if err := initStore[g.MatchSet](app); err != nil {
+	if err := initStore[MatchSet](app); err != nil {
 		return err
 	}
-	if err := initStore[g.Player](app); err != nil {
+	if err := initStore[Player](app); err != nil {
 		return err
 	}
-	if err := initStore[g.PlayingLevel](app); err != nil {
+	if err := initStore[PlayingLevel](app); err != nil {
 		return err
 	}
-	if err := initStore[g.Team](app); err != nil {
+	if err := initStore[Team](app); err != nil {
 		return err
 	}
-	if err := initStore[g.TieBreaker](app); err != nil {
+	if err := initStore[TieBreaker](app); err != nil {
 		return err
 	}
-	if err := initStore[g.TournamentModeSettings](app); err != nil {
+	if err := initStore[TournamentModeSettings](app); err != nil {
 		return err
 	}
-	if err := initStore[g.Tournament](app); err != nil {
+	if err := initStore[Tournament](app); err != nil {
 		return err
 	}
 
@@ -179,8 +179,8 @@ func (s *BaseRecordStore[_, PP]) ExpandAll() error {
 	return nil
 }
 
-func (s *BaseRecordStore[_, PP]) Created(record *core.Record) error {
-	proxy, _ := WrapRecord[PP](record)
+func (s *BaseRecordStore[P, PP]) Created(record *core.Record) error {
+	proxy, _ := WrapRecord[P, PP](record)
 
 	s.Store.Set(record.Id, proxy)
 	s.recordList = append(s.recordList, proxy)
@@ -220,4 +220,35 @@ func (s *BaseRecordStore[_, PP]) Deleted(record *core.Record) error {
 	relationStore.RemoveFromRelations(record)
 
 	return nil
+}
+
+// Finds the stored proxy of a record
+func FindProxy[P Proxy, PP ProxyP[P]](record *core.Record) (PP, error) {
+	collectionName := record.Collection().Name
+	proxyCollectionName := PP.CollectionName(nil)
+	if collectionName != proxyCollectionName {
+		return nil, errors.New("the generic proxy type is not of the same collection as the given record")
+	}
+	store, err := FindRecordStore[PP]()
+	if err != nil {
+		return nil, err
+	}
+
+	found, ok := store.FindProxy(record.Id)
+	if !ok {
+		return nil, errors.New("the record has no stored proxy")
+	}
+
+	return found, nil
+}
+
+func fetchCollection[PP ProxyP[P], P Proxy](app core.App) ([]PP, error) {
+	records := make([]PP, 0)
+	collectionName := PP.CollectionName(nil)
+	query := app.RecordQuery(collectionName)
+
+	if err := query.All(&records); err != nil {
+		return nil, err
+	}
+	return records, nil
 }

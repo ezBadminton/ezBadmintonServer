@@ -128,8 +128,20 @@ const (
 	Disqualified
 )
 
-var zzPlayerStatusSelectNameMap = map[string]PlayerStatus{"notAttending": 0, "attending": 1, "injured": 2, "forfeited": 3, "disqualified": 4}
-var zzPlayerStatusSelectIotaMap = map[PlayerStatus]string{0: "notAttending", 1: "attending", 2: "injured", 3: "forfeited", 4: "disqualified"}
+var zzPlayerStatusSelectNameMap = map[string]PlayerStatus{
+	"notAttending": 0,
+	"attending":    1,
+	"injured":      2,
+	"forfeited":    3,
+	"disqualified": 4,
+}
+var zzPlayerStatusSelectIotaMap = map[PlayerStatus]string{
+	0: "notAttending",
+	1: "attending",
+	2: "injured",
+	3: "forfeited",
+	4: "disqualified",
+}
 
 type Player struct {
 	core.BaseRecordProxy
@@ -221,8 +233,18 @@ const (
 	Any
 )
 
-var zzGenderCategorySelectNameMap = map[string]GenderCategory{"female": 0, "male": 1, "mixed": 2, "any": 3}
-var zzGenderCategorySelectIotaMap = map[GenderCategory]string{0: "female", 1: "male", 2: "mixed", 3: "any"}
+var zzGenderCategorySelectNameMap = map[string]GenderCategory{
+	"female": 0,
+	"male":   1,
+	"mixed":  2,
+	"any":    3,
+}
+var zzGenderCategorySelectIotaMap = map[GenderCategory]string{
+	0: "female",
+	1: "male",
+	2: "mixed",
+	3: "any",
+}
 
 type Competition struct {
 	core.BaseRecordProxy
@@ -832,8 +854,14 @@ const (
 	Under
 )
 
-var zzAgeGroupTypeSelectNameMap = map[string]AgeGroupType{"over": 0, "under": 1}
-var zzAgeGroupTypeSelectIotaMap = map[AgeGroupType]string{0: "over", 1: "under"}
+var zzAgeGroupTypeSelectNameMap = map[string]AgeGroupType{
+	"over":  0,
+	"under": 1,
+}
+var zzAgeGroupTypeSelectIotaMap = map[AgeGroupType]string{
+	0: "over",
+	1: "under",
+}
 
 type AgeGroup struct {
 	core.BaseRecordProxy
@@ -892,8 +920,16 @@ const (
 	Auto
 )
 
-var zzQueueModeSelectNameMap = map[string]QueueMode{"manual": 0, "autoCourtAssignment": 1, "auto": 2}
-var zzQueueModeSelectIotaMap = map[QueueMode]string{0: "manual", 1: "autoCourtAssignment", 2: "auto"}
+var zzQueueModeSelectNameMap = map[string]QueueMode{
+	"manual":              0,
+	"autoCourtAssignment": 1,
+	"auto":                2,
+}
+var zzQueueModeSelectIotaMap = map[QueueMode]string{
+	0: "manual",
+	1: "autoCourtAssignment",
+	2: "auto",
+}
 
 type Tournament struct {
 	core.BaseRecordProxy
@@ -994,8 +1030,20 @@ const (
 	SingleEliminationWithConsolation
 )
 
-var zzTournamentTypeSelectNameMap = map[string]TournamentType{"RoundRobin": 0, "SingleElimination": 1, "GroupKnockout": 2, "DoubleElimination": 3, "SingleEliminationWithConsolation": 4}
-var zzTournamentTypeSelectIotaMap = map[TournamentType]string{0: "RoundRobin", 1: "SingleElimination", 2: "GroupKnockout", 3: "DoubleElimination", 4: "SingleEliminationWithConsolation"}
+var zzTournamentTypeSelectNameMap = map[string]TournamentType{
+	"RoundRobin":                       0,
+	"SingleElimination":                1,
+	"GroupKnockout":                    2,
+	"DoubleElimination":                3,
+	"SingleEliminationWithConsolation": 4,
+}
+var zzTournamentTypeSelectIotaMap = map[TournamentType]string{
+	0: "RoundRobin",
+	1: "SingleElimination",
+	2: "GroupKnockout",
+	3: "DoubleElimination",
+	4: "SingleEliminationWithConsolation",
+}
 
 type SeedingMode int
 
@@ -1005,8 +1053,16 @@ const (
 	TieredSeeds
 )
 
-var zzSeedingModeSelectNameMap = map[string]SeedingMode{"random": 0, "single": 1, "tiered": 2}
-var zzSeedingModeSelectIotaMap = map[SeedingMode]string{0: "random", 1: "single", 2: "tiered"}
+var zzSeedingModeSelectNameMap = map[string]SeedingMode{
+	"random": 0,
+	"single": 1,
+	"tiered": 2,
+}
+var zzSeedingModeSelectIotaMap = map[SeedingMode]string{
+	0: "random",
+	1: "single",
+	2: "tiered",
+}
 
 type KnockOutMode int
 
@@ -1016,8 +1072,16 @@ const (
 	Consolation
 )
 
-var zzKnockOutModeSelectNameMap = map[string]KnockOutMode{"single": 0, "double": 1, "consolation": 2}
-var zzKnockOutModeSelectIotaMap = map[KnockOutMode]string{0: "single", 1: "double", 2: "consolation"}
+var zzKnockOutModeSelectNameMap = map[string]KnockOutMode{
+	"single":      0,
+	"double":      1,
+	"consolation": 2,
+}
+var zzKnockOutModeSelectIotaMap = map[KnockOutMode]string{
+	0: "single",
+	1: "double",
+	2: "consolation",
+}
 
 type TournamentModeSettings struct {
 	core.BaseRecordProxy

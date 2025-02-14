@@ -7,11 +7,13 @@ import (
 )
 
 func BindPlayerHooks(app core.App) {
-	app.OnRecordCreate(collection.Players).BindFunc(OnPlayerWithNewClub)
-	app.OnRecordUpdate(collection.Players).BindFunc(OnPlayerWithNewClub)
+	cName := CName[Player]()
 
-	app.OnRecordAfterUpdateSuccess(collection.Players).BindFunc(OnPlayerClubChange)
-	app.OnRecordAfterDeleteSuccess(collection.Players).BindFunc(OnPlayerClubChange)
+	app.OnRecordCreate(cName).BindFunc(OnPlayerWithNewClub)
+	app.OnRecordUpdate(cName).BindFunc(OnPlayerWithNewClub)
+
+	app.OnRecordAfterUpdateSuccess(cName).BindFunc(OnPlayerClubChange)
+	app.OnRecordAfterDeleteSuccess(cName).BindFunc(OnPlayerClubChange)
 }
 
 // Checks if the player comes with a newly created club
@@ -71,7 +73,7 @@ func OnPlayerClubChange(e *core.RecordEvent) error {
 }
 
 func saveNewClub(name string, app core.App) (string, error) {
-	newClub, err := collection.NewProxy[Club](app)
+	newClub, err := NewProxy[Club](app)
 	if err != nil {
 		return "", err
 	}

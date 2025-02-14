@@ -8,6 +8,7 @@ import (
 	"github.com/ezBadminton/ezBadmintonServer/api"
 	watchers "github.com/ezBadminton/ezBadmintonServer/client_watchers"
 	"github.com/ezBadminton/ezBadmintonServer/collection"
+	g "github.com/ezBadminton/ezBadmintonServer/generated"
 	_ "github.com/ezBadminton/ezBadmintonServer/migrations"
 
 	"github.com/pocketbase/pocketbase"
@@ -33,8 +34,9 @@ func main() {
 		if watchClient {
 			watchers.WatchClientForExit()
 		}
+		organizerCName := g.CName[g.TournamentOrganizer]()
 		e.Router.GET(
-			fmt.Sprintf("/api/ezbadminton/%s/exists", collection.TournamentOrganizers),
+			fmt.Sprintf("/api/ezbadminton/%s/exists", organizerCName),
 			func(e *core.RequestEvent) error { return GetTournamentOrganizerExists(e, app) },
 		)
 		return e.Next()
@@ -73,6 +75,7 @@ func GetTournamentOrganizerExists(e *core.RequestEvent, dao core.App) error {
 }
 
 func tournamentOrganizerExists() bool {
-	cache, _ := collection.FindRecordStoreByCollectionName(collection.TournamentOrganizers)
+	organizerCName := g.CName[g.TournamentOrganizer]()
+	cache, _ := collection.FindRecordStoreByCollectionName(organizerCName)
 	return cache.Length() > 0
 }
