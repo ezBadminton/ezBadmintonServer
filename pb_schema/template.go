@@ -61,7 +61,7 @@ type PlayingLevel struct {
 	// system: id
 	Id      string
 	name    string
-	index   float64
+	index   int
 	created types.DateTime
 	updated types.DateTime
 }
@@ -93,7 +93,7 @@ type Competition struct {
 	// collection-name: competitions
 	// system: id
 	Id       string
-	teamSize float64
+	teamSize int
 	// select: GenderCategory(female, male, mixed, any)
 	genderCategory         int
 	ageGroup               *AgeGroup
@@ -104,7 +104,7 @@ type Competition struct {
 	draw                   []*Team
 	matches                []*MatchData
 	tieBreakers            []*TieBreaker
-	rngSeed                float64
+	rngSeed                int
 	created                types.DateTime
 	updated                types.DateTime
 }
@@ -125,8 +125,8 @@ type Gymnasium struct {
 	Id         string
 	name       string
 	directions string
-	rows       float64
-	columns    float64
+	rows       int
+	columns    int
 	created    types.DateTime
 	updated    types.DateTime
 }
@@ -137,8 +137,8 @@ type Court struct {
 	Id        string
 	gymnasium *Gymnasium
 	name      string
-	positionX float64
-	positionY float64
+	positionX int
+	positionY int
 	isActive  bool
 	created   types.DateTime
 	updated   types.DateTime
@@ -164,8 +164,8 @@ type MatchSet struct {
 	// collection-name: match_sets
 	// system: id
 	Id          string
-	team1Points float64
-	team2Points float64
+	team1Points int
+	team2Points int
 	created     types.DateTime
 	updated     types.DateTime
 }
@@ -193,7 +193,7 @@ type AgeGroup struct {
 	// collection-name: age_groups
 	// system: id
 	Id  string
-	age float64
+	age int
 	// select: AgeGroupType(over, under)
 	type_   int
 	created types.DateTime
@@ -209,7 +209,7 @@ type Tournament struct {
 	usePlayingLevels      bool
 	dontReprintGameSheets bool
 	printQrCodes          bool
-	playerRestTime        float64
+	playerRestTime        int
 	// select: QueueMode(manual, autoCourtAssignment, auto)
 	queueMode int
 	created   types.DateTime
@@ -226,14 +226,14 @@ type TournamentModeSettings struct {
 	seedingMode int
 	// select: KnockOutMode(single, double, consolation)
 	knockOutMode         int
-	passes               float64
-	numGroups            float64
-	numQualifications    float64
-	numConsolationRounds float64
-	placesToPlayOut      float64
-	winningPoints        float64
-	winningSets          float64
-	maxPoints            float64
+	passes               int
+	numGroups            int
+	numQualifications    int
+	numConsolationRounds int
+	placesToPlayOut      int
+	winningPoints        int
+	winningSets          int
+	maxPoints            int
 	twoPointMargin       bool
 	created              types.DateTime
 	updated              types.DateTime

@@ -62,11 +62,11 @@ func (p *PlayingLevel) SetName(name string) {
 	p.Set("name", name)
 }
 
-func (p *PlayingLevel) Index() float64 {
-	return p.GetFloat("index")
+func (p *PlayingLevel) Index() int {
+	return p.GetInt("index")
 }
 
-func (p *PlayingLevel) SetIndex(index float64) {
+func (p *PlayingLevel) SetIndex(index int) {
 	p.Set("index", index)
 }
 
@@ -254,11 +254,11 @@ func (p *Competition) CollectionName() string {
 	return "competitions"
 }
 
-func (p *Competition) TeamSize() float64 {
-	return p.GetFloat("teamSize")
+func (p *Competition) TeamSize() int {
+	return p.GetInt("teamSize")
 }
 
-func (p *Competition) SetTeamSize(teamSize float64) {
+func (p *Competition) SetTeamSize(teamSize int) {
 	p.Set("teamSize", teamSize)
 }
 
@@ -442,11 +442,11 @@ func (p *Competition) SetTieBreakers(tieBreakers []*TieBreaker) {
 	p.SetExpand(e)
 }
 
-func (p *Competition) RngSeed() float64 {
-	return p.GetFloat("rngSeed")
+func (p *Competition) RngSeed() int {
+	return p.GetInt("rngSeed")
 }
 
-func (p *Competition) SetRngSeed(rngSeed float64) {
+func (p *Competition) SetRngSeed(rngSeed int) {
 	p.Set("rngSeed", rngSeed)
 }
 
@@ -545,19 +545,19 @@ func (p *Gymnasium) SetDirections(directions string) {
 	p.Set("directions", directions)
 }
 
-func (p *Gymnasium) Rows() float64 {
-	return p.GetFloat("rows")
+func (p *Gymnasium) Rows() int {
+	return p.GetInt("rows")
 }
 
-func (p *Gymnasium) SetRows(rows float64) {
+func (p *Gymnasium) SetRows(rows int) {
 	p.Set("rows", rows)
 }
 
-func (p *Gymnasium) Columns() float64 {
-	return p.GetFloat("columns")
+func (p *Gymnasium) Columns() int {
+	return p.GetInt("columns")
 }
 
-func (p *Gymnasium) SetColumns(columns float64) {
+func (p *Gymnasium) SetColumns(columns int) {
 	p.Set("columns", columns)
 }
 
@@ -609,19 +609,19 @@ func (p *Court) SetName(name string) {
 	p.Set("name", name)
 }
 
-func (p *Court) PositionX() float64 {
-	return p.GetFloat("positionX")
+func (p *Court) PositionX() int {
+	return p.GetInt("positionX")
 }
 
-func (p *Court) SetPositionX(positionX float64) {
+func (p *Court) SetPositionX(positionX int) {
 	p.Set("positionX", positionX)
 }
 
-func (p *Court) PositionY() float64 {
-	return p.GetFloat("positionY")
+func (p *Court) PositionY() int {
+	return p.GetInt("positionY")
 }
 
-func (p *Court) SetPositionY(positionY float64) {
+func (p *Court) SetPositionY(positionY int) {
 	p.Set("positionY", positionY)
 }
 
@@ -783,19 +783,19 @@ func (p *MatchSet) CollectionName() string {
 	return "match_sets"
 }
 
-func (p *MatchSet) Team1Points() float64 {
-	return p.GetFloat("team1Points")
+func (p *MatchSet) Team1Points() int {
+	return p.GetInt("team1Points")
 }
 
-func (p *MatchSet) SetTeam1Points(team1Points float64) {
+func (p *MatchSet) SetTeam1Points(team1Points int) {
 	p.Set("team1Points", team1Points)
 }
 
-func (p *MatchSet) Team2Points() float64 {
-	return p.GetFloat("team2Points")
+func (p *MatchSet) Team2Points() int {
+	return p.GetInt("team2Points")
 }
 
-func (p *MatchSet) SetTeam2Points(team2Points float64) {
+func (p *MatchSet) SetTeam2Points(team2Points int) {
 	p.Set("team2Points", team2Points)
 }
 
@@ -871,11 +871,11 @@ func (p *AgeGroup) CollectionName() string {
 	return "age_groups"
 }
 
-func (p *AgeGroup) Age() float64 {
-	return p.GetFloat("age")
+func (p *AgeGroup) Age() int {
+	return p.GetInt("age")
 }
 
-func (p *AgeGroup) SetAge(age float64) {
+func (p *AgeGroup) SetAge(age int) {
 	p.Set("age", age)
 }
 
@@ -979,11 +979,11 @@ func (p *Tournament) SetPrintQrCodes(printQrCodes bool) {
 	p.Set("printQrCodes", printQrCodes)
 }
 
-func (p *Tournament) PlayerRestTime() float64 {
-	return p.GetFloat("playerRestTime")
+func (p *Tournament) PlayerRestTime() int {
+	return p.GetInt("playerRestTime")
 }
 
-func (p *Tournament) SetPlayerRestTime(playerRestTime float64) {
+func (p *Tournament) SetPlayerRestTime(playerRestTime int) {
 	p.Set("playerRestTime", playerRestTime)
 }
 
@@ -1142,67 +1142,67 @@ func (p *TournamentModeSettings) SetKnockOutMode(knockOutMode KnockOutMode) {
 	p.Set("knockOutMode", i)
 }
 
-func (p *TournamentModeSettings) Passes() float64 {
-	return p.GetFloat("passes")
+func (p *TournamentModeSettings) Passes() int {
+	return p.GetInt("passes")
 }
 
-func (p *TournamentModeSettings) SetPasses(passes float64) {
+func (p *TournamentModeSettings) SetPasses(passes int) {
 	p.Set("passes", passes)
 }
 
-func (p *TournamentModeSettings) NumGroups() float64 {
-	return p.GetFloat("numGroups")
+func (p *TournamentModeSettings) NumGroups() int {
+	return p.GetInt("numGroups")
 }
 
-func (p *TournamentModeSettings) SetNumGroups(numGroups float64) {
+func (p *TournamentModeSettings) SetNumGroups(numGroups int) {
 	p.Set("numGroups", numGroups)
 }
 
-func (p *TournamentModeSettings) NumQualifications() float64 {
-	return p.GetFloat("numQualifications")
+func (p *TournamentModeSettings) NumQualifications() int {
+	return p.GetInt("numQualifications")
 }
 
-func (p *TournamentModeSettings) SetNumQualifications(numQualifications float64) {
+func (p *TournamentModeSettings) SetNumQualifications(numQualifications int) {
 	p.Set("numQualifications", numQualifications)
 }
 
-func (p *TournamentModeSettings) NumConsolationRounds() float64 {
-	return p.GetFloat("numConsolationRounds")
+func (p *TournamentModeSettings) NumConsolationRounds() int {
+	return p.GetInt("numConsolationRounds")
 }
 
-func (p *TournamentModeSettings) SetNumConsolationRounds(numConsolationRounds float64) {
+func (p *TournamentModeSettings) SetNumConsolationRounds(numConsolationRounds int) {
 	p.Set("numConsolationRounds", numConsolationRounds)
 }
 
-func (p *TournamentModeSettings) PlacesToPlayOut() float64 {
-	return p.GetFloat("placesToPlayOut")
+func (p *TournamentModeSettings) PlacesToPlayOut() int {
+	return p.GetInt("placesToPlayOut")
 }
 
-func (p *TournamentModeSettings) SetPlacesToPlayOut(placesToPlayOut float64) {
+func (p *TournamentModeSettings) SetPlacesToPlayOut(placesToPlayOut int) {
 	p.Set("placesToPlayOut", placesToPlayOut)
 }
 
-func (p *TournamentModeSettings) WinningPoints() float64 {
-	return p.GetFloat("winningPoints")
+func (p *TournamentModeSettings) WinningPoints() int {
+	return p.GetInt("winningPoints")
 }
 
-func (p *TournamentModeSettings) SetWinningPoints(winningPoints float64) {
+func (p *TournamentModeSettings) SetWinningPoints(winningPoints int) {
 	p.Set("winningPoints", winningPoints)
 }
 
-func (p *TournamentModeSettings) WinningSets() float64 {
-	return p.GetFloat("winningSets")
+func (p *TournamentModeSettings) WinningSets() int {
+	return p.GetInt("winningSets")
 }
 
-func (p *TournamentModeSettings) SetWinningSets(winningSets float64) {
+func (p *TournamentModeSettings) SetWinningSets(winningSets int) {
 	p.Set("winningSets", winningSets)
 }
 
-func (p *TournamentModeSettings) MaxPoints() float64 {
-	return p.GetFloat("maxPoints")
+func (p *TournamentModeSettings) MaxPoints() int {
+	return p.GetInt("maxPoints")
 }
 
-func (p *TournamentModeSettings) SetMaxPoints(maxPoints float64) {
+func (p *TournamentModeSettings) SetMaxPoints(maxPoints int) {
 	p.Set("maxPoints", maxPoints)
 }
 

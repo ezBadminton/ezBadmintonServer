@@ -7,9 +7,10 @@ import (
 
 	"github.com/ezBadminton/ezBadmintonServer/api"
 	watchers "github.com/ezBadminton/ezBadmintonServer/client_watchers"
-	"github.com/ezBadminton/ezBadmintonServer/collection"
 	g "github.com/ezBadminton/ezBadmintonServer/generated"
 	_ "github.com/ezBadminton/ezBadmintonServer/migrations"
+	"github.com/ezBadminton/ezBadmintonServer/store"
+	"github.com/ezBadminton/ezBadmintonServer/tops"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -29,6 +30,7 @@ func main() {
 	//RegisterHooks(app)
 	//RegisterRoutes(app)
 	api.BindPlayerHooks(app)
+	api.BindRegistrationHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {
@@ -47,7 +49,10 @@ func main() {
 			return err
 		}
 
-		if err := collection.InitStores(e.App); err != nil {
+		if err := store.InitStores(e.App); err != nil {
+			return err
+		}
+		if err := tops.InitRegistrations(); err != nil {
 			return err
 		}
 
@@ -76,6 +81,6 @@ func GetTournamentOrganizerExists(e *core.RequestEvent, dao core.App) error {
 
 func tournamentOrganizerExists() bool {
 	organizerCName := g.CName[g.TournamentOrganizer]()
-	cache, _ := collection.FindRecordStoreByCollectionName(organizerCName)
+	cache, _ := store.FindRecordStoreByCollectionName(organizerCName)
 	return cache.Length() > 0
 }

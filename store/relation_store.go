@@ -1,8 +1,9 @@
-package collection
+package store
 
 import (
 	"errors"
 	"slices"
+	"sync"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/pocketbase/pocketbase/core"
@@ -13,6 +14,7 @@ type RelationStore struct {
 	// is related to as the relation child
 	// record ID -> parent record -> field names
 	reverseRelations map[string]map[*core.Record][]string
+	mu               sync.Mutex
 }
 
 func newRelationStore() *RelationStore {
@@ -22,12 +24,26 @@ func newRelationStore() *RelationStore {
 }
 
 func ExpandRelations[PP ProxyP[P], P Proxy](records ...PP) error {
+	return expandRelations(true, records)
+}
+
+// Expands the relations but does not store the reverese relations
+func ExpandRelationsDry[PP ProxyP[P], P Proxy](records ...PP) error {
+	return expandRelations(false, records)
+}
+
+func expandRelations[PP ProxyP[P], P Proxy](storeReverse bool, records []PP) error {
 	r := relationStore
+	defer r.mu.Unlock()
+	r.mu.Lock()
+
 	collectionName := PP.CollectionName(nil)
 	relations := Relations[collectionName]
 
-	for _, record := range records {
-		r.resetReverseRelations(record.ProxyRecord())
+	if storeReverse {
+		for _, record := range records {
+			r.resetReverseRelations(record.ProxyRecord())
+		}
 	}
 
 	for relatedCollectionName, relatedFields := range relations {
@@ -36,7 +52,7 @@ func ExpandRelations[PP ProxyP[P], P Proxy](records ...PP) error {
 			return err
 		}
 
-		if err := expandRecordRelations(records, relatedStore, relatedFields); err != nil {
+		if err := expandRecordRelations(records, relatedStore, relatedFields, storeReverse); err != nil {
 			return err
 		}
 	}
@@ -44,7 +60,11 @@ func ExpandRelations[PP ProxyP[P], P Proxy](records ...PP) error {
 }
 
 func ListRelationParents(record *core.Record) []*core.Record {
-	relMap, ok := relationStore.reverseRelations[record.Id]
+	r := relationStore
+	r.mu.Lock()
+	relMap, ok := r.reverseRelations[record.Id]
+	r.mu.Unlock()
+
 	if !ok {
 		return nil
 	}
@@ -55,10 +75,30 @@ func ListRelationParents(record *core.Record) []*core.Record {
 	return parents
 }
 
+func RelationParentsByFieldName(record *core.Record) map[*core.Record][]string {
+	r := relationStore
+	defer r.mu.Unlock()
+	r.mu.Lock()
+
+	relMap, ok := r.reverseRelations[record.Id]
+	if !ok {
+		return nil
+	}
+
+	clone := make(map[*core.Record][]string, len(relMap))
+	for k, v := range relMap {
+		clone[k] = v
+	}
+
+	return clone
+}
+
 // Remove the record from all its relation parents
 func (r *RelationStore) RemoveFromRelations(record *core.Record) {
-	r.resetReverseRelations(record)
+	defer r.mu.Unlock()
+	r.mu.Lock()
 
+	r.resetReverseRelations(record)
 	relations := r.reverseRelations[record.Id]
 	for parent, fields := range relations {
 		relationFields := parent.Expand()
@@ -89,7 +129,12 @@ func (r *RelationStore) resetReverseRelations(record *core.Record) {
 	}
 }
 
-func expandRecordRelations[PP ProxyP[P], P Proxy](records []PP, relatedStore RecordStore, relatedFields []RelationField) error {
+func expandRecordRelations[PP ProxyP[P], P Proxy](
+	records []PP,
+	relatedStore RecordStore,
+	relatedFields []RelationField,
+	storeReverse bool,
+) error {
 	r := relationStore
 	for _, record := range records {
 		proxyRelations := make(map[string]any)
@@ -97,9 +142,19 @@ func expandRecordRelations[PP ProxyP[P], P Proxy](records []PP, relatedStore Rec
 		for _, relatedField := range relatedFields {
 			var err error
 			if relatedField.IsMulti {
-				err = r.expandMultiRelation(record, proxyRelations, relatedStore, relatedField.FieldName)
+				err = r.expandMultiRelation(record,
+					proxyRelations,
+					relatedStore,
+					relatedField.FieldName,
+					storeReverse,
+				)
 			} else {
-				err = r.expandSingleRelation(record, proxyRelations, relatedStore, relatedField.FieldName)
+				err = r.expandSingleRelation(record,
+					proxyRelations,
+					relatedStore,
+					relatedField.FieldName,
+					storeReverse,
+				)
 			}
 			if err != nil {
 				return err
@@ -111,7 +166,13 @@ func expandRecordRelations[PP ProxyP[P], P Proxy](records []PP, relatedStore Rec
 	return nil
 }
 
-func (r *RelationStore) expandSingleRelation(record core.RecordProxy, proxyRelations map[string]any, relatedStore RecordStore, relatedFieldName string) error {
+func (r *RelationStore) expandSingleRelation(
+	record core.RecordProxy,
+	proxyRelations map[string]any,
+	relatedStore RecordStore,
+	relatedFieldName string,
+	storeReverse bool,
+) error {
 	pRecord := record.ProxyRecord()
 	relatedId := pRecord.GetString(relatedFieldName)
 	if relatedId == "" {
@@ -125,12 +186,20 @@ func (r *RelationStore) expandSingleRelation(record core.RecordProxy, proxyRelat
 
 	relatedPRecord := relatedRecord.ProxyRecord()
 	proxyRelations[relatedFieldName] = relatedPRecord
-	r.storeReverseRelation(pRecord, relatedPRecord, relatedFieldName)
+	if storeReverse {
+		r.storeReverseRelation(pRecord, relatedPRecord, relatedFieldName)
+	}
 
 	return nil
 }
 
-func (r *RelationStore) expandMultiRelation(record core.RecordProxy, proxyRelations map[string]any, relatedStore RecordStore, relatedFieldName string) error {
+func (r *RelationStore) expandMultiRelation(
+	record core.RecordProxy,
+	proxyRelations map[string]any,
+	relatedStore RecordStore,
+	relatedFieldName string,
+	storeReverse bool,
+) error {
 	pRecord := record.ProxyRecord()
 	relatedIds := pRecord.GetStringSlice(relatedFieldName)
 	relatedRecords := make([]*core.Record, len(relatedIds))
@@ -143,7 +212,9 @@ func (r *RelationStore) expandMultiRelation(record core.RecordProxy, proxyRelati
 
 		relatedPRecord := relatedRecord.ProxyRecord()
 		relatedRecords[i] = relatedPRecord
-		r.storeReverseRelation(pRecord, relatedPRecord, relatedFieldName)
+		if storeReverse {
+			r.storeReverseRelation(pRecord, relatedPRecord, relatedFieldName)
+		}
 	}
 
 	proxyRelations[relatedFieldName] = relatedRecords

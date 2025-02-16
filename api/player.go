@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/ezBadminton/ezBadmintonServer/collection"
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
+	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -46,7 +46,7 @@ func OnPlayerWithNewClub(e *core.RecordEvent) error {
 // Checks if the update/delete of a player caused the
 // player's club to be empty and deletes the club.
 func OnPlayerClubChange(e *core.RecordEvent) error {
-	oldPlayer, err := collection.FindProxy[Player](e.Record)
+	oldPlayer, err := store.FindProxy[Player](e.Record)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func OnPlayerClubChange(e *core.RecordEvent) error {
 
 	deleteOldClub := false
 	if oldClub != nil && oldClub.Id != newClubId {
-		playersInOldClub := collection.ListRelationParents(oldClub.Record)
+		playersInOldClub := store.ListRelationParents(oldClub.Record)
 		deleteOldClub = len(playersInOldClub) == 1
 	}
 
