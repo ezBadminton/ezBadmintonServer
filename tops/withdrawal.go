@@ -4,43 +4,35 @@ import (
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 )
 
-type tournamentParticipant struct {
-	*Player
-}
-
-func (p tournamentParticipant) Id() string {
-	return p.Player.Id
-}
-
-func (c *CompetitionTournament) listWithdrawMatches(player *Player) []*MatchData {
-	wrappedPlayer := tournamentParticipant{player}
-	withdrawMatches := c.Tournament.ListWithdrawMatches(wrappedPlayer)
+func (c *CompetitionTournament) listWithdrawMatches(team *Team) []*MatchData {
+	wrapped := &TournamentPlayer{team}
+	withdrawMatches := c.Tournament.ListWithdrawMatches(wrapped)
 	return matchesToMatchData(withdrawMatches)
 }
 
-func (c *CompetitionTournament) listReenterMatches(player *Player) []*MatchData {
-	wrappedPlayer := tournamentParticipant{player}
-	reenterMatches := c.Tournament.ListReenterMatches(wrappedPlayer)
+func (c *CompetitionTournament) listReenterMatches(team *Team) []*MatchData {
+	wrapped := &TournamentPlayer{team}
+	reenterMatches := c.Tournament.ListReenterMatches(wrapped)
 	return matchesToMatchData(reenterMatches)
 }
 
-func (c *CompetitionTournament) withdrawPlayer(player *Player) []*MatchData {
-	wrappedPlayer := tournamentParticipant{player}
-	withdrawMatches := c.Tournament.WithdrawPlayer(wrappedPlayer)
+func (c *CompetitionTournament) withdrawTeam(team *Team) []*MatchData {
+	wrapped := &TournamentPlayer{team}
+	withdrawMatches := c.Tournament.WithdrawPlayer(wrapped)
 	return matchesToMatchData(withdrawMatches)
 }
 
-func (c *CompetitionTournament) reenterPlayer(player *Player) []*MatchData {
-	wrappedPlayer := tournamentParticipant{player}
-	reenterMatches := c.Tournament.ReenterPlayer(wrappedPlayer)
+func (c *CompetitionTournament) reenterTeam(team *Team) []*MatchData {
+	wrapped := &TournamentPlayer{team}
+	reenterMatches := c.Tournament.ReenterPlayer(wrapped)
 	return matchesToMatchData(reenterMatches)
 }
 
-func (c *CompetitionTournament) isWithdrawn(player *Player) bool {
+func (c *CompetitionTournament) isWithdrawn(team *Team) bool {
 	for _, m := range c.MatchList().Matches {
-		players := playersInMatch(m)
-		for _, p := range players {
-			if p.Id == player.Id {
+		withdrawnTeams := m.WithdrawnPlayers
+		for _, p := range withdrawnTeams {
+			if p.Id() == team.Id {
 				return true
 			}
 		}
@@ -83,19 +75,20 @@ func listStatusChangeMatches(player *Player, newStatus PlayerStatus) *StatusChan
 	changes := make(map[*Competition][]*MatchData)
 	for _, reg := range regs {
 		tournament := Tournaments.findTournament(reg.Competition.Id)
+		team := reg.Team
 		if tournament == nil || !tournament.Started || tournament.Ended {
 			continue
 		}
 		var changedMatches []*MatchData
 		if withdrawing {
-			changedMatches = tournament.listWithdrawMatches(player)
+			changedMatches = tournament.listWithdrawMatches(team)
 		} else {
-			changedMatches = tournament.listReenterMatches(player)
+			changedMatches = tournament.listReenterMatches(team)
 		}
 
 		addToChanges :=
 			len(changedMatches) > 0 ||
-				(!withdrawing && tournament.isWithdrawn(player))
+				(!withdrawing && tournament.isWithdrawn(team))
 
 		if addToChanges {
 			changes[tournament.Competition] = changedMatches
