@@ -29,6 +29,9 @@ func BindRegistrationHooks(app core.App) {
 }
 
 func CheckRegistration(e *core.RecordRequestEvent) error {
+	if e.Auth.IsSuperuser() {
+		return e.Next()
+	}
 	var competition *Competition
 	params := e.Request.URL.Query()
 
@@ -53,5 +56,5 @@ func CheckRegistration(e *core.RecordRequestEvent) error {
 }
 
 func listRegistrations(e *core.RequestEvent) error {
-	return tops.TopsRecordListResponse(tops.Registrations.List, e)
+	return tops.TopsRecordListResponse(tops.Registrations.List(), e)
 }

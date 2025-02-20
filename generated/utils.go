@@ -8,7 +8,7 @@ import (
 )
 
 type Proxy interface {
-	Users | PlayingLevel | Club | Player | Competition | Team | Gymnasium | Court | MatchData | MatchSet | TournamentOrganizer | AgeGroup | Tournament | TournamentModeSettings | TieBreaker
+	Users | PlayingLevel | Club | Player | Competition | Team | Gymnasium | Court | MatchData | MatchSet | TournamentOrganizer | AgeGroup | TournamentEvent | TournamentModeSettings | TieBreaker
 }
 
 // This interface constrains a type parameter of
@@ -91,7 +91,8 @@ type RelationField struct {
 	IsMulti   bool
 }
 
-// This map contains all relations between the collections.
+// This map contains all relations between the collections that
+// have a proxy struct with a CollectionName() method.
 // It maps like this:
 //
 //	collection name

@@ -9,13 +9,13 @@ import (
 
 func init() {
 	m.Register(func(app core.App) error {
-		cName := CName[Tournament]()
+		cName := CName[TournamentEvent]()
 		tournamentCollection, err := app.FindCollectionByNameOrId(cName)
 		if err != nil {
 			return err
 		}
 
-		tournament := Tournament{}
+		tournament := TournamentEvent{}
 		tournament.SetProxyRecord(core.NewRecord(tournamentCollection))
 		tournament.SetTitle("TheTournament")
 		tournament.SetDontReprintGameSheets(true)

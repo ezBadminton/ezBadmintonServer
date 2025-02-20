@@ -46,7 +46,7 @@ func OnPlayerWithNewClub(e *core.RecordEvent) error {
 // Checks if the update/delete of a player caused the
 // player's club to be empty and deletes the club.
 func OnPlayerClubChange(e *core.RecordEvent) error {
-	oldPlayer, err := store.FindProxy[Player](e.Record)
+	oldPlayer, err := store.FindProxy[Player](e.Record.Id)
 	if err != nil {
 		return err
 	}

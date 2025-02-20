@@ -200,7 +200,7 @@ type AgeGroup struct {
 	updated types.DateTime
 }
 
-type Tournament struct {
+type TournamentEvent struct {
 	// collection-name: tournaments
 	// system: id
 	Id                    string

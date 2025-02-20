@@ -4,6 +4,7 @@ go 1.23.5
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
+	github.com/ezBadminton/gotournament v0.1.0
 	github.com/pocketbase/pocketbase v0.25.2
 )
 
@@ -29,6 +30,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.11 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
+	github.com/dominikbraun/graph v0.23.0 // indirect
 	github.com/domodwyer/mailyak/v3 v3.6.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
@@ -68,3 +70,5 @@ require (
 	modernc.org/sqlite v1.34.5 // indirect
 	modernc.org/strutil v1.2.1 // indirect
 )
+
+replace github.com/ezBadminton/gotournament => ../gotournament

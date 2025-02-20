@@ -931,63 +931,63 @@ var zzQueueModeSelectIotaMap = map[QueueMode]string{
 	2: "auto",
 }
 
-type Tournament struct {
+type TournamentEvent struct {
 	core.BaseRecordProxy
 }
 
-func (p *Tournament) CollectionName() string {
+func (p *TournamentEvent) CollectionName() string {
 	return "tournaments"
 }
 
-func (p *Tournament) Title() string {
+func (p *TournamentEvent) Title() string {
 	return p.GetString("title")
 }
 
-func (p *Tournament) SetTitle(title string) {
+func (p *TournamentEvent) SetTitle(title string) {
 	p.Set("title", title)
 }
 
-func (p *Tournament) UseAgeGroups() bool {
+func (p *TournamentEvent) UseAgeGroups() bool {
 	return p.GetBool("useAgeGroups")
 }
 
-func (p *Tournament) SetUseAgeGroups(useAgeGroups bool) {
+func (p *TournamentEvent) SetUseAgeGroups(useAgeGroups bool) {
 	p.Set("useAgeGroups", useAgeGroups)
 }
 
-func (p *Tournament) UsePlayingLevels() bool {
+func (p *TournamentEvent) UsePlayingLevels() bool {
 	return p.GetBool("usePlayingLevels")
 }
 
-func (p *Tournament) SetUsePlayingLevels(usePlayingLevels bool) {
+func (p *TournamentEvent) SetUsePlayingLevels(usePlayingLevels bool) {
 	p.Set("usePlayingLevels", usePlayingLevels)
 }
 
-func (p *Tournament) DontReprintGameSheets() bool {
+func (p *TournamentEvent) DontReprintGameSheets() bool {
 	return p.GetBool("dontReprintGameSheets")
 }
 
-func (p *Tournament) SetDontReprintGameSheets(dontReprintGameSheets bool) {
+func (p *TournamentEvent) SetDontReprintGameSheets(dontReprintGameSheets bool) {
 	p.Set("dontReprintGameSheets", dontReprintGameSheets)
 }
 
-func (p *Tournament) PrintQrCodes() bool {
+func (p *TournamentEvent) PrintQrCodes() bool {
 	return p.GetBool("printQrCodes")
 }
 
-func (p *Tournament) SetPrintQrCodes(printQrCodes bool) {
+func (p *TournamentEvent) SetPrintQrCodes(printQrCodes bool) {
 	p.Set("printQrCodes", printQrCodes)
 }
 
-func (p *Tournament) PlayerRestTime() int {
+func (p *TournamentEvent) PlayerRestTime() int {
 	return p.GetInt("playerRestTime")
 }
 
-func (p *Tournament) SetPlayerRestTime(playerRestTime int) {
+func (p *TournamentEvent) SetPlayerRestTime(playerRestTime int) {
 	p.Set("playerRestTime", playerRestTime)
 }
 
-func (p *Tournament) QueueMode() QueueMode {
+func (p *TournamentEvent) QueueMode() QueueMode {
 	option := p.GetString("queueMode")
 	i, ok := zzQueueModeSelectNameMap[option]
 	if !ok {
@@ -996,7 +996,7 @@ func (p *Tournament) QueueMode() QueueMode {
 	return i
 }
 
-func (p *Tournament) SetQueueMode(queueMode QueueMode) {
+func (p *TournamentEvent) SetQueueMode(queueMode QueueMode) {
 	i, ok := zzQueueModeSelectIotaMap[queueMode]
 	if !ok {
 		panic("Unknown select value")
@@ -1004,19 +1004,19 @@ func (p *Tournament) SetQueueMode(queueMode QueueMode) {
 	p.Set("queueMode", i)
 }
 
-func (p *Tournament) Created() types.DateTime {
+func (p *TournamentEvent) Created() types.DateTime {
 	return p.GetDateTime("created")
 }
 
-func (p *Tournament) SetCreated(created types.DateTime) {
+func (p *TournamentEvent) SetCreated(created types.DateTime) {
 	p.Set("created", created)
 }
 
-func (p *Tournament) Updated() types.DateTime {
+func (p *TournamentEvent) Updated() types.DateTime {
 	return p.GetDateTime("updated")
 }
 
-func (p *Tournament) SetUpdated(updated types.DateTime) {
+func (p *TournamentEvent) SetUpdated(updated types.DateTime) {
 	p.Set("updated", updated)
 }
 

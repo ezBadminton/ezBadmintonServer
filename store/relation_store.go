@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"maps"
 	"slices"
 	"sync"
 
@@ -161,7 +162,10 @@ func expandRecordRelations[PP ProxyP[P], P Proxy](
 			}
 		}
 
-		record.ProxyRecord().SetExpand(proxyRelations)
+		pRecord := record.ProxyRecord()
+		relations := pRecord.Expand()
+		maps.Copy(relations, proxyRelations)
+		pRecord.SetExpand(relations)
 	}
 	return nil
 }

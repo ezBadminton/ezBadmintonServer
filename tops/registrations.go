@@ -31,12 +31,12 @@ func (r Registration) ToMap() map[string]any {
 var Registrations *RegistrationStore
 
 type RegistrationStore struct {
-	List                []*Registration
-	ByPlayer            map[string][]*Registration
-	ByTeam              map[string]*Registration
-	ByCompetition       map[string][]*Registration
-	ByCompetitionPlayer map[string]map[string]*Registration
-	ById                map[string]*Registration
+	list                []*Registration
+	byPlayer            map[string][]*Registration
+	byTeam              map[string]*Registration
+	byCompetition       map[string][]*Registration
+	byCompetitionPlayer map[string]map[string]*Registration
+	byId                map[string]*Registration
 	mu                  sync.RWMutex
 }
 
@@ -49,12 +49,12 @@ func InitRegistrations() error {
 	teams := teamStore.RecordList
 
 	Registrations = &RegistrationStore{
-		List:                make([]*Registration, 0),
-		ByPlayer:            make(map[string][]*Registration),
-		ByTeam:              make(map[string]*Registration),
-		ByCompetition:       make(map[string][]*Registration),
-		ByCompetitionPlayer: make(map[string]map[string]*Registration),
-		ById:                make(map[string]*Registration),
+		list:                make([]*Registration, 0),
+		byPlayer:            make(map[string][]*Registration),
+		byTeam:              make(map[string]*Registration),
+		byCompetition:       make(map[string][]*Registration),
+		byCompetitionPlayer: make(map[string]map[string]*Registration),
+		byId:                make(map[string]*Registration),
 	}
 
 	Registrations.addRegistrations(teams...)
@@ -66,9 +66,23 @@ func InitRegistrations() error {
 	return nil
 }
 
+func (s *RegistrationStore) List() []*Registration {
+	defer s.mu.RUnlock()
+	s.mu.RLock()
+
+	return s.list
+}
+
+func (s *RegistrationStore) RegistrationsOfPlayer(playerId string) []*Registration {
+	defer s.mu.RUnlock()
+	s.mu.RLock()
+
+	return s.byPlayer[playerId]
+}
+
 func (s *RegistrationStore) VerifyRegistration(team *Team, competition *Competition) error {
 	if competition == nil {
-		reg, ok := s.ByTeam[team.Id]
+		reg, ok := s.byTeam[team.Id]
 		if !ok {
 			return errors.New("the team is not registered yet")
 		}
@@ -80,7 +94,7 @@ func (s *RegistrationStore) VerifyRegistration(team *Team, competition *Competit
 		return errors.New("the team has too many players to be registered in this competition")
 	}
 
-	playerRegs, ok := s.ByCompetitionPlayer[competition.Id]
+	playerRegs, ok := s.byCompetitionPlayer[competition.Id]
 	if !ok {
 		return nil
 	}
@@ -104,30 +118,30 @@ func (s *RegistrationStore) addRegistrations(teams ...*Team) {
 		comp := reg.Competition
 		players := team.Players()
 
-		s.List = append(s.List, reg)
+		s.list = append(s.list, reg)
 
-		compPlayerRegs, ok := s.ByCompetitionPlayer[comp.Id]
+		compPlayerRegs, ok := s.byCompetitionPlayer[comp.Id]
 		if !ok {
 			compPlayerRegs = make(map[string]*Registration)
 		}
 
 		for _, p := range players {
-			playerRegs, ok := s.ByPlayer[p.Id]
+			playerRegs, ok := s.byPlayer[p.Id]
 			if !ok {
 				playerRegs = make([]*Registration, 0)
 			}
-			s.ByPlayer[p.Id] = append(playerRegs, reg)
+			s.byPlayer[p.Id] = append(playerRegs, reg)
 			compPlayerRegs[p.Id] = reg
 		}
 
-		compRegs, ok := s.ByCompetition[comp.Id]
+		compRegs, ok := s.byCompetition[comp.Id]
 		if !ok {
 			compRegs = make([]*Registration, 0)
 		}
-		s.ByCompetition[comp.Id] = append(compRegs, reg)
+		s.byCompetition[comp.Id] = append(compRegs, reg)
 
-		s.ByTeam[team.Id] = reg
-		s.ById[reg.Id] = reg
+		s.byTeam[team.Id] = reg
+		s.byId[reg.Id] = reg
 	}
 }
 
@@ -135,31 +149,31 @@ func (s *RegistrationStore) playerAdded(player *Player, team *Team) {
 	defer s.mu.Unlock()
 	s.mu.Lock()
 
-	reg := s.ByTeam[team.Id]
+	reg := s.byTeam[team.Id]
 	comp := reg.Competition
 
-	playerRegs, ok := s.ByPlayer[player.Id]
+	playerRegs, ok := s.byPlayer[player.Id]
 	if !ok {
 		playerRegs = make([]*Registration, 0)
 	}
-	s.ByPlayer[player.Id] = append(playerRegs, reg)
+	s.byPlayer[player.Id] = append(playerRegs, reg)
 
-	s.ByCompetitionPlayer[comp.Id][player.Id] = reg
+	s.byCompetitionPlayer[comp.Id][player.Id] = reg
 }
 
 func (s *RegistrationStore) playerRemoved(player *Player, team *Team) {
 	defer s.mu.Unlock()
 	s.mu.Lock()
 
-	reg := s.ByTeam[team.Id]
+	reg := s.byTeam[team.Id]
 	comp := reg.Competition
 
-	s.ByPlayer[player.Id] = slices.DeleteFunc(
-		s.ByPlayer[player.Id],
+	s.byPlayer[player.Id] = slices.DeleteFunc(
+		s.byPlayer[player.Id],
 		func(r *Registration) bool { return r == reg },
 	)
 
-	delete(s.ByCompetitionPlayer[comp.Id], player.Id)
+	delete(s.byCompetitionPlayer[comp.Id], player.Id)
 }
 
 func (s *RegistrationStore) Created(team *Team) {
@@ -188,21 +202,21 @@ func (s *RegistrationStore) Deleted(team *Team) {
 	defer s.mu.Unlock()
 	s.mu.Lock()
 
-	reg := s.ByTeam[team.Id]
+	reg := s.byTeam[team.Id]
 	comp := reg.Competition
 	players := team.Players()
 
 	finder := func(r *Registration) bool { return r == reg }
 
-	s.List = slices.DeleteFunc(s.List, finder)
+	s.list = slices.DeleteFunc(s.list, finder)
 
-	delete(s.ByTeam, team.Id)
+	delete(s.byTeam, team.Id)
 
-	s.ByCompetition[comp.Id] = slices.DeleteFunc(s.ByCompetition[comp.Id], finder)
+	s.byCompetition[comp.Id] = slices.DeleteFunc(s.byCompetition[comp.Id], finder)
 
 	for _, p := range players {
-		s.ByPlayer[p.Id] = slices.DeleteFunc(s.ByPlayer[p.Id], finder)
-		delete(s.ByCompetitionPlayer[comp.Id], p.Id)
+		s.byPlayer[p.Id] = slices.DeleteFunc(s.byPlayer[p.Id], finder)
+		delete(s.byCompetitionPlayer[comp.Id], p.Id)
 	}
 }
 

@@ -31,6 +31,9 @@ func main() {
 	//RegisterRoutes(app)
 	api.BindPlayerHooks(app)
 	api.BindRegistrationHooks(app)
+	api.BindTournamentPlanHooks(app)
+	api.BindDrawHooks(app)
+	api.BindResultHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {
@@ -53,6 +56,9 @@ func main() {
 			return err
 		}
 		if err := tops.InitRegistrations(); err != nil {
+			return err
+		}
+		if err := tops.InitTournaments(); err != nil {
 			return err
 		}
 

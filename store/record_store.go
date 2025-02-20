@@ -67,7 +67,7 @@ func InitStores(app core.App) error {
 	go initStoreWg[Team](app, &wg, errCh, storeCh)
 	go initStoreWg[TieBreaker](app, &wg, errCh, storeCh)
 	go initStoreWg[TournamentModeSettings](app, &wg, errCh, storeCh)
-	go initStoreWg[Tournament](app, &wg, errCh, storeCh)
+	go initStoreWg[TournamentEvent](app, &wg, errCh, storeCh)
 
 	go func() {
 		wg.Wait()
@@ -286,18 +286,13 @@ func (s *BaseRecordStore[_, PP]) Deleted(record *core.Record) error {
 }
 
 // Finds the stored proxy of a record with known proxy type
-func FindProxy[P Proxy, PP ProxyP[P]](record *core.Record) (PP, error) {
-	collectionName := record.Collection().Name
-	proxyCollectionName := PP.CollectionName(nil)
-	if collectionName != proxyCollectionName {
-		return nil, errors.New("the generic proxy type is not of the same collection as the given record")
-	}
+func FindProxy[P Proxy, PP ProxyP[P]](recordId string) (PP, error) {
 	store, err := FindRecordStore[P, PP]()
 	if err != nil {
 		return nil, err
 	}
 
-	found, ok := store.FindProxy(record.Id)
+	found, ok := store.FindProxy(recordId)
 	if !ok {
 		return nil, errors.New("the record has no stored proxy")
 	}
