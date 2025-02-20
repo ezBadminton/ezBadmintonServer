@@ -33,38 +33,22 @@ func BindDrawHooks(app core.App) {
 // Responds with a list of Team IDs which are the draw.
 // If no draw exists, an attempt is made to create one.
 func getDraw(e *core.RequestEvent) error {
-	competition, err := findCompetition(e)
-	if competition == nil {
-		return err
+	competition, err := findCompetition(e.Request)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	draw := competition.Draw()
-	if len(draw) == 0 {
-		competition, _ = WrapRecord[Competition](competition.Clone())
-		draw = tops.MakeDraw(competition)
-		competition.SetDraw(draw)
-
-		if err := e.App.Save(competition); err != nil {
-			return e.String(http.StatusConflict, "the competition is in the wrong state to have a draw made. there need to be enough players and valid tournament settings.")
-		}
+	if err := tops.MakeDraw(e.App, competition); err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	drawIds := idList(draw)
-	result := map[string]any{
-		"draw": drawIds,
-	}
-	return e.JSON(http.StatusOK, result)
+	return e.NoContent(http.StatusOK)
 }
 
 func swapDrawPositions(e *core.RequestEvent) error {
-	competition, err := findCompetition(e)
-	if competition == nil {
-		return err
-	}
-
-	draw := competition.Draw()
-	if len(draw) == 0 {
-		return e.String(http.StatusBadRequest, "there is no draw to swap")
+	competition, err := findCompetition(e.Request)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
 	data := struct {
@@ -77,20 +61,11 @@ func swapDrawPositions(e *core.RequestEvent) error {
 		return e.String(http.StatusBadRequest, "the swap list does not have 2 unique IDs")
 	}
 
-	i0 := slices.IndexFunc(draw, idFinder[Team](data.Swap[0]))
-	i1 := slices.IndexFunc(draw, idFinder[Team](data.Swap[1]))
-
-	if i0 == -1 || i1 == -1 {
-		return e.String(http.StatusBadRequest, "the swapped IDs are not in the draw")
-	}
-
-	draw[i0], draw[i1] = draw[i1], draw[i0]
-
-	competition, _ = WrapRecord[Competition](competition.Clone())
-	competition.SetDraw(draw)
-
-	if err := e.App.Save(competition); err != nil {
+	err = tops.DrawSwap(e.App, competition, data.Swap[0], data.Swap[1])
+	if errors.Is(err, tops.ErrUnexpected) {
 		return e.NoContent(http.StatusInternalServerError)
+	} else if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -117,17 +92,9 @@ func handleDrawChange(e *core.RecordEvent) error {
 		return e.Next()
 	}
 
-	started, _ := tops.Tournaments.HasStarted(competition.Id)
-	if started {
-		return errors.New("can not change draw while competition tournament is running")
-	}
-
-	var tournament *tops.CompetitionTournament
-	if len(draw) > 0 {
-		tournament, err = tops.CreateTournament(competition)
-		if err != nil {
-			return err
-		}
+	tournament, err := tops.CreateTournament(competition)
+	if err != nil {
+		return err
 	}
 
 	// The update handler of the tournament operations (tops/tournaments.go)

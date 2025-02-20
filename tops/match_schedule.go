@@ -3,7 +3,6 @@ package tops
 import (
 	"fmt"
 	"slices"
-	"sync"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	got "github.com/ezBadminton/gotournament/core"
@@ -48,13 +47,12 @@ type ScheduledRound struct {
 // rounds that represents the playing order.
 type MatchScheduler struct {
 	RoundQueue []*ScheduledRound
-	mu         sync.RWMutex
 }
 
 var Schedule *MatchScheduler
 
 func InitSchedule() error {
-	runningTournaments := Tournaments.ListRunning()
+	runningTournaments := Tournaments.listRunning()
 	offsets := calculateScheduleOffsets(runningTournaments)
 
 	orderedRounds := make([][]*got.Match, 0)
@@ -91,7 +89,7 @@ func InitSchedule() error {
 		roundIndex := roundIndexes[i]
 
 		for i, m := range round {
-			matchData := Tournaments.FindMatchData(m)
+			matchData := Tournaments.findMatchData(m)
 			matchStatus, playerStatus := scheduleStatus(m, competition)
 			scheduledMatches[i] = &ScheduledMatch{
 				Match:          matchData,
@@ -124,17 +122,17 @@ func InitSchedule() error {
 }
 
 func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerScheduleStatus) {
-	if MatchInfo.MatchFinished(match) {
+	if matchFinished(match) {
 		return Done, nil
 	}
-	if MatchInfo.MatchStarted(match) {
+	if matchStarted(match) {
 		return InProgress, nil
 	}
-	if MatchInfo.HasCourt(match) {
+	if hasCourt(match) {
 		return Ready, nil
 	}
 
-	players := MatchInfo.PlayersInMatch(match)
+	players := playersInMatch(match)
 
 	if len(players) < competition.TeamSize()*2 {
 		return Wait, nil
@@ -145,7 +143,7 @@ func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus,
 	playerWait, playerRest := false, false
 
 	for _, p := range players {
-		isPlaying, _ := PlayerTracker.IsPlaying(p)
+		isPlaying, _ := PlayerTracker.isPlaying(p)
 		if !isPlaying {
 			continue
 		}
@@ -154,7 +152,7 @@ func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus,
 	}
 
 	for _, p := range players {
-		isResting := PlayerTracker.IsResting(p)
+		isResting := PlayerTracker.isResting(p)
 		if !isResting {
 			continue
 		}
@@ -194,7 +192,7 @@ func calculateScheduleOffsets(tournaments []*CompetitionTournament) []int {
 func numCompletedRounds(tournament got.MatchLister) int {
 	completed := 0
 	for _, round := range tournament.MatchList().Rounds {
-		if !MatchInfo.MatchesFinished(round.Matches) {
+		if !matchesFinished(round.Matches) {
 			break
 		}
 		completed += 1

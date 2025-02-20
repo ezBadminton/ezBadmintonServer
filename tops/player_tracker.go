@@ -2,7 +2,6 @@ package tops
 
 import (
 	"slices"
-	"sync"
 	"time"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
@@ -16,7 +15,6 @@ type PlayerOccupationTracker struct {
 	// player id -> last ended match
 	lastMatches map[string]*MatchData
 	restTime    time.Duration
-	mu          sync.RWMutex
 }
 
 var PlayerTracker *PlayerOccupationTracker
@@ -27,7 +25,7 @@ func InitPlayerTracker() error {
 		return err
 	}
 
-	runningTournaments := Tournaments.ListRunning()
+	runningTournaments := Tournaments.listRunning()
 	matches := make([]*got.Match, 0)
 	for _, t := range runningTournaments {
 		matches = append(matches, t.MatchList().Matches...)
@@ -49,12 +47,12 @@ func InitPlayerTracker() error {
 func collectCurrentMatches(matches []*got.Match) map[string]*MatchData {
 	inMatch := make(map[string]*MatchData)
 	for _, m := range matches {
-		if !MatchInfo.MatchRunning(m) {
+		if !matchRunning(m) {
 			continue
 		}
 
-		matchData := Tournaments.FindMatchData(m)
-		players := MatchInfo.PlayersInMatch(m)
+		matchData := Tournaments.findMatchData(m)
+		players := playersInMatch(m)
 
 		for _, p := range players {
 			inMatch[p.Id] = matchData
@@ -72,8 +70,8 @@ func collectLastMatches(sortedMatches []*got.Match) map[string]*MatchData {
 			break
 		}
 
-		matchData := Tournaments.FindMatchData(m)
-		players := MatchInfo.PlayersInMatch(m)
+		matchData := Tournaments.findMatchData(m)
+		players := playersInMatch(m)
 
 		for _, p := range players {
 			_, ok := lastMatches[p.Id]
@@ -87,10 +85,7 @@ func collectLastMatches(sortedMatches []*got.Match) map[string]*MatchData {
 
 // TODO: track ending matches
 
-func (t *PlayerOccupationTracker) IsPlaying(player *Player) (bool, *MatchData) {
-	defer t.mu.RUnlock()
-	t.mu.RLock()
-
+func (t *PlayerOccupationTracker) isPlaying(player *Player) (bool, *MatchData) {
 	match, ok := t.inMatch[player.Id]
 	if !ok {
 		return false, nil
@@ -98,10 +93,7 @@ func (t *PlayerOccupationTracker) IsPlaying(player *Player) (bool, *MatchData) {
 	return true, match
 }
 
-func (t *PlayerOccupationTracker) IsResting(player *Player) bool {
-	defer t.mu.RUnlock()
-	t.mu.RLock()
-
+func (t *PlayerOccupationTracker) isResting(player *Player) bool {
 	lastMatch, ok := t.lastMatches[player.Id]
 	if !ok {
 		return false

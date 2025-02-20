@@ -20,5 +20,5 @@ func BindTournamentPlanHooks(app core.App) {
 }
 
 func listTournamentPlans(e *core.RequestEvent) error {
-	return tops.TopsRecordListResponse(tops.Tournaments.List(), e)
+	return tops.TopsRecordListResponse(tops.ListTournaments(), e)
 }

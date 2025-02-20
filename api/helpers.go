@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"slices"
 
@@ -17,11 +18,11 @@ func idList[S ~[]P, P core.RecordProxy](records S) []string {
 	return ids
 }
 
-func findCompetition(e *core.RequestEvent) (*Competition, error) {
-	competitionId := e.Request.PathValue("competition")
+func findCompetition(r *http.Request) (*Competition, error) {
+	competitionId := r.PathValue("competition")
 	competition, err := store.FindProxy[Competition](competitionId)
 	if err != nil {
-		return nil, e.String(http.StatusBadRequest, "could not find the competition ID")
+		return nil, errors.New("could not find the competition ID")
 	}
 	return competition, nil
 }

@@ -16,7 +16,7 @@ type StatusChangeMatchList struct {
 
 // When a player changes status, they withdraw or reenter from/to matches.
 // This function lists the matches.
-func ListStatusChangedMatches(player *Player, newStatus PlayerStatus) error {
+func listStatusChangedMatches(player *Player, newStatus PlayerStatus) error {
 	var withdrawing bool
 	status := player.Status()
 	if status != Attending && newStatus == Attending {
@@ -28,10 +28,10 @@ func ListStatusChangedMatches(player *Player, newStatus PlayerStatus) error {
 		return nil
 	}
 
-	regs := Registrations.RegistrationsOfPlayer(player.Id)
+	regs := Registrations.registrationsOfPlayer(player.Id)
 	runningTournaments := make([]*CompetitionTournament, 0)
 	for _, reg := range regs {
-		tournament := Tournaments.FindTournament(reg.Competition.Id)
+		tournament := Tournaments.findTournament(reg.Competition.Id)
 		if tournament == nil {
 			continue
 		}

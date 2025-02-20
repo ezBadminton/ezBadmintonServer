@@ -1,7 +1,3 @@
-// The tournament operations package contains
-// tournament logic and holds data in memory that is derived
-// from the persistent records and is needed by the
-// tops functions
 package tops
 
 import (
@@ -33,6 +29,9 @@ func (r *BaseTopsRecord) ToMap(with map[string]any) map[string]any {
 }
 
 func TopsRecordListResponse[S ~[]T, T TopsRecord](records S, e *core.RequestEvent) error {
+	defer topsMu.RUnlock()
+	topsMu.RLock()
+
 	data := make([]map[string]any, len(records))
 	for i, r := range records {
 		data[i] = r.ToMap()

@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"sync"
 	"time"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/ezBadminton/gotournament/badminton"
 	got "github.com/ezBadminton/gotournament/core"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 type Tournament interface {
@@ -39,32 +39,12 @@ func (c *CompetitionTournament) ToMap() map[string]any {
 	return c.BaseTopsRecord.ToMap(data)
 }
 
-func (c *CompetitionTournament) started() bool {
-	matches := c.Competition.Matches()
-	started := len(matches) > 0
-	return started
-}
-
-func (c *CompetitionTournament) ended() bool {
-	matches := c.Competition.Matches()
-	ended := true
-	for _, m := range matches {
-		sets := m.Sets()
-		if len(sets) == 0 {
-			ended = false
-			break
-		}
-	}
-	return ended
-}
-
 var Tournaments *TournamentStore
 
 type TournamentStore struct {
 	tournaments map[string]*CompetitionTournament
 	list        []*CompetitionTournament
 	matchData   map[int]*MatchData
-	mu          sync.RWMutex
 }
 
 func InitTournaments() error {
@@ -83,22 +63,13 @@ func InitTournaments() error {
 		return err
 	}
 
-	compStore.RegisterUpdateHandler(CompetitionUpdated)
+	compStore.RegisterUpdateHandler(competitionUpdated)
+	compStore.RegisterFailedUpdateHandler(competitionUpdateFailed)
 
 	return nil
 }
 
-func (s *TournamentStore) List() []*CompetitionTournament {
-	defer s.mu.RUnlock()
-	s.mu.RLock()
-
-	return s.list
-}
-
-func (s *TournamentStore) ListRunning() []*CompetitionTournament {
-	defer s.mu.RUnlock()
-	s.mu.RLock()
-
+func (s *TournamentStore) listRunning() []*CompetitionTournament {
 	tournaments := make([]*CompetitionTournament, 0, len(s.list))
 	for _, t := range s.list {
 		if t.Started && !t.Ended {
@@ -109,24 +80,15 @@ func (s *TournamentStore) ListRunning() []*CompetitionTournament {
 	return tournaments
 }
 
-func (s *TournamentStore) FindTournament(competitionId string) *CompetitionTournament {
-	defer s.mu.RUnlock()
-	s.mu.RLock()
-
+func (s *TournamentStore) findTournament(competitionId string) *CompetitionTournament {
 	return s.tournaments[competitionId]
 }
 
-func (s *TournamentStore) FindMatchData(match *got.Match) *MatchData {
-	defer s.mu.RUnlock()
-	s.mu.RLock()
-
+func (s *TournamentStore) findMatchData(match *got.Match) *MatchData {
 	return s.matchData[match.Id()]
 }
 
-func (s *TournamentStore) SetTournament(competitionId string, tournament *CompetitionTournament) {
-	defer s.mu.Unlock()
-	s.mu.Lock()
-
+func (s *TournamentStore) setTournament(competitionId string, tournament *CompetitionTournament) {
 	s.tournaments[competitionId] = tournament
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
 		return t.Competition.Id == competitionId
@@ -136,10 +98,7 @@ func (s *TournamentStore) SetTournament(competitionId string, tournament *Compet
 	slices.SortFunc(s.list, compareTournaments)
 }
 
-func (s *TournamentStore) RemoveTournament(competitionId string) {
-	defer s.mu.Unlock()
-	s.mu.Lock()
-
+func (s *TournamentStore) removeTournament(competitionId string) {
 	tournament := s.tournaments[competitionId]
 	if tournament == nil {
 		return
@@ -157,12 +116,9 @@ func (s *TournamentStore) RemoveTournament(competitionId string) {
 }
 
 func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
-	defer s.mu.Unlock()
-	s.mu.Lock()
-
 	for _, comp := range competitions {
-		tournament, err := CreateTournament(comp)
-		if errors.Is(err, ErrNoDraw) {
+		tournament, err := s.createTournament(comp)
+		if tournament == nil && err == nil {
 			continue
 		}
 		if err != nil {
@@ -176,11 +132,19 @@ func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
 	return nil
 }
 
-func CreateTournament(comp *Competition) (*CompetitionTournament, error) {
+func (s *TournamentStore) createTournament(comp *Competition) (*CompetitionTournament, error) {
+	currentTournament, ok := s.tournaments[comp.Id]
+	if ok && currentTournament.Started {
+		return nil, errors.New("can not update draw while competition is running")
+	}
+
 	entries, err := newEntries(comp)
-	if err != nil {
+	if errors.Is(err, ErrNoDraw) {
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
+
 	settings := comp.TournamentModeSettings()
 	if settings == nil {
 		return nil, errors.New("cannot create tournament without mode settings")
@@ -242,56 +206,91 @@ func CreateTournament(comp *Competition) (*CompetitionTournament, error) {
 	return compTournament, nil
 }
 
-func (s *TournamentStore) HasStarted(competitionId string) (bool, error) {
-	defer s.mu.RUnlock()
-	s.mu.RLock()
-
+func (s *TournamentStore) start(app core.App, competitionId string) error {
 	tournament := s.tournaments[competitionId]
 	if tournament == nil {
-		return false, errors.New("competition has no draw")
+		return ErrNoDraw
 	}
-
-	return tournament.Started, nil
-}
-
-func (s *TournamentStore) SetStarted(competitionId string, started bool) error {
-	defer s.mu.Unlock()
-	s.mu.Lock()
-
-	tournament := s.tournaments[competitionId]
-	if tournament == nil {
-		return errors.New("competition has no draw")
-	}
-
-	if started && tournament.Started {
+	if tournament.Started {
 		return errors.New("competition already running")
 	}
-	if !started && !tournament.Started {
-		return errors.New("competition not running")
+
+	matchData, err := createMatchData(app, tournament)
+	if err != nil {
+		return ErrUnexpected
 	}
 
-	tournament.Started = started
+	comp, _ := WrapRecord[Competition](tournament.Competition.Clone())
+	comp.SetMatches(matchData)
+	if err := app.Save(comp); err != nil {
+		return ErrUnexpected
+	}
+
+	tournament.Started = true
 	tournament.Ended = false
-
-	if !started {
-		dehydrate(tournament)
-	}
 
 	return nil
 }
 
-func CompetitionUpdated(_, competition *Competition) {
+func (s *TournamentStore) stop(app core.App, competitionId string) error {
+	tournament := s.tournaments[competitionId]
+	if tournament == nil {
+		return ErrNoDraw
+	}
+	if !tournament.Started {
+		return errors.New("competition is not running")
+	}
+
+	comp, _ := WrapRecord[Competition](tournament.Competition.Clone())
+	comp.SetMatches(nil)
+	if err := app.Save(comp); err != nil {
+		return ErrUnexpected
+	}
+
+	dehydrate(tournament)
+
+	tournament.Started = false
+	tournament.Ended = false
+
+	return nil
+}
+
+func createMatchData(app core.App, tournament got.MatchLister) ([]*MatchData, error) {
+	matches := tournament.MatchList().Matches
+	matchData := make([]*MatchData, len(matches))
+	for i := range matches {
+		data, err := NewProxy[MatchData](app)
+		if err != nil {
+			return nil, errors.New("could not create match data proxy")
+		}
+		matchData[i] = data
+	}
+
+	return matchData, nil
+}
+
+func competitionUpdated(_, competition *Competition) {
 	data := competition.CustomData()
 	newTournament, ok := data["DRAW_CHANGE"]
 	if !ok {
 		return
 	}
 
+	defer topsMu.Unlock()
+
 	if newTournament != nil {
 		t := newTournament.(*CompetitionTournament)
-		Tournaments.SetTournament(competition.Id, t)
+		Tournaments.setTournament(competition.Id, t)
 	} else {
-		Tournaments.RemoveTournament(competition.Id)
+		Tournaments.removeTournament(competition.Id)
+	}
+}
+
+func competitionUpdateFailed(competition *Competition) {
+	data := competition.CustomData()
+	_, ok := data["DRAW_CHANGE"]
+	if ok {
+		topsMu.Unlock()
 	}
 }
 
@@ -339,7 +338,7 @@ func hydrate(tournament *CompetitionTournament) error {
 
 	tournament.Update(nil)
 
-	tournament.Ended = MatchInfo.MatchesFinished(matches)
+	tournament.Ended = matchesFinished(matches)
 
 	return nil
 }

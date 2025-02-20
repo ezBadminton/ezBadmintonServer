@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
@@ -23,81 +24,45 @@ func BindStartStopHooks(app core.App) {
 }
 
 func handleStartStop(e *core.RequestEvent) error {
-	competition, err := findCompetition(e)
-	if competition == nil {
-		return err
-	}
-	tournament := tops.Tournaments.FindTournament(competition.Id)
-	if tournament == nil {
-		return e.String(http.StatusBadRequest, "competition has no draw")
+	competition, err := findCompetition(e.Request)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
 	body := struct {
-		Started bool `json:"started"`
+		Start bool `json:"start"`
 	}{}
 	if err := e.BindBody(&body); err != nil {
-		return e.String(http.StatusBadRequest, "the body does not contain JSON with one 'started' bool field")
+		return e.String(http.StatusBadRequest, "the body does not contain JSON with one 'start' bool field")
 	}
 
-	if body.Started {
-		return startCompetition(e, tournament)
+	if body.Start {
+		return startCompetition(e, competition)
 	} else {
-		return stopCompetition(e, tournament)
+		return stopCompetition(e, competition)
 	}
 }
 
-func startCompetition(e *core.RequestEvent, tournament *tops.CompetitionTournament) error {
-	comp := tournament.Competition
-	started, err := tops.Tournaments.HasStarted(comp.Id)
-	if err != nil {
-		return e.JSON(http.StatusBadRequest, err)
-	}
-	if started {
-		return e.String(http.StatusBadRequest, "competition already running")
-	}
+func startCompetition(e *core.RequestEvent, competition *Competition) error {
+	err := tops.StartTournament(e.App, competition.Id)
 
-	matches := tournament.MatchList().Matches
-	matchData := make([]*MatchData, len(matches))
-	for i := range matches {
-		data, err := NewProxy[MatchData](e.App)
-		if err != nil {
-			return e.NoContent(http.StatusInternalServerError)
-		}
-		matchData[i] = data
-	}
-
-	comp, _ = WrapRecord[Competition](tournament.Competition.Clone())
-	comp.SetMatches(matchData)
-	if err := e.App.Save(comp); err != nil {
+	if errors.Is(err, tops.ErrUnexpected) {
 		return e.NoContent(http.StatusInternalServerError)
+	} else if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	if err := tops.Tournaments.SetStarted(comp.Id, true); err != nil {
-		return e.NoContent(http.StatusInternalServerError)
-	}
-
-	return nil
+	return e.NoContent(http.StatusOK)
 }
 
-func stopCompetition(e *core.RequestEvent, tournament *tops.CompetitionTournament) error {
-	comp := tournament.Competition
-	started, err := tops.Tournaments.HasStarted(comp.Id)
-	if err != nil {
-		return e.JSON(http.StatusBadRequest, err)
-	}
-	if !started {
-		return e.JSON(http.StatusBadRequest, "competition not running")
+func stopCompetition(e *core.RequestEvent, competition *Competition) error {
+	err := tops.StopTournament(e.App, competition.Id)
+
+	if errors.Is(err, tops.ErrUnexpected) {
+		return e.NoContent(http.StatusInternalServerError)
+	} else if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	comp, _ = WrapRecord[Competition](tournament.Competition.Clone())
-	comp.SetMatches(nil)
-	if err := e.App.Save(comp); err != nil {
-		return e.JSON(http.StatusInternalServerError, nil)
-	}
-
-	if err := tops.Tournaments.SetStarted(comp.Id, false); err != nil {
-		return e.JSON(http.StatusInternalServerError, nil)
-	}
-
-	return nil
+	return e.NoContent(http.StatusOK)
 }

@@ -3,7 +3,6 @@ package tops
 import (
 	"errors"
 	"slices"
-	"sync"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
@@ -37,7 +36,6 @@ type RegistrationStore struct {
 	byCompetition       map[string][]*Registration
 	byCompetitionPlayer map[string]map[string]*Registration
 	byId                map[string]*Registration
-	mu                  sync.RWMutex
 }
 
 func InitRegistrations() error {
@@ -59,28 +57,18 @@ func InitRegistrations() error {
 
 	Registrations.addRegistrations(teams...)
 
-	teamStore.RegisterCreateHander(Registrations.Created)
-	teamStore.RegisterUpdateHandler(Registrations.Updated)
-	teamStore.RegisterDeleteHandler(Registrations.Deleted)
+	teamStore.RegisterCreateHander(Registrations.created)
+	teamStore.RegisterUpdateHandler(Registrations.updated)
+	teamStore.RegisterDeleteHandler(Registrations.deleted)
 
 	return nil
 }
 
-func (s *RegistrationStore) List() []*Registration {
-	defer s.mu.RUnlock()
-	s.mu.RLock()
-
-	return s.list
-}
-
-func (s *RegistrationStore) RegistrationsOfPlayer(playerId string) []*Registration {
-	defer s.mu.RUnlock()
-	s.mu.RLock()
-
+func (s *RegistrationStore) registrationsOfPlayer(playerId string) []*Registration {
 	return s.byPlayer[playerId]
 }
 
-func (s *RegistrationStore) VerifyRegistration(team *Team, competition *Competition) error {
+func (s *RegistrationStore) verifyRegistration(team *Team, competition *Competition) error {
 	if competition == nil {
 		reg, ok := s.byTeam[team.Id]
 		if !ok {
@@ -110,9 +98,6 @@ func (s *RegistrationStore) VerifyRegistration(team *Team, competition *Competit
 }
 
 func (s *RegistrationStore) addRegistrations(teams ...*Team) {
-	defer s.mu.Unlock()
-	s.mu.Lock()
-
 	for _, team := range teams {
 		reg := teamToRegistration(team)
 		comp := reg.Competition
@@ -146,9 +131,6 @@ func (s *RegistrationStore) addRegistrations(teams ...*Team) {
 }
 
 func (s *RegistrationStore) playerAdded(player *Player, team *Team) {
-	defer s.mu.Unlock()
-	s.mu.Lock()
-
 	reg := s.byTeam[team.Id]
 	comp := reg.Competition
 
@@ -162,9 +144,6 @@ func (s *RegistrationStore) playerAdded(player *Player, team *Team) {
 }
 
 func (s *RegistrationStore) playerRemoved(player *Player, team *Team) {
-	defer s.mu.Unlock()
-	s.mu.Lock()
-
 	reg := s.byTeam[team.Id]
 	comp := reg.Competition
 
@@ -176,11 +155,11 @@ func (s *RegistrationStore) playerRemoved(player *Player, team *Team) {
 	delete(s.byCompetitionPlayer[comp.Id], player.Id)
 }
 
-func (s *RegistrationStore) Created(team *Team) {
+func (s *RegistrationStore) created(team *Team) {
 	Registrations.addRegistrations(team)
 }
 
-func (s *RegistrationStore) Updated(oldTeam, updatedTeam *Team) {
+func (s *RegistrationStore) updated(oldTeam, updatedTeam *Team) {
 	oldPlayers := oldTeam.Players()
 	updatedPlayers := updatedTeam.Players()
 	if len(oldPlayers) > len(updatedPlayers) {
@@ -198,10 +177,7 @@ func (s *RegistrationStore) Updated(oldTeam, updatedTeam *Team) {
 	}
 }
 
-func (s *RegistrationStore) Deleted(team *Team) {
-	defer s.mu.Unlock()
-	s.mu.Lock()
-
+func (s *RegistrationStore) deleted(team *Team) {
 	reg := s.byTeam[team.Id]
 	comp := reg.Competition
 	players := team.Players()

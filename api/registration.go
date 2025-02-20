@@ -1,8 +1,6 @@
 package api
 
 import (
-	"errors"
-
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
@@ -29,25 +27,12 @@ func BindRegistrationHooks(app core.App) {
 }
 
 func CheckRegistration(e *core.RecordRequestEvent) error {
-	if e.Auth.IsSuperuser() {
-		return e.Next()
-	}
-	var competition *Competition
-	params := e.Request.URL.Query()
-
-	if params.Has("competition") {
-		compId := params.Get("competition")
-		compStore, _ := store.FindRecordStore[Competition]()
-		competition, _ = compStore.FindProxy(compId)
-		if competition == nil {
-			return errors.New("the given competition ID was not found")
-		}
-	}
+	competition, _ := findCompetition(e.Request)
 
 	team, _ := WrapRecord[Team](e.Record)
 	store.ExpandRelationsDry(team)
 
-	err := tops.Registrations.VerifyRegistration(team, competition)
+	err := tops.VerifyRegistration(team, competition)
 	if err != nil {
 		return err
 	}
@@ -56,5 +41,5 @@ func CheckRegistration(e *core.RecordRequestEvent) error {
 }
 
 func listRegistrations(e *core.RequestEvent) error {
-	return tops.TopsRecordListResponse(tops.Registrations.List(), e)
+	return tops.TopsRecordListResponse(tops.ListRegistrations(), e)
 }
