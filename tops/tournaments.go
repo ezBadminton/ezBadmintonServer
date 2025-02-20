@@ -391,7 +391,7 @@ func setWithdrawnTeams(match *got.Match, withdrawnTeams []*Team) {
 
 	withdrawn := make([]got.Player, len(withdrawnTeams))
 	for i, t := range withdrawnTeams {
-		withdrawn[i] = &TournamentPlayer{t}
+		withdrawn[i] = TournamentPlayer{t}
 	}
 
 	match.WithdrawnPlayers = withdrawn
@@ -401,7 +401,7 @@ type TournamentPlayer struct {
 	*Team
 }
 
-func (p *TournamentPlayer) Id() string {
+func (p TournamentPlayer) Id() string {
 	return p.Team.Id
 }
 
@@ -423,7 +423,7 @@ func newEntries(comp *Competition) (*got.ConstantRanking, error) {
 
 	tournamentPlayers := make([]got.Player, len(draw))
 	for i, t := range draw {
-		tournamentPlayers[i] = &TournamentPlayer{t}
+		tournamentPlayers[i] = TournamentPlayer{t}
 	}
 
 	entryRanking := got.NewConstantRanking(tournamentPlayers)

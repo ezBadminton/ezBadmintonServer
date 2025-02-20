@@ -6,7 +6,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-func BindPlayerHooks(app core.App) {
+func BindClubHooks(app core.App) {
 	cName := CName[Player]()
 
 	app.OnRecordCreate(cName).BindFunc(OnPlayerWithNewClub)

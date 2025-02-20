@@ -29,11 +29,12 @@ func main() {
 
 	//RegisterHooks(app)
 	//RegisterRoutes(app)
-	api.BindPlayerHooks(app)
+	api.BindClubHooks(app)
 	api.BindRegistrationHooks(app)
 	api.BindTournamentPlanHooks(app)
 	api.BindDrawHooks(app)
 	api.BindResultHooks(app)
+	api.BindPlayerStatusHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {
@@ -59,6 +60,9 @@ func main() {
 			return err
 		}
 		if err := tops.InitTournaments(); err != nil {
+			return err
+		}
+		if err := tops.InitWithdrawalHandlers(); err != nil {
 			return err
 		}
 
