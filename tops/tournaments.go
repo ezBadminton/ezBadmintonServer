@@ -42,18 +42,20 @@ func (c *CompetitionTournament) ToMap() map[string]any {
 var Tournaments *TournamentStore
 
 type TournamentStore struct {
+	app         core.App
 	tournaments map[string]*CompetitionTournament
 	list        []*CompetitionTournament
 	matchData   map[int]*MatchData
 }
 
-func InitTournaments() error {
+func InitTournaments(app core.App) error {
 	compStore, err := store.FindRecordStore[Competition]()
 	if err != nil {
 		return err
 	}
 
 	Tournaments = &TournamentStore{
+		app:         app,
 		tournaments: make(map[string]*CompetitionTournament),
 		list:        make([]*CompetitionTournament, 0),
 	}
@@ -65,6 +67,7 @@ func InitTournaments() error {
 
 	compStore.RegisterUpdateHandler(competitionUpdated)
 	compStore.RegisterFailedUpdateHandler(competitionUpdateFailed)
+	compStore.RegisterRealtimeNotifier(Tournaments.sendTournamentDrawUpdate)
 
 	return nil
 }
@@ -88,18 +91,25 @@ func (s *TournamentStore) findMatchData(match *got.Match) *MatchData {
 	return s.matchData[match.Id()]
 }
 
-func (s *TournamentStore) setTournament(competitionId string, tournament *CompetitionTournament) {
-	s.tournaments[competitionId] = tournament
+func (s *TournamentStore) setTournament(competition *Competition, tournament *CompetitionTournament) {
+	_, ok := s.tournaments[competition.Id]
+	if ok {
+		competition.SetRaw(TournamentUpdateKey, tournament)
+	} else {
+		competition.SetRaw(TournamentCreateKey, tournament)
+	}
+
+	s.tournaments[competition.Id] = tournament
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
-		return t.Competition.Id == competitionId
+		return t.Competition.Id == competition.Id
 	})
 	s.list = append(s.list, tournament)
 
 	slices.SortFunc(s.list, compareTournaments)
 }
 
-func (s *TournamentStore) removeTournament(competitionId string) {
-	tournament := s.tournaments[competitionId]
+func (s *TournamentStore) removeTournament(competition *Competition) {
+	tournament := s.tournaments[competition.Id]
 	if tournament == nil {
 		return
 	}
@@ -109,10 +119,12 @@ func (s *TournamentStore) removeTournament(competitionId string) {
 		delete(s.matchData, m.Id())
 	}
 
-	delete(s.tournaments, competitionId)
+	delete(s.tournaments, competition.Id)
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
-		return t.Competition.Id == competitionId
+		return t.Competition.Id == competition.Id
 	})
+
+	competition.SetRaw(TournamentDeleteKey, tournament)
 }
 
 func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
@@ -271,7 +283,7 @@ func createMatchData(app core.App, tournament got.MatchLister) ([]*MatchData, er
 
 func competitionUpdated(_, competition *Competition) {
 	data := competition.CustomData()
-	newTournament, ok := data["DRAW_CHANGE"]
+	newTournament, ok := data[DrawChangeKey]
 	if !ok {
 		return
 	}
@@ -280,18 +292,34 @@ func competitionUpdated(_, competition *Competition) {
 
 	t, ok := newTournament.(*CompetitionTournament)
 	if ok {
-		Tournaments.setTournament(competition.Id, t)
+		Tournaments.setTournament(competition, t)
 	} else {
-		Tournaments.removeTournament(competition.Id)
+		Tournaments.removeTournament(competition)
 	}
 }
 
 func competitionUpdateFailed(competition *Competition) {
 	data := competition.CustomData()
-	_, ok := data["DRAW_CHANGE"]
+	_, ok := data[DrawChangeKey]
 	if ok {
 		topsMu.Unlock()
 	}
+}
+
+func (s *TournamentStore) sendTournamentDrawUpdate(competition *Competition) {
+	customData := competition.CustomData()
+	action, tournament := realtimeActionAndData[CompetitionTournament](
+		TournamentCreateKey,
+		TournamentUpdateKey,
+		TournamentDeleteKey,
+		customData,
+	)
+
+	if action == "" {
+		return
+	}
+
+	realtimeNotify(s.app, "tournamentplans", action, tournament)
 }
 
 func hydrate(tournament *CompetitionTournament) error {

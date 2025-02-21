@@ -38,7 +38,6 @@ type RegistrationStore struct {
 	byCompetition       map[string][]*Registration
 	byCompetitionPlayer map[string]map[string]*Registration
 	byId                map[string]*Registration
-	realtimeDeleted     map[string]*Registration
 }
 
 func InitRegistrations(app core.App) error {
@@ -57,7 +56,6 @@ func InitRegistrations(app core.App) error {
 		byCompetition:       make(map[string][]*Registration),
 		byCompetitionPlayer: make(map[string]map[string]*Registration),
 		byId:                make(map[string]*Registration),
-		realtimeDeleted:     make(map[string]*Registration),
 	}
 
 	Registrations.addRegistrations(teams...)
@@ -164,7 +162,9 @@ func (s *RegistrationStore) playerRemoved(player *Player, team *Team) {
 func (s *RegistrationStore) created(team *Team) {
 	defer topsMu.Unlock()
 	topsMu.Lock()
+
 	Registrations.addRegistrations(team)
+	team.SetRaw(RegistrationCreateKey, s.byTeam[team.Id])
 }
 
 func (s *RegistrationStore) updated(oldTeam, updatedTeam *Team) {
@@ -189,6 +189,8 @@ func (s *RegistrationStore) updated(oldTeam, updatedTeam *Team) {
 		addedPlayer := updatedPlayers[len(updatedPlayers)-1]
 		s.playerAdded(addedPlayer, updatedTeam)
 	}
+
+	updatedTeam.SetRaw(RegistrationUpdateKey, reg)
 }
 
 func (s *RegistrationStore) deleted(team *Team) {
@@ -212,24 +214,20 @@ func (s *RegistrationStore) deleted(team *Team) {
 		delete(s.byCompetitionPlayer[comp.Id], p.Id)
 	}
 
-	s.realtimeDeleted[team.Id] = reg
+	team.SetRaw(RegistrationDeleteKey, reg)
 }
 
-func (s *RegistrationStore) sendRealtimeNotification(action string, team *Team) {
-	topsMu.RLock()
-	var reg *Registration
-	var ok bool
-	switch action {
-	case core.ModelEventTypeDelete:
-		reg, ok = s.realtimeDeleted[team.Id]
-		delete(s.realtimeDeleted, team.Id) // Delete despite read lock because nothing accesses this
-	default:
-		reg, ok = s.byTeam[team.Id]
-	}
-	topsMu.RUnlock()
+func (s *RegistrationStore) sendRealtimeNotification(team *Team) {
+	customData := team.CustomData()
+	action, reg := realtimeActionAndData[Registration](
+		RegistrationCreateKey,
+		RegistrationUpdateKey,
+		RegistrationDeleteKey,
+		customData,
+	)
 
-	if !ok {
-		panic("realtime notifier could not find registration")
+	if action == "" {
+		return
 	}
 
 	realtimeNotify(s.app, "registrations", action, reg)

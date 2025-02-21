@@ -110,11 +110,9 @@ Loop:
 	errHandler = errorHook(createStoreHook(RecordStore.FailedDelete))
 	app.OnRecordAfterDeleteError(collectionNames...).BindFunc(errHandler)
 
-	realtimeNotifier := createRealtimeNotifierHook(core.ModelEventTypeCreate, RecordStore.RealtimeUpdate)
+	realtimeNotifier := createRealtimeNotifierHook(RecordStore.RealtimeUpdate)
 	app.OnRecordAfterCreateSuccess(collectionNames...).Bind(realtimeNotifier)
-	realtimeNotifier = createRealtimeNotifierHook(core.ModelEventTypeUpdate, RecordStore.RealtimeUpdate)
 	app.OnRecordAfterUpdateSuccess(collectionNames...).Bind(realtimeNotifier)
-	realtimeNotifier = createRealtimeNotifierHook(core.ModelEventTypeDelete, RecordStore.RealtimeUpdate)
 	app.OnRecordAfterDeleteSuccess(collectionNames...).Bind(realtimeNotifier)
 
 	app.OnRealtimeMessageSend()
@@ -152,7 +150,7 @@ func errorHook(errorHook func(*core.RecordEvent) error) func(*core.RecordErrorEv
 	return func(e *core.RecordErrorEvent) error { return errorHook(&e.RecordEvent) }
 }
 
-func createRealtimeNotifierHook(action string, handler func(RecordStore, string, *core.Record) error) *hook.Handler[*core.RecordEvent] {
+func createRealtimeNotifierHook(handler func(RecordStore, *core.Record) error) *hook.Handler[*core.RecordEvent] {
 	return &hook.Handler[*core.RecordEvent]{
 		Func: func(e *core.RecordEvent) error {
 			if err := e.Next(); err != nil {
@@ -164,7 +162,7 @@ func createRealtimeNotifierHook(action string, handler func(RecordStore, string,
 			if err != nil {
 				return err
 			}
-			if err = handler(store, action, e.Record); err != nil {
+			if err = handler(store, e.Record); err != nil {
 				return err
 			}
 
@@ -184,7 +182,7 @@ type RecordStore interface {
 	FailedCreate(*core.Record) error
 	FailedUpdate(*core.Record) error
 	FailedDelete(*core.Record) error
-	RealtimeUpdate(string, *core.Record) error
+	RealtimeUpdate(*core.Record) error
 }
 
 type BaseRecordStore[P Proxy, PP ProxyP[P]] struct {
@@ -200,7 +198,7 @@ type BaseRecordStore[P Proxy, PP ProxyP[P]] struct {
 	failedUpdateHandlers,
 	failedDeleteHandlers []func(PP)
 
-	realtimeNotifiers []func(string, PP)
+	realtimeNotifiers []func(PP)
 }
 
 func newStore[P Proxy, PP ProxyP[P]](app core.App) (*BaseRecordStore[P, PP], error) {
@@ -284,7 +282,7 @@ func (s *BaseRecordStore[P, PP]) RegisterFailedDeleteHandler(handler func(delete
 	s.failedDeleteHandlers = append(s.failedCreateHandlers, handler)
 }
 
-func (s *BaseRecordStore[P, PP]) RegisterRealtimeNotifier(handler func(action string, record PP)) {
+func (s *BaseRecordStore[P, PP]) RegisterRealtimeNotifier(handler func(record PP)) {
 	s.realtimeNotifiers = append(s.realtimeNotifiers, handler)
 }
 
@@ -393,14 +391,14 @@ func (s *BaseRecordStore[P, PP]) FailedDelete(record *core.Record) error {
 	return nil
 }
 
-func (s *BaseRecordStore[P, PP]) RealtimeUpdate(action string, record *core.Record) error {
+func (s *BaseRecordStore[P, PP]) RealtimeUpdate(record *core.Record) error {
 	proxy, ok := s.FindProxy(record.Id)
 	if !ok {
 		return errors.New("the relatime updated record is not part of the store")
 	}
 
 	for _, handler := range s.realtimeNotifiers {
-		handler(action, proxy)
+		handler(proxy)
 	}
 
 	return nil

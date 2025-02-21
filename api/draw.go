@@ -105,7 +105,7 @@ func handleDrawChange(e *core.RecordEvent) error {
 	// reads this custom record data and stores it in the TournamentStore
 	// It is not done here to avoid persisting a tournament when
 	// the transaction of the draw change is unsuccessful.
-	e.Record.SetRaw("DRAW_CHANGE", rawTournament)
+	e.Record.SetRaw(tops.DrawChangeKey, rawTournament)
 
 	return e.Next()
 }

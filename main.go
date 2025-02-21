@@ -59,7 +59,7 @@ func main() {
 		if err := tops.InitRegistrations(e.App); err != nil {
 			return err
 		}
-		if err := tops.InitTournaments(); err != nil {
+		if err := tops.InitTournaments(e.App); err != nil {
 			return err
 		}
 		if err := tops.InitWithdrawalHandlers(); err != nil {
