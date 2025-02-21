@@ -22,12 +22,14 @@ func InitWithdrawalHandlers() error {
 }
 
 type FloatingStatusChange struct {
-	team     TournamentPlayer
-	matches  []*got.Match
-	withdraw bool
+	team         TournamentPlayer
+	registration *Registration
+	matches      []*got.Match
+	withdraw     bool
 }
 
 func (c *FloatingStatusChange) apply() {
+	c.registration.Withdrawn = c.withdraw
 	if c.withdraw {
 		c.applyWithdrawal()
 	} else {
@@ -62,7 +64,8 @@ func (c *CompetitionTournament) listReenterMatches(team *Team) []*MatchData {
 	return matchesToMatchData(reenterMatches)
 }
 
-func (c *CompetitionTournament) withdrawTeam(app core.App, team *Team) (*FloatingStatusChange, error) {
+func (c *CompetitionTournament) withdrawTeam(app core.App, registration *Registration) (*FloatingStatusChange, error) {
+	team := registration.Team
 	wrapped := TournamentPlayer{team}
 	withdrawMatches := c.ListWithdrawMatches(wrapped)
 	matchData := matchesToMatchData(withdrawMatches)
@@ -70,14 +73,16 @@ func (c *CompetitionTournament) withdrawTeam(app core.App, team *Team) (*Floatin
 		return nil, err
 	}
 	change := &FloatingStatusChange{
-		team:     wrapped,
-		matches:  withdrawMatches,
-		withdraw: true,
+		team:         wrapped,
+		registration: registration,
+		matches:      withdrawMatches,
+		withdraw:     true,
 	}
 	return change, nil
 }
 
-func (c *CompetitionTournament) reenterTeam(app core.App, team *Team) (*FloatingStatusChange, error) {
+func (c *CompetitionTournament) reenterTeam(app core.App, registration *Registration) (*FloatingStatusChange, error) {
+	team := registration.Team
 	wrapped := TournamentPlayer{team}
 	reenterMatches := c.ListReenterMatches(wrapped)
 	matchData := matchesToMatchData(reenterMatches)
@@ -85,9 +90,10 @@ func (c *CompetitionTournament) reenterTeam(app core.App, team *Team) (*Floating
 		return nil, err
 	}
 	change := &FloatingStatusChange{
-		team:     wrapped,
-		matches:  reenterMatches,
-		withdraw: false,
+		team:         wrapped,
+		registration: registration,
+		matches:      reenterMatches,
+		withdraw:     false,
 	}
 	return change, nil
 }
@@ -191,9 +197,9 @@ func withdrawOrReenterPlayer(
 		var change *FloatingStatusChange
 		var err error
 		if withdraw {
-			change, err = tournament.withdrawTeam(app, reg.Team)
+			change, err = tournament.withdrawTeam(app, reg)
 		} else {
-			change, err = tournament.reenterTeam(app, reg.Team)
+			change, err = tournament.reenterTeam(app, reg)
 		}
 		if err != nil {
 			return nil, err
