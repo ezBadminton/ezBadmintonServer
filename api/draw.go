@@ -33,7 +33,7 @@ func BindDrawHooks(app core.App) {
 // Responds with a list of Team IDs which are the draw.
 // If no draw exists, an attempt is made to create one.
 func getDraw(e *core.RequestEvent) error {
-	competition, err := findCompetition(e.Request)
+	competition, err := findPathId[Competition]("competition", e.Request)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}
@@ -46,7 +46,7 @@ func getDraw(e *core.RequestEvent) error {
 }
 
 func swapDrawPositions(e *core.RequestEvent) error {
-	competition, err := findCompetition(e.Request)
+	competition, err := findPathId[Competition]("competition", e.Request)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}

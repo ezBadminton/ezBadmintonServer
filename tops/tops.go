@@ -91,3 +91,10 @@ func WithdrawOrReenterPlayer(
 
 	return changes, err
 }
+
+func ListPlayerStatusChanges(player *Player, newStatus PlayerStatus) *StatusChangeResult {
+	defer topsMu.RUnlock()
+	topsMu.RLock()
+
+	return listStatusChangeMatches(player, newStatus)
+}

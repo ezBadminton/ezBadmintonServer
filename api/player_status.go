@@ -1,16 +1,51 @@
 package api
 
 import (
+	"net/http"
+	"strconv"
+
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 func BindPlayerStatusHooks(app core.App) {
 	cName := CName[Player]()
+	url := "/api/ezbadminton/statuschangelist/{player}/{status}"
+
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		group := e.Router.Group(url)
+		group.Bind(apis.RequireAuth())
+
+		group.GET("", getStatusChangeList)
+
+		return e.Next()
+	})
 
 	app.OnRecordUpdateRequest(cName).BindFunc(onPlayerWithCompetitionIds)
 	app.OnRecordUpdate(cName).BindFunc(onPlayerStatusChange)
+}
+
+func getStatusChangeList(e *core.RequestEvent) error {
+	player, err := findPathId[Player]("player", e.Request)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+
+	statusValue := e.Request.PathValue("status")
+	statusI, err := strconv.Atoi(statusValue)
+	if err != nil {
+		return e.String(http.StatusBadRequest, "could not parse player status integer value")
+	}
+	status := PlayerStatus(statusI)
+	if status < NotAttending || status > Disqualified {
+		return e.String(http.StatusBadRequest, "invalid player status")
+	}
+
+	changes := tops.ListPlayerStatusChanges(player, status)
+
+	return e.JSON(http.StatusOK, changes.ToMap())
 }
 
 func onPlayerWithCompetitionIds(e *core.RecordRequestEvent) error {

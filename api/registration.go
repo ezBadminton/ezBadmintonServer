@@ -27,7 +27,7 @@ func BindRegistrationHooks(app core.App) {
 }
 
 func CheckRegistration(e *core.RecordRequestEvent) error {
-	competition, _ := findCompetition(e.Request)
+	competition, _ := findPathId[Competition]("competition", e.Request)
 
 	team, _ := WrapRecord[Team](e.Record)
 	store.ExpandRelationsDry(team)

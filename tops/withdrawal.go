@@ -125,6 +125,10 @@ type StatusChangeResult struct {
 }
 
 func (r *StatusChangeResult) ToMap() map[string]any {
+	if r == nil {
+		return map[string]any{"changes": []string{}}
+	}
+
 	changes := make(map[string]any, len(r.Changes))
 	for comp, matches := range r.Changes {
 		changes[comp.Id] = idList(matches)

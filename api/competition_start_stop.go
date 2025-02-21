@@ -24,7 +24,7 @@ func BindStartStopHooks(app core.App) {
 }
 
 func handleStartStop(e *core.RequestEvent) error {
-	competition, err := findCompetition(e.Request)
+	competition, err := findPathId[Competition]("competition", e.Request)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}

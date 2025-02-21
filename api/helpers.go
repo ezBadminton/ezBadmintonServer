@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 
@@ -18,13 +19,14 @@ func idList[S ~[]P, P core.RecordProxy](records S) []string {
 	return ids
 }
 
-func findCompetition(r *http.Request) (*Competition, error) {
-	competitionId := r.PathValue("competition")
-	competition, err := store.FindProxy[Competition](competitionId)
+func findPathId[P Proxy, PP ProxyP[P]](pathValueName string, r *http.Request) (PP, error) {
+	id := r.PathValue(pathValueName)
+	proxy, err := store.FindProxy[P, PP](id)
 	if err != nil {
-		return nil, errors.New("could not find the competition ID")
+		errMsg := fmt.Sprintf("could not find the %v ID", pathValueName)
+		return nil, errors.New(errMsg)
 	}
-	return competition, nil
+	return proxy, nil
 }
 
 func idFinder[P Proxy, PP ProxyP[P]](id string) func(p PP) bool {
