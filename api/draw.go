@@ -75,7 +75,7 @@ func swapDrawPositions(e *core.RequestEvent) error {
 // and if one is found, (re-)creates a new tournament
 // with the new draw.
 func handleDrawChange(e *core.RecordEvent) error {
-	oldCompetition, competition, err := oldNew[Competition](e)
+	oldCompetition, competition, err := oldNew[Competition](e, true)
 	if err != nil {
 		return err
 	}
@@ -96,12 +96,16 @@ func handleDrawChange(e *core.RecordEvent) error {
 	if err != nil {
 		return err
 	}
+	var rawTournament any = tournament
+	if tournament == nil {
+		rawTournament = struct{}{}
+	}
 
 	// The update handler of the tournament operations (tops/tournaments.go)
 	// reads this custom record data and stores it in the TournamentStore
 	// It is not done here to avoid persisting a tournament when
 	// the transaction of the draw change is unsuccessful.
-	e.Record.SetRaw("DRAW_CHANGE", tournament)
+	e.Record.SetRaw("DRAW_CHANGE", rawTournament)
 
 	return e.Next()
 }

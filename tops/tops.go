@@ -37,12 +37,12 @@ func StopTournament(app core.App, competitionId string) error {
 }
 
 func CreateTournament(competition *Competition) (*CompetitionTournament, error) {
-	topsMu.RLock()
+	topsMu.Lock()
 
 	tournament, err := Tournaments.createTournament(competition)
 	if err != nil {
 		// Only unlock on error. Otherwise the competition update handler unlocks after transaction.
-		defer topsMu.RUnlock()
+		defer topsMu.Unlock()
 	}
 	return tournament, err
 }

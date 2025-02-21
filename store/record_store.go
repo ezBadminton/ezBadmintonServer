@@ -7,6 +7,7 @@ import (
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 )
 
 var stores map[string]RecordStore
@@ -109,6 +110,15 @@ Loop:
 	errHandler = errorHook(createStoreHook(RecordStore.FailedDelete))
 	app.OnRecordAfterDeleteError(collectionNames...).BindFunc(errHandler)
 
+	realtimeNotifier := createRealtimeNotifierHook(core.ModelEventTypeCreate, RecordStore.RealtimeUpdate)
+	app.OnRecordAfterCreateSuccess(collectionNames...).Bind(realtimeNotifier)
+	realtimeNotifier = createRealtimeNotifierHook(core.ModelEventTypeUpdate, RecordStore.RealtimeUpdate)
+	app.OnRecordAfterUpdateSuccess(collectionNames...).Bind(realtimeNotifier)
+	realtimeNotifier = createRealtimeNotifierHook(core.ModelEventTypeDelete, RecordStore.RealtimeUpdate)
+	app.OnRecordAfterDeleteSuccess(collectionNames...).Bind(realtimeNotifier)
+
+	app.OnRealtimeMessageSend()
+
 	return nil
 }
 
@@ -142,6 +152,28 @@ func errorHook(errorHook func(*core.RecordEvent) error) func(*core.RecordErrorEv
 	return func(e *core.RecordErrorEvent) error { return errorHook(&e.RecordEvent) }
 }
 
+func createRealtimeNotifierHook(action string, handler func(RecordStore, string, *core.Record) error) *hook.Handler[*core.RecordEvent] {
+	return &hook.Handler[*core.RecordEvent]{
+		Func: func(e *core.RecordEvent) error {
+			if err := e.Next(); err != nil {
+				return err
+			}
+
+			collectionName := e.Record.Collection().Name
+			store, err := FindRecordStoreByCollectionName(collectionName)
+			if err != nil {
+				return err
+			}
+			if err = handler(store, action, e.Record); err != nil {
+				return err
+			}
+
+			return nil
+		},
+		Priority: -99,
+	}
+}
+
 type RecordStore interface {
 	FindRecord(id string) (core.RecordProxy, bool)
 	Length() int
@@ -152,6 +184,7 @@ type RecordStore interface {
 	FailedCreate(*core.Record) error
 	FailedUpdate(*core.Record) error
 	FailedDelete(*core.Record) error
+	RealtimeUpdate(string, *core.Record) error
 }
 
 type BaseRecordStore[P Proxy, PP ProxyP[P]] struct {
@@ -166,6 +199,8 @@ type BaseRecordStore[P Proxy, PP ProxyP[P]] struct {
 	failedCreateHandlers,
 	failedUpdateHandlers,
 	failedDeleteHandlers []func(PP)
+
+	realtimeNotifiers []func(string, PP)
 }
 
 func newStore[P Proxy, PP ProxyP[P]](app core.App) (*BaseRecordStore[P, PP], error) {
@@ -249,6 +284,10 @@ func (s *BaseRecordStore[P, PP]) RegisterFailedDeleteHandler(handler func(delete
 	s.failedDeleteHandlers = append(s.failedCreateHandlers, handler)
 }
 
+func (s *BaseRecordStore[P, PP]) RegisterRealtimeNotifier(handler func(action string, record PP)) {
+	s.realtimeNotifiers = append(s.realtimeNotifiers, handler)
+}
+
 func (s *BaseRecordStore[P, PP]) Created(record *core.Record) error {
 	s.mu.Lock()
 
@@ -272,7 +311,7 @@ func (s *BaseRecordStore[P, PP]) Created(record *core.Record) error {
 func (s *BaseRecordStore[P, PP]) Updated(record *core.Record) error {
 	proxy, ok := s.FindProxy(record.Id)
 	if !ok {
-		return errors.New("the updated record is not part of the cache")
+		return errors.New("the updated record is not part of the store")
 	}
 
 	s.mu.Lock()
@@ -296,7 +335,7 @@ func (s *BaseRecordStore[P, PP]) Updated(record *core.Record) error {
 func (s *BaseRecordStore[_, PP]) Deleted(record *core.Record) error {
 	proxy, ok := s.FindProxy(record.Id)
 	if !ok {
-		return errors.New("the deleted record is not part of the cache")
+		return errors.New("the deleted record is not part of the store")
 	}
 
 	s.mu.Lock()
@@ -331,7 +370,7 @@ func (s *BaseRecordStore[P, PP]) FailedCreate(record *core.Record) error {
 func (s *BaseRecordStore[P, PP]) FailedUpdate(record *core.Record) error {
 	proxy, ok := s.FindProxy(record.Id)
 	if !ok {
-		return errors.New("the not-updated record is not part of the cache")
+		return errors.New("the not-updated record is not part of the store")
 	}
 
 	for _, handler := range s.failedUpdateHandlers {
@@ -344,11 +383,24 @@ func (s *BaseRecordStore[P, PP]) FailedUpdate(record *core.Record) error {
 func (s *BaseRecordStore[P, PP]) FailedDelete(record *core.Record) error {
 	proxy, ok := s.FindProxy(record.Id)
 	if !ok {
-		return errors.New("the not-deleted record is not part of the cache")
+		return errors.New("the not-deleted record is not part of the store")
 	}
 
 	for _, handler := range s.failedDeleteHandlers {
 		handler(proxy)
+	}
+
+	return nil
+}
+
+func (s *BaseRecordStore[P, PP]) RealtimeUpdate(action string, record *core.Record) error {
+	proxy, ok := s.FindProxy(record.Id)
+	if !ok {
+		return errors.New("the relatime updated record is not part of the store")
+	}
+
+	for _, handler := range s.realtimeNotifiers {
+		handler(action, proxy)
 	}
 
 	return nil

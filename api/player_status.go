@@ -57,7 +57,7 @@ func onPlayerWithCompetitionIds(e *core.RecordRequestEvent) error {
 }
 
 func onPlayerStatusChange(e *core.RecordEvent) error {
-	oldPlayer, player, err := oldNew[Player](e)
+	oldPlayer, player, err := oldNew[Player](e, false)
 	if err != nil {
 		return err
 	}

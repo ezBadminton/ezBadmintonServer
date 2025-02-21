@@ -92,18 +92,6 @@ func (c *CompetitionTournament) reenterTeam(app core.App, team *Team) (*Floating
 	return change, nil
 }
 
-func (c *CompetitionTournament) isWithdrawn(team *Team) bool {
-	for _, m := range c.MatchList().Matches {
-		withdrawnTeams := m.WithdrawnPlayers
-		for _, p := range withdrawnTeams {
-			if p.Id() == team.Id {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func saveWithdrawalLists(app core.App, matches []*got.Match, matchData []*MatchData) error {
 	for i, m := range matches {
 		withdrawn := make([]*Team, len(m.WithdrawnPlayers))
@@ -169,9 +157,7 @@ func listStatusChangeMatches(player *Player, newStatus PlayerStatus) *StatusChan
 			changedMatches = tournament.listReenterMatches(team)
 		}
 
-		addToChanges :=
-			len(changedMatches) > 0 ||
-				(!withdrawing && tournament.isWithdrawn(team))
+		addToChanges := len(changedMatches) > 0 || (!withdrawing && reg.Withdrawn)
 
 		if addToChanges {
 			changes[tournament.Competition] = changedMatches

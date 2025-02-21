@@ -56,7 +56,7 @@ func main() {
 		if err := store.InitStores(e.App); err != nil {
 			return err
 		}
-		if err := tops.InitRegistrations(); err != nil {
+		if err := tops.InitRegistrations(e.App); err != nil {
 			return err
 		}
 		if err := tops.InitTournaments(); err != nil {

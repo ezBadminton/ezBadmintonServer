@@ -27,7 +27,11 @@ func BindRegistrationHooks(app core.App) {
 }
 
 func CheckRegistration(e *core.RecordRequestEvent) error {
-	competition, _ := findPathId[Competition]("competition", e.Request)
+	if e.Auth.IsSuperuser() {
+		return e.Next()
+	}
+	competitionId := e.Request.URL.Query().Get("competition")
+	competition, _ := store.FindProxy[Competition](competitionId)
 
 	team, _ := WrapRecord[Team](e.Record)
 	store.ExpandRelationsDry(team)

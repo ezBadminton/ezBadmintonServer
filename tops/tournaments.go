@@ -278,8 +278,8 @@ func competitionUpdated(_, competition *Competition) {
 
 	defer topsMu.Unlock()
 
-	if newTournament != nil {
-		t := newTournament.(*CompetitionTournament)
+	t, ok := newTournament.(*CompetitionTournament)
+	if ok {
 		Tournaments.setTournament(competition.Id, t)
 	} else {
 		Tournaments.removeTournament(competition.Id)

@@ -6,6 +6,7 @@ import (
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // A simple tuple of a Competition and a Team
@@ -30,15 +31,17 @@ func (r Registration) ToMap() map[string]any {
 var Registrations *RegistrationStore
 
 type RegistrationStore struct {
+	app                 core.App
 	list                []*Registration
 	byPlayer            map[string][]*Registration
 	byTeam              map[string]*Registration
 	byCompetition       map[string][]*Registration
 	byCompetitionPlayer map[string]map[string]*Registration
 	byId                map[string]*Registration
+	realtimeDeleted     map[string]*Registration
 }
 
-func InitRegistrations() error {
+func InitRegistrations(app core.App) error {
 	teamStore, err := store.FindRecordStore[Team]()
 	if err != nil {
 		return err
@@ -47,12 +50,14 @@ func InitRegistrations() error {
 	teams := teamStore.RecordList
 
 	Registrations = &RegistrationStore{
+		app:                 app,
 		list:                make([]*Registration, 0),
 		byPlayer:            make(map[string][]*Registration),
 		byTeam:              make(map[string]*Registration),
 		byCompetition:       make(map[string][]*Registration),
 		byCompetitionPlayer: make(map[string]map[string]*Registration),
 		byId:                make(map[string]*Registration),
+		realtimeDeleted:     make(map[string]*Registration),
 	}
 
 	Registrations.addRegistrations(teams...)
@@ -60,6 +65,7 @@ func InitRegistrations() error {
 	teamStore.RegisterCreateHander(Registrations.created)
 	teamStore.RegisterUpdateHandler(Registrations.updated)
 	teamStore.RegisterDeleteHandler(Registrations.deleted)
+	teamStore.RegisterRealtimeNotifier(Registrations.sendRealtimeNotification)
 
 	return nil
 }
@@ -156,10 +162,18 @@ func (s *RegistrationStore) playerRemoved(player *Player, team *Team) {
 }
 
 func (s *RegistrationStore) created(team *Team) {
+	defer topsMu.Unlock()
+	topsMu.Lock()
 	Registrations.addRegistrations(team)
 }
 
 func (s *RegistrationStore) updated(oldTeam, updatedTeam *Team) {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	reg := s.byTeam[updatedTeam.Id]
+	reg.Team = updatedTeam
+
 	oldPlayers := oldTeam.Players()
 	updatedPlayers := updatedTeam.Players()
 	if len(oldPlayers) > len(updatedPlayers) {
@@ -178,6 +192,9 @@ func (s *RegistrationStore) updated(oldTeam, updatedTeam *Team) {
 }
 
 func (s *RegistrationStore) deleted(team *Team) {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
 	reg := s.byTeam[team.Id]
 	comp := reg.Competition
 	players := team.Players()
@@ -194,6 +211,28 @@ func (s *RegistrationStore) deleted(team *Team) {
 		s.byPlayer[p.Id] = slices.DeleteFunc(s.byPlayer[p.Id], finder)
 		delete(s.byCompetitionPlayer[comp.Id], p.Id)
 	}
+
+	s.realtimeDeleted[team.Id] = reg
+}
+
+func (s *RegistrationStore) sendRealtimeNotification(action string, team *Team) {
+	topsMu.RLock()
+	var reg *Registration
+	var ok bool
+	switch action {
+	case core.ModelEventTypeDelete:
+		reg, ok = s.realtimeDeleted[team.Id]
+		delete(s.realtimeDeleted, team.Id) // Delete despite read lock because nothing accesses this
+	default:
+		reg, ok = s.byTeam[team.Id]
+	}
+	topsMu.RUnlock()
+
+	if !ok {
+		panic("realtime notifier could not find registration")
+	}
+
+	realtimeNotify(s.app, "registrations", action, reg)
 }
 
 func teamToRegistration(team *Team) *Registration {

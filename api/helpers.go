@@ -45,15 +45,17 @@ func containsAll[S ~[]PP, P Proxy, PP ProxyP[P]](a, b S) bool {
 	return true
 }
 
-func oldNew[P Proxy, PP ProxyP[P]](e *core.RecordEvent) (PP, PP, error) {
+func oldNew[P Proxy, PP ProxyP[P]](e *core.RecordEvent, expandDry bool) (PP, PP, error) {
 	old, err := store.FindProxy[P, PP](e.Record.Id)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	new, _ := WrapRecord[P, PP](e.Record)
-	if err := store.ExpandRelationsDry(new); err != nil {
-		return nil, nil, err
+	if expandDry {
+		if err := store.ExpandRelationsDry(new); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return old, new, nil
