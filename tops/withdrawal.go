@@ -211,7 +211,7 @@ func withdrawOrReenterPlayer(
 
 func onPlayerStatusChange(_, player *Player) {
 	customData := player.CustomData()
-	statusChanges, ok := customData["STATUS_CHANGES"]
+	statusChanges, ok := customData[StatusChangeKey]
 	if !ok {
 		return
 	}
@@ -225,7 +225,7 @@ func onPlayerStatusChange(_, player *Player) {
 
 func onFailedPlayerStatusChange(player *Player) {
 	customData := player.CustomData()
-	_, ok := customData["STATUS_CHANGES"]
+	_, ok := customData[StatusChangeKey]
 	if ok {
 		topsMu.Unlock()
 	}

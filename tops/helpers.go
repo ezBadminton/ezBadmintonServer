@@ -6,8 +6,12 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+// These keys are used for custom data entries
+// in records that serve for passing data down
+// the hook chain
 const (
 	DrawChangeKey         string = "DRAW_CHANGE"
+	StatusChangeKey              = "STATUS_CHANGES"
 	TournamentCreateKey          = "CREATED_TOURNAMENT"
 	TournamentUpdateKey          = "UPDATED_TOURNAMENT"
 	TournamentDeleteKey          = "DELETED_TOURNAMENT"

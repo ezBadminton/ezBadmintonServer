@@ -10,6 +10,8 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+const CompetitionsKey = "COMPETITIONS"
+
 func BindPlayerStatusHooks(app core.App) {
 	cName := CName[Player]()
 	url := "/api/ezbadminton/statuschangelist/{player}/{status}"
@@ -51,7 +53,7 @@ func getStatusChangeList(e *core.RequestEvent) error {
 func onPlayerWithCompetitionIds(e *core.RecordRequestEvent) error {
 	competitionIds := readCompetitionIds(e.RequestEvent)
 	if len(competitionIds) > 0 {
-		e.Record.SetRaw("COMPETITIONS", competitionIds)
+		e.Record.SetRaw(CompetitionsKey, competitionIds)
 	}
 	return e.Next()
 }
@@ -77,7 +79,7 @@ func onPlayerStatusChange(e *core.RecordEvent) error {
 	}
 
 	customData := e.Record.CustomData()
-	competitionIds, ok := customData["COMPETITIONS"].([]string)
+	competitionIds, ok := customData[CompetitionsKey].([]string)
 	if !ok {
 		return e.Next()
 	}
@@ -90,7 +92,7 @@ func onPlayerStatusChange(e *core.RecordEvent) error {
 			return err
 		}
 
-		e.Record.SetRaw("STATUS_CHANGES", changes)
+		e.Record.SetRaw(tops.StatusChangeKey, changes)
 
 		return e.Next()
 	})
