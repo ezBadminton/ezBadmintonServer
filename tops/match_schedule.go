@@ -46,7 +46,8 @@ type ScheduledRound struct {
 // The match scheduler holds an ordered list of
 // rounds that represents the playing order.
 type MatchScheduler struct {
-	RoundQueue []*ScheduledRound
+	roundQueue     []*ScheduledRound
+	runningMatches []*MatchData
 }
 
 var Schedule *MatchScheduler
@@ -83,6 +84,7 @@ func InitSchedule() error {
 	}
 
 	roundQueue := make([]*ScheduledRound, len(orderedRounds))
+	runningMatches := make([]*MatchData, 0)
 	for i, round := range orderedRounds {
 		scheduledMatches := make([]*ScheduledMatch, len(round))
 		competition := roundCompetitions[i]
@@ -95,6 +97,9 @@ func InitSchedule() error {
 				Match:          matchData,
 				ScheduleStatus: matchStatus,
 				PlayerStatus:   playerStatus,
+			}
+			if matchStatus == InProgress {
+				runningMatches = append(runningMatches, matchData)
 			}
 		}
 
@@ -115,11 +120,14 @@ func InitSchedule() error {
 	}
 
 	Schedule = &MatchScheduler{
-		RoundQueue: roundQueue,
+		roundQueue:     roundQueue,
+		runningMatches: runningMatches,
 	}
 
 	return nil
 }
+
+// TODO schedule updates
 
 func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerScheduleStatus) {
 	if matchFinished(match) {

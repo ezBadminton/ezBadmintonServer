@@ -65,6 +65,9 @@ func main() {
 		if err := tops.InitWithdrawalHandlers(); err != nil {
 			return err
 		}
+		if err := tops.InitCourts(); err != nil {
+			return err
+		}
 
 		return nil
 	})
