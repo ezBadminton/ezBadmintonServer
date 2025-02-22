@@ -19,6 +19,9 @@ func idList[S ~[]P, P core.RecordProxy](records S) []string {
 	return ids
 }
 
+// Looks up the path value by the given pathValueName and
+// attempts to find the proxy of the given type with that
+// value as its ID
 func findPathId[P Proxy, PP ProxyP[P]](pathValueName string, r *http.Request) (PP, error) {
 	id := r.PathValue(pathValueName)
 	proxy, err := store.FindProxy[P, PP](id)

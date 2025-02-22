@@ -12,6 +12,8 @@ import (
 const (
 	DrawChangeKey         string = "DRAW_CHANGE"
 	StatusChangeKey              = "STATUS_CHANGES"
+	DeleteVerifiedKey            = "DELETE_VERIFIED"
+	CourtsOfGymKey               = "COURTS_OF_GYM"
 	TournamentCreateKey          = "CREATED_TOURNAMENT"
 	TournamentUpdateKey          = "UPDATED_TOURNAMENT"
 	TournamentDeleteKey          = "DELETED_TOURNAMENT"

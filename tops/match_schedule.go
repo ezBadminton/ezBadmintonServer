@@ -48,6 +48,8 @@ type ScheduledRound struct {
 type MatchScheduler struct {
 	roundQueue     []*ScheduledRound
 	runningMatches []*MatchData
+	// Match data id -> scheduled match
+	scheduled map[string]*ScheduledMatch
 }
 
 var Schedule *MatchScheduler
@@ -85,6 +87,7 @@ func InitSchedule() error {
 
 	roundQueue := make([]*ScheduledRound, len(orderedRounds))
 	runningMatches := make([]*MatchData, 0)
+	scheduledMap := make(map[string]*ScheduledMatch)
 	for i, round := range orderedRounds {
 		scheduledMatches := make([]*ScheduledMatch, len(round))
 		competition := roundCompetitions[i]
@@ -101,6 +104,7 @@ func InitSchedule() error {
 			if matchStatus == InProgress {
 				runningMatches = append(runningMatches, matchData)
 			}
+			scheduledMap[matchData.Id] = scheduledMatches[i]
 		}
 
 		id := fmt.Sprintf("s-%v-%v", competition.Id, roundIndex)
@@ -122,12 +126,22 @@ func InitSchedule() error {
 	Schedule = &MatchScheduler{
 		roundQueue:     roundQueue,
 		runningMatches: runningMatches,
+		scheduled:      scheduledMap,
 	}
 
 	return nil
 }
 
 // TODO schedule updates
+
+func (s *MatchScheduler) scheduleStatus(matchData *MatchData) ScheduleStatus {
+	return s.scheduled[matchData.Id].ScheduleStatus
+}
+
+func (s *MatchScheduler) setMatchScheduleStatus(matchData *MatchData, newStatus ScheduleStatus) {
+	scheduledMatch := s.scheduled[matchData.Id]
+	scheduledMatch.ScheduleStatus = newStatus
+}
 
 func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerScheduleStatus) {
 	if matchFinished(match) {

@@ -98,3 +98,38 @@ func ListPlayerStatusChanges(player *Player, newStatus PlayerStatus) *StatusChan
 
 	return listStatusChangeMatches(player, newStatus)
 }
+
+func AssignCourtToMatch(app core.App, matchData *MatchData, court *Court) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return Courts.assignCourtToMatch(app, matchData, court)
+}
+
+func UnassignCourt(app core.App, matchData *MatchData) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return Courts.unassignCourt(app, matchData)
+}
+
+func VerifyCourtDeletion(court *Court) error {
+	topsMu.Lock()
+
+	err := Courts.verifyCourtDeletion(court)
+	if err != nil {
+		defer topsMu.Unlock()
+	}
+	return err
+}
+
+func VerifyGymnasiumDeletion(gymnasium *Gymnasium) error {
+	topsMu.Lock()
+
+	err := Courts.verifyGymnasiumDeletion(gymnasium)
+	if err != nil {
+		defer topsMu.Unlock()
+	}
+
+	return err
+}
