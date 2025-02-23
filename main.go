@@ -34,7 +34,6 @@ func main() {
 	api.BindRegistrationHooks(app)
 	api.BindTournamentPlanHooks(app)
 	api.BindDrawHooks(app)
-	api.BindResultHooks(app)
 	api.BindPlayerStatusHooks(app)
 	api.BindMatchHooks(app)
 
