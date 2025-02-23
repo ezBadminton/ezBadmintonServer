@@ -7,16 +7,14 @@ import (
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 func BindDrawHooks(app core.App) {
-	url := "/api/ezbadminton/draw/{competition}"
+	url := "/draw/{competition}"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		group := e.Router.Group(url)
-		group.Bind(apis.RequireAuth())
+		group := rootGroup.Group(url)
 
 		group.POST("/make", makeDraw)
 		group.POST("/swap", swapDrawPositions)

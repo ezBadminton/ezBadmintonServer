@@ -3,16 +3,14 @@ package api
 import (
 	"net/http"
 
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 func BindResultHooks(app core.App) {
-	url := "/api/ezbadminton/result/{competition}"
+	url := "/result/{competition}"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		group := e.Router.Group(url)
-		group.Bind(apis.RequireAuth())
+		group := rootGroup.Group(url)
 
 		group.POST("", postResult)
 

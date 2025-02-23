@@ -5,16 +5,14 @@ import (
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 func BindStartStopHooks(app core.App) {
-	url := "/api/ezbadminton/tournaments/{competition}"
+	url := "/tournaments/{competition}"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		group := e.Router.Group(url)
-		group.Bind(apis.RequireAuth())
+		group := rootGroup.Group(url)
 
 		group.POST("/start", startCompetition)
 		group.POST("/stop", stopCompetition)

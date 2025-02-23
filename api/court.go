@@ -7,19 +7,17 @@ import (
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 func BindCourtHooks(app core.App) {
-	url := "/api/ezbadminton/courts"
+	url := "/courts"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		group := e.Router.Group(url)
-		group.Bind(apis.RequireAuth())
+		group := rootGroup.Group(url)
 
 		group.DELETE("/{court}", deleteCourt)
-		group.DELETE("/gymnasium/{gynmasium}", deleteGymnasium)
+		group.DELETE("/gymnasium/{gymnasium}", deleteGymnasium)
 		group.POST("/{matchdata}/assign", assignCourt)
 		group.POST("/{matchdata}/unassign", unassignCourt)
 

@@ -7,18 +7,16 @@ import (
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 const CompetitionsKey = "COMPETITIONS"
 
 func BindPlayerStatusHooks(app core.App) {
-	url := "/api/ezbadminton/playerstatus/{player}"
+	url := "/playerstatus/{player}"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		group := e.Router.Group(url)
-		group.Bind(apis.RequireAuth())
+		group := rootGroup.Group(url)
 
 		group.GET("/{status}/preview", getStatusChangeList)
 		group.POST("", setPlayerStatus)

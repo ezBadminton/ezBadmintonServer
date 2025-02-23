@@ -29,6 +29,7 @@ func main() {
 
 	//RegisterHooks(app)
 	//RegisterRoutes(app)
+	api.InitRootApiRoute(app)
 	api.BindClubHooks(app)
 	api.BindRegistrationHooks(app)
 	api.BindTournamentPlanHooks(app)
