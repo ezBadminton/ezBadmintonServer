@@ -36,17 +36,6 @@ func StopTournament(app core.App, competitionId string) error {
 	return Tournaments.stop(app, competitionId)
 }
 
-func CreateTournament(competition *Competition) (*CompetitionTournament, error) {
-	topsMu.Lock()
-
-	tournament, err := Tournaments.createTournament(competition)
-	if err != nil {
-		// Only unlock on error. Otherwise the competition update handler unlocks after transaction.
-		defer topsMu.Unlock()
-	}
-	return tournament, err
-}
-
 func MakeDraw(app core.App, competition *Competition) error {
 	defer topsMu.Unlock()
 	topsMu.Lock()
@@ -54,11 +43,32 @@ func MakeDraw(app core.App, competition *Competition) error {
 	return makeDraw(app, competition)
 }
 
+func Redraw(app core.App, competition *Competition) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return redraw(app, competition)
+}
+
 func DrawSwap(app core.App, competition *Competition, a, b string) error {
 	defer topsMu.Unlock()
 	topsMu.Lock()
 
 	return drawSwap(app, competition, a, b)
+}
+
+func DeleteDraw(app core.App, competition *Competition) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return deleteDraw(app, competition)
+}
+
+func SetSeeds(app core.App, competition *Competition, seeds []*Team) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return setSeeds(app, competition, seeds)
 }
 
 func ListRegistrations() []*Registration {

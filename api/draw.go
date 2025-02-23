@@ -3,7 +3,6 @@ package api
 import (
 	"errors"
 	"net/http"
-	"slices"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
@@ -19,20 +18,17 @@ func BindDrawHooks(app core.App) {
 		group := e.Router.Group(url)
 		group.Bind(apis.RequireAuth())
 
-		group.GET("", getDraw)
+		group.POST("/make", makeDraw)
 		group.POST("/swap", swapDrawPositions)
+		group.POST("/redraw", redraw)
+		group.POST("/seeds", setSeeds)
+		group.DELETE("", deleteDraw)
 
 		return e.Next()
 	})
-
-	cName := CName[Competition]()
-	app.OnRecordUpdate(cName).BindFunc(handleDrawChange)
-	app.OnRecordUpdate(cName).BindFunc(checkSeeds)
 }
 
-// Responds with a list of Team IDs which are the draw.
-// If no draw exists, an attempt is made to create one.
-func getDraw(e *core.RequestEvent) error {
+func makeDraw(e *core.RequestEvent) error {
 	competition, err := findPathId[Competition]("competition", e.Request)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -62,66 +58,72 @@ func swapDrawPositions(e *core.RequestEvent) error {
 	}
 
 	err = tops.DrawSwap(e.App, competition, data.Swap[0], data.Swap[1])
-	if errors.Is(err, tops.ErrUnexpected) {
-		return e.NoContent(http.StatusInternalServerError)
-	} else if err != nil {
+	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}
 
 	return e.NoContent(http.StatusOK)
 }
 
-// Checks for a change in the draw of a competition
-// and if one is found, (re-)creates a new tournament
-// with the new draw.
-func handleDrawChange(e *core.RecordEvent) error {
-	oldCompetition, competition, err := oldNew[Competition](e, true)
+func redraw(e *core.RequestEvent) error {
+	competition, err := findPathId[Competition]("competition", e.Request)
 	if err != nil {
-		return err
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	oldDraw := oldCompetition.Draw()
-	draw := competition.Draw()
-
-	didChange := !slices.EqualFunc(
-		oldDraw, draw,
-		func(a, b *Team) bool { return a.Id == b.Id },
-	)
-
-	if !didChange {
-		return e.Next()
+	if err := tops.Redraw(e.App, competition); err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	tournament, err := tops.CreateTournament(competition)
-	if err != nil {
-		return err
-	}
-	var rawTournament any = tournament
-	if tournament == nil {
-		rawTournament = struct{}{}
-	}
-
-	// The update handler of the tournament operations (tops/tournaments.go)
-	// reads this custom record data and stores it in the TournamentStore
-	// It is not done here to avoid persisting a tournament when
-	// the transaction of the draw change is unsuccessful.
-	e.Record.SetRaw(tops.DrawChangeKey, rawTournament)
-
-	return e.Next()
+	return e.NoContent(http.StatusOK)
 }
 
-func checkSeeds(e *core.RecordEvent) error {
-	competition, _ := WrapRecord[Competition](e.Record)
-	if err := store.ExpandRelationsDry(competition); err != nil {
-		return err
+func deleteDraw(e *core.RequestEvent) error {
+	competition, err := findPathId[Competition]("competition", e.Request)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	seeds := competition.Seeds()
-	registrations := competition.Registrations()
-
-	if !containsAll(registrations, seeds) {
-		return errors.New("can not set a seed for an unregistered team")
+	if err := tops.DeleteDraw(e.App, competition); err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	return e.Next()
+	return e.NoContent(http.StatusOK)
+}
+
+func setSeeds(e *core.RequestEvent) error {
+	competition, err := findPathId[Competition]("competition", e.Request)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+	seeds, err := readSeedsFromBody(e)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+
+	if err := tops.SetSeeds(e.App, competition, seeds); err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+
+	return e.NoContent(http.StatusOK)
+}
+
+func readSeedsFromBody(e *core.RequestEvent) ([]*Team, error) {
+	data := struct {
+		SeedIds []string `json:"seeds"`
+	}{}
+	if err := e.BindBody(&data); err != nil {
+		return nil, errors.New("the JSON body does not contain a 'seeds' field of team IDs")
+	}
+
+	seeds := make([]*Team, 0, len(data.SeedIds))
+	for _, id := range data.SeedIds {
+		team, err := store.FindProxy[Team](id)
+		if err != nil {
+			return nil, errors.New("the team ID does not exist")
+		}
+		seeds = append(seeds, team)
+	}
+
+	return seeds, nil
 }

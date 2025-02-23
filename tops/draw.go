@@ -2,6 +2,7 @@ package tops
 
 import (
 	"errors"
+	"math/rand"
 	"slices"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
@@ -10,10 +11,11 @@ import (
 )
 
 func makeDraw(app core.App, comp *Competition) error {
-	draw := comp.Draw()
-	if len(draw) > 0 {
-		return nil // Already has a draw
+	if len(comp.Matches()) != 0 {
+		return errors.New("can not make a draw for a running tournament")
 	}
+
+	draw := comp.Draw()
 	comp, _ = WrapRecord[Competition](comp.Clone())
 
 	registrations := comp.Registrations()
@@ -35,17 +37,62 @@ func makeDraw(app core.App, comp *Competition) error {
 	seedingMode := int(settings.SeedingMode())
 	rngSeed := int64(comp.RngSeed())
 
-	draw = got.SeededShuffle(seeded, unseeded, seedingMode, rngSeed)
-	comp.SetDraw(draw)
+	newDraw := got.SeededShuffle(seeded, unseeded, seedingMode, rngSeed)
+
+	didChange := !slices.EqualFunc(
+		draw, newDraw,
+		func(a, b *Team) bool { return a.Id == b.Id },
+	)
+	if !didChange {
+		return nil
+	}
+
+	comp.SetDraw(newDraw)
+	tournament, err := Tournaments.createTournament(comp)
+	if err != nil {
+		return err
+	}
 
 	if err := app.Save(comp); err != nil {
-		return errors.New("the competition is in the wrong state to have a draw made. there need to be enough players and valid tournament settings.")
+		return err
 	}
+
+	Tournaments.setTournament(comp, tournament)
+
+	return nil
+}
+
+func redraw(app core.App, comp *Competition) error {
+	comp, _ = WrapRecord[Competition](comp.Clone())
+	comp.SetRngSeed(rand.Int())
+	return makeDraw(app, comp)
+}
+
+func deleteDraw(app core.App, comp *Competition) error {
+	if len(comp.Matches()) != 0 {
+		return errors.New("can not make a draw change for a running tournament")
+	}
+	if len(comp.Draw()) == 0 {
+		return errors.New("competition has no draw")
+	}
+
+	comp, _ = WrapRecord[Competition](comp.Clone())
+	comp.SetDraw(nil)
+
+	if err := app.Save(comp); err != nil {
+		return err
+	}
+
+	Tournaments.removeTournament(comp)
 
 	return nil
 }
 
 func drawSwap(app core.App, competition *Competition, a, b string) error {
+	if len(competition.Matches()) != 0 {
+		return errors.New("can not make a draw change for a running tournament")
+	}
+
 	draw := competition.Draw()
 	if len(draw) == 0 {
 		return errors.New("there is no draw to swap")
@@ -65,6 +112,28 @@ func drawSwap(app core.App, competition *Competition, a, b string) error {
 
 	if err := app.Save(competition); err != nil {
 		return ErrUnexpected
+	}
+
+	tournament, _ := Tournaments.createTournament(competition)
+	Tournaments.setTournament(competition, tournament)
+
+	return nil
+}
+
+func setSeeds(app core.App, competition *Competition, seeds []*Team) error {
+	if len(competition.Matches()) != 0 {
+		return errors.New("can not set seeds for a running tournament")
+	}
+	registrations := competition.Registrations()
+	if !containsAll(registrations, seeds) {
+		return errors.New("can not seed unregistered team")
+	}
+
+	competition, _ = WrapRecord[Competition](competition.Clone())
+	competition.SetSeeds(seeds)
+
+	if err := app.Save(competition); err != nil {
+		return err
 	}
 
 	return nil

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
@@ -36,16 +35,6 @@ func idFinder[P Proxy, PP ProxyP[P]](id string) func(p PP) bool {
 	return func(p PP) bool {
 		return p.ProxyRecord().Id == id
 	}
-}
-
-// Returns true if a contains all proxies of b compared by ID.
-func containsAll[S ~[]PP, P Proxy, PP ProxyP[P]](a, b S) bool {
-	for _, p := range b {
-		if !slices.ContainsFunc(a, idFinder[P, PP](p.ProxyRecord().Id)) {
-			return false
-		}
-	}
-	return true
 }
 
 func oldNew[P Proxy, PP ProxyP[P]](e *core.RecordEvent, expandDry bool) (PP, PP, error) {

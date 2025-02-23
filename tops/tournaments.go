@@ -75,9 +75,7 @@ func InitTournaments(app core.App) error {
 		return err
 	}
 
-	compStore.RegisterUpdateHandler(competitionUpdated)
-	compStore.RegisterFailedUpdateHandler(competitionUpdateFailed)
-	compStore.RegisterRealtimeNotifier(Tournaments.sendTournamentDrawUpdate)
+	// TODO tournament realtime notify
 
 	return nil
 }
@@ -94,19 +92,12 @@ func (s *TournamentStore) listRunning() []*CompetitionTournament {
 }
 
 func (s *TournamentStore) setTournament(competition *Competition, tournament *CompetitionTournament) {
-	_, ok := s.tournaments[competition.Id]
-	if ok {
-		competition.SetRaw(TournamentUpdateKey, tournament)
-	} else {
-		competition.SetRaw(TournamentCreateKey, tournament)
-	}
-
 	s.tournaments[competition.Id] = tournament
+
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
 		return t.Competition.Id == competition.Id
 	})
 	s.list = append(s.list, tournament)
-
 	slices.SortFunc(s.list, compareTournaments)
 }
 
@@ -130,8 +121,6 @@ func (s *TournamentStore) removeTournament(competition *Competition) {
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
 		return t.Competition.Id == competition.Id
 	})
-
-	competition.SetRaw(TournamentDeleteKey, tournament)
 }
 
 func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
@@ -287,47 +276,6 @@ func createMatchData(app core.App, tournament got.MatchLister) ([]*MatchData, er
 	}
 
 	return matchData, nil
-}
-
-func competitionUpdated(_, competition *Competition) {
-	data := competition.CustomData()
-	newTournament, ok := data[DrawChangeKey]
-	if !ok {
-		return
-	}
-
-	defer topsMu.Unlock()
-
-	t, ok := newTournament.(*CompetitionTournament)
-	if ok {
-		Tournaments.setTournament(competition, t)
-	} else {
-		Tournaments.removeTournament(competition)
-	}
-}
-
-func competitionUpdateFailed(competition *Competition) {
-	data := competition.CustomData()
-	_, ok := data[DrawChangeKey]
-	if ok {
-		topsMu.Unlock()
-	}
-}
-
-func (s *TournamentStore) sendTournamentDrawUpdate(competition *Competition) {
-	customData := competition.CustomData()
-	action, tournament := realtimeActionAndData[CompetitionTournament](
-		TournamentCreateKey,
-		TournamentUpdateKey,
-		TournamentDeleteKey,
-		customData,
-	)
-
-	if action == "" {
-		return
-	}
-
-	realtimeNotify(s.app, "tournamentplans", action, tournament)
 }
 
 func hydrate(tournament *CompetitionTournament) error {
