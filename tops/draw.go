@@ -111,7 +111,7 @@ func drawSwap(app core.App, competition *Competition, a, b string) error {
 	competition.SetDraw(draw)
 
 	if err := app.Save(competition); err != nil {
-		return ErrUnexpected
+		return err
 	}
 
 	tournament, _ := Tournaments.createTournament(competition)

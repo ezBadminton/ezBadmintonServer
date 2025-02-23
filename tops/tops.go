@@ -4,7 +4,6 @@
 package tops
 
 import (
-	"errors"
 	"sync"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
@@ -12,8 +11,6 @@ import (
 )
 
 var topsMu sync.RWMutex
-
-var ErrUnexpected error = errors.New("an unexpected error occurred during tournament operations")
 
 func ListTournaments() []*CompetitionTournament {
 	defer topsMu.RUnlock()

@@ -226,13 +226,24 @@ func (s *TournamentStore) start(app core.App, competitionId string) error {
 
 	matchData, err := createMatchData(app, tournament)
 	if err != nil {
-		return ErrUnexpected
+		return err
 	}
 
 	comp, _ := WrapRecord[Competition](tournament.Competition.Clone())
 	comp.SetMatches(matchData)
-	if err := app.Save(comp); err != nil {
-		return ErrUnexpected
+	err = app.RunInTransaction(func(txApp core.App) error {
+		for _, m := range matchData {
+			if err := txApp.Save(m); err != nil {
+				return err
+			}
+		}
+		if err := txApp.Save(comp); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	tournament.Started = true
@@ -250,10 +261,24 @@ func (s *TournamentStore) stop(app core.App, competitionId string) error {
 		return errors.New("competition is not running")
 	}
 
+	matchData := tournament.Competition.Matches()
+
 	comp, _ := WrapRecord[Competition](tournament.Competition.Clone())
 	comp.SetMatches(nil)
-	if err := app.Save(comp); err != nil {
-		return ErrUnexpected
+
+	err := app.RunInTransaction(func(txApp core.App) error {
+		if err := txApp.Save(comp); err != nil {
+			return err
+		}
+		for _, m := range matchData {
+			if err := txApp.Delete(m); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	dehydrate(tournament)
