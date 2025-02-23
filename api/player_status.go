@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -13,20 +14,17 @@ import (
 const CompetitionsKey = "COMPETITIONS"
 
 func BindPlayerStatusHooks(app core.App) {
-	cName := CName[Player]()
-	url := "/api/ezbadminton/statuschangelist/{player}/{status}"
+	url := "/api/ezbadminton/playerstatus/{player}"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := e.Router.Group(url)
 		group.Bind(apis.RequireAuth())
 
-		group.GET("", getStatusChangeList)
+		group.GET("/{status}/preview", getStatusChangeList)
+		group.POST("", setPlayerStatus)
 
 		return e.Next()
 	})
-
-	app.OnRecordUpdateRequest(cName).BindFunc(onPlayerWithCompetitionIds)
-	app.OnRecordUpdate(cName).BindFunc(onPlayerStatusChange)
 }
 
 func getStatusChangeList(e *core.RequestEvent) error {
@@ -41,8 +39,8 @@ func getStatusChangeList(e *core.RequestEvent) error {
 		return e.String(http.StatusBadRequest, "could not parse player status integer value")
 	}
 	status := PlayerStatus(statusI)
-	if status < NotAttending || status > Disqualified {
-		return e.String(http.StatusBadRequest, "invalid player status")
+	if err := validatePlayerStatus(status); err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
 	changes := tops.ListPlayerStatusChanges(player, status)
@@ -50,58 +48,26 @@ func getStatusChangeList(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, changes.ToMap())
 }
 
-func onPlayerWithCompetitionIds(e *core.RecordRequestEvent) error {
-	competitionIds := readCompetitionIds(e.RequestEvent)
-	if len(competitionIds) > 0 {
-		e.Record.SetRaw(CompetitionsKey, competitionIds)
-	}
-	return e.Next()
-}
-
-func onPlayerStatusChange(e *core.RecordEvent) error {
-	oldPlayer, player, err := oldNew[Player](e, false)
+func setPlayerStatus(e *core.RequestEvent) error {
+	player, err := findPathId[Player]("player", e.Request)
 	if err != nil {
-		return err
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+	status, err := readPlayerStatusFromBody(e)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+	competitionIds := readCompetitionIdsFromBody(e)
+
+	err = tops.SetPlayerStatus(e.App, player, status, competitionIds)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
 	}
 
-	oldStatus, status := oldPlayer.Status(), player.Status()
-	if oldStatus == status {
-		return e.Next()
-	}
-
-	var withdraw bool
-	if oldStatus == Attending && status != Attending {
-		withdraw = true
-	} else if oldStatus != Attending && status == Attending {
-		withdraw = false
-	} else {
-		return e.Next()
-	}
-
-	customData := e.Record.CustomData()
-	competitionIds, ok := customData[CompetitionsKey].([]string)
-	if !ok {
-		return e.Next()
-	}
-
-	app := e.App
-	err = e.App.RunInTransaction(func(txApp core.App) error {
-		e.App = txApp
-		changes, err := tops.WithdrawOrReenterPlayer(e.App, player, competitionIds, withdraw)
-		if err != nil {
-			return err
-		}
-
-		e.Record.SetRaw(tops.StatusChangeKey, changes)
-
-		return e.Next()
-	})
-	e.App = app
-
-	return err
+	return e.NoContent(http.StatusOK)
 }
 
-func readCompetitionIds(e *core.RequestEvent) []string {
+func readCompetitionIdsFromBody(e *core.RequestEvent) []string {
 	data := struct {
 		Competitions []string `json:"competitions"`
 	}{}
@@ -109,4 +75,25 @@ func readCompetitionIds(e *core.RequestEvent) []string {
 		return nil
 	}
 	return data.Competitions
+}
+
+func readPlayerStatusFromBody(e *core.RequestEvent) (PlayerStatus, error) {
+	data := struct {
+		Status int `json:"status"`
+	}{}
+	if err := e.BindBody(&data); err != nil {
+		return 0, errors.New("the JSON body does not contain the 'status' field")
+	}
+	status := PlayerStatus(data.Status)
+	if err := validatePlayerStatus(status); err != nil {
+		return 0, err
+	}
+	return status, nil
+}
+
+func validatePlayerStatus(status PlayerStatus) error {
+	if status < NotAttending || status > Disqualified {
+		return errors.New("invalid player status")
+	}
+	return nil
 }

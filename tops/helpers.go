@@ -12,16 +12,11 @@ import (
 // in records that serve for passing data down
 // the hook chain
 const (
-	DrawChangeKey         string = "DRAW_CHANGE"
-	StatusChangeKey              = "STATUS_CHANGES"
-	DeleteVerifiedKey            = "DELETE_VERIFIED"
-	CourtsOfGymKey               = "COURTS_OF_GYM"
-	TournamentCreateKey          = "CREATED_TOURNAMENT"
-	TournamentUpdateKey          = "UPDATED_TOURNAMENT"
-	TournamentDeleteKey          = "DELETED_TOURNAMENT"
-	RegistrationCreateKey        = "CREATED_REGISTRATION"
-	RegistrationUpdateKey        = "UPDATED_REGISTRATION"
-	RegistrationDeleteKey        = "DELETED_REGISTRATION"
+	DeleteVerifiedKey     = "DELETE_VERIFIED"
+	CourtsOfGymKey        = "COURTS_OF_GYM"
+	RegistrationCreateKey = "CREATED_REGISTRATION"
+	RegistrationUpdateKey = "UPDATED_REGISTRATION"
+	RegistrationDeleteKey = "DELETED_REGISTRATION"
 )
 
 func idFinder[P Proxy, PP ProxyP[P]](id string) func(p PP) bool {

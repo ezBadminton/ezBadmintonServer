@@ -85,21 +85,16 @@ func VerifyRegistration(team *Team, competition *Competition) error {
 	return Registrations.verifyRegistration(team, competition)
 }
 
-func WithdrawOrReenterPlayer(
+func SetPlayerStatus(
 	app core.App,
 	player *Player,
+	newStatus PlayerStatus,
 	competitionIds []string,
-	withdraw bool,
-) ([]*FloatingStatusChange, error) {
+) error {
+	defer topsMu.Unlock()
 	topsMu.Lock()
 
-	changes, err := withdrawOrReenterPlayer(app, player, competitionIds, withdraw)
-	if err != nil {
-		// Only unlock on error. Otherwise the player update handler unlocks after transaction.
-		defer topsMu.Unlock()
-	}
-
-	return changes, err
+	return setPlayerStatus(app, player, newStatus, competitionIds)
 }
 
 func ListPlayerStatusChanges(player *Player, newStatus PlayerStatus) *StatusChangeResult {

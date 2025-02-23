@@ -63,9 +63,6 @@ func main() {
 		if err := tops.InitTournaments(e.App); err != nil {
 			return err
 		}
-		if err := tops.InitWithdrawalHandlers(); err != nil {
-			return err
-		}
 		if err := tops.InitCourts(); err != nil {
 			return err
 		}
