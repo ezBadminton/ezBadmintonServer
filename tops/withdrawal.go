@@ -151,9 +151,9 @@ func listStatusChangeMatches(player *Player, newStatus PlayerStatus) *StatusChan
 	regs := Registrations.registrationsOfPlayer(player.Id)
 	changes := make(map[*Competition][]*MatchData)
 	for _, reg := range regs {
-		tournament := Tournaments.findTournament(reg.Competition.Id)
+		tournament, ok := Tournaments.tournaments[reg.Competition.Id]
 		team := reg.Team
-		if tournament == nil || !tournament.Started || tournament.Ended {
+		if !ok || !tournament.Started || tournament.Ended {
 			continue
 		}
 		var changedMatches []*MatchData
@@ -186,8 +186,8 @@ func withdrawOrReenterPlayer(
 ) ([]*FloatingStatusChange, error) {
 	changes := make([]*FloatingStatusChange, 0)
 	for _, id := range competitionIds {
-		tournament := Tournaments.findTournament(id)
-		if tournament == nil {
+		tournament, ok := Tournaments.tournaments[id]
+		if !ok {
 			continue
 		}
 		reg, ok := Registrations.byCompetitionPlayer[id][player.Id]

@@ -26,6 +26,7 @@ type CompetitionTournament struct {
 	BaseTopsRecord
 	*Competition
 	Tournament
+	badminton.ScoreSettings
 	Started, Ended bool
 }
 
@@ -42,10 +43,16 @@ func (c *CompetitionTournament) ToMap() map[string]any {
 var Tournaments *TournamentStore
 
 type TournamentStore struct {
-	app         core.App
+	app  core.App
+	list []*CompetitionTournament
+	// Competition id -> tournament
 	tournaments map[string]*CompetitionTournament
-	list        []*CompetitionTournament
-	matchData   map[int]*MatchData
+	// Tournament match id -> match data
+	matchData map[int]*MatchData
+	// match data id -> tournament match
+	matches map[string]*got.Match
+	// match data id -> tournament
+	byMatch map[string]*CompetitionTournament
 }
 
 func InitTournaments(app core.App) error {
@@ -58,6 +65,9 @@ func InitTournaments(app core.App) error {
 		app:         app,
 		tournaments: make(map[string]*CompetitionTournament),
 		list:        make([]*CompetitionTournament, 0),
+		matchData:   make(map[int]*MatchData),
+		matches:     make(map[string]*got.Match),
+		byMatch:     make(map[string]*CompetitionTournament),
 	}
 
 	err = Tournaments.addTournaments(compStore.RecordList...)
@@ -81,14 +91,6 @@ func (s *TournamentStore) listRunning() []*CompetitionTournament {
 	}
 
 	return tournaments
-}
-
-func (s *TournamentStore) findTournament(competitionId string) *CompetitionTournament {
-	return s.tournaments[competitionId]
-}
-
-func (s *TournamentStore) findMatchData(match *got.Match) *MatchData {
-	return s.matchData[match.Id()]
 }
 
 func (s *TournamentStore) setTournament(competition *Competition, tournament *CompetitionTournament) {
@@ -117,6 +119,11 @@ func (s *TournamentStore) removeTournament(competition *Competition) {
 	matches := tournament.MatchList().Matches
 	for _, m := range matches {
 		delete(s.matchData, m.Id())
+		matchData := s.matchData[m.Id()]
+		if matchData != nil {
+			delete(s.matches, matchData.Id)
+			delete(s.byMatch, matchData.Id)
+		}
 	}
 
 	delete(s.tournaments, competition.Id)
@@ -211,8 +218,9 @@ func (s *TournamentStore) createTournament(comp *Competition) (*CompetitionTourn
 			Created: created,
 			Updated: updated,
 		},
-		Competition: comp,
-		Tournament:  tournament,
+		Competition:   comp,
+		Tournament:    tournament,
+		ScoreSettings: scoreSettings,
 	}
 
 	return compTournament, nil
@@ -362,6 +370,8 @@ func hydrate(tournament *CompetitionTournament) error {
 		setWithdrawnTeams(match, withdrawn)
 
 		Tournaments.matchData[match.Id()] = data
+		Tournaments.matches[data.Id] = match
+		Tournaments.byMatch[data.Id] = tournament
 	}
 
 	tournament.Update(nil)
@@ -381,6 +391,11 @@ func dehydrate(tournament got.MatchLister) {
 		m.WithdrawnPlayers = nil
 
 		delete(Tournaments.matchData, m.Id())
+		matchData := Tournaments.matchData[m.Id()]
+		if matchData != nil {
+			delete(Tournaments.matches, matchData.Id)
+			delete(Tournaments.byMatch, matchData.Id)
+		}
 	}
 }
 

@@ -133,3 +133,31 @@ func VerifyGymnasiumDeletion(gymnasium *Gymnasium) error {
 
 	return err
 }
+
+func StartMatch(app core.App, matchData *MatchData) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return startMatch(app, matchData)
+}
+
+func CancelMatch(app core.App, matchData *MatchData) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return cancelMatch(app, matchData)
+}
+
+func SetMatchScore(app core.App, matchData *MatchData, score [][]int) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return setMatchScore(app, matchData, score)
+}
+
+func ResetMatch(app core.App, matchData *MatchData) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return resetMatch(app, matchData)
+}

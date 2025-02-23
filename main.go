@@ -35,6 +35,7 @@ func main() {
 	api.BindDrawHooks(app)
 	api.BindResultHooks(app)
 	api.BindPlayerStatusHooks(app)
+	api.BindMatchHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {
@@ -66,6 +67,9 @@ func main() {
 			return err
 		}
 		if err := tops.InitCourts(); err != nil {
+			return err
+		}
+		if err := tops.InitMatches(); err != nil {
 			return err
 		}
 

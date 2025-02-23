@@ -94,7 +94,7 @@ func InitSchedule() error {
 		roundIndex := roundIndexes[i]
 
 		for i, m := range round {
-			matchData := Tournaments.findMatchData(m)
+			matchData := Tournaments.matchData[m.Id()]
 			matchStatus, playerStatus := scheduleStatus(m, competition)
 			scheduledMatches[i] = &ScheduledMatch{
 				Match:          matchData,
@@ -138,9 +138,31 @@ func (s *MatchScheduler) scheduleStatus(matchData *MatchData) ScheduleStatus {
 	return s.scheduled[matchData.Id].ScheduleStatus
 }
 
-func (s *MatchScheduler) setMatchScheduleStatus(matchData *MatchData, newStatus ScheduleStatus) {
+func (s *MatchScheduler) setMatchScheduleStatus(matchData *MatchData, newStatus ScheduleStatus, court *Court) {
 	scheduledMatch := s.scheduled[matchData.Id]
+	currentStatus := scheduledMatch.ScheduleStatus
+
 	scheduledMatch.ScheduleStatus = newStatus
+
+	if occupationalState(currentStatus) && !occupationalState(newStatus) {
+		delete(Courts.occupied, court.Id)
+	} else if !occupationalState(currentStatus) && occupationalState(newStatus) {
+		Courts.occupied[court.Id] = matchData.Id
+	}
+}
+
+func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionTournament) {
+	competition := tournament.Competition
+	matches := tournament.MatchList().Matches
+
+	for _, m := range matches {
+		matchData := Tournaments.matchData[m.Id()]
+		status, playerStatus := scheduleStatus(m, competition)
+		scheduledMatch := s.scheduled[matchData.Id]
+
+		scheduledMatch.ScheduleStatus = status
+		scheduledMatch.PlayerStatus = playerStatus
+	}
 }
 
 func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerScheduleStatus) {

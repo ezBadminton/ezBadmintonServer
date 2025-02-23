@@ -51,7 +51,7 @@ func collectCurrentMatches(matches []*got.Match) map[string]*MatchData {
 			continue
 		}
 
-		matchData := Tournaments.findMatchData(m)
+		matchData := Tournaments.matchData[m.Id()]
 		players := playersInMatch(m)
 
 		for _, p := range players {
@@ -70,7 +70,7 @@ func collectLastMatches(sortedMatches []*got.Match) map[string]*MatchData {
 			break
 		}
 
-		matchData := Tournaments.findMatchData(m)
+		matchData := Tournaments.matchData[m.Id()]
 		players := playersInMatch(m)
 
 		for _, p := range players {

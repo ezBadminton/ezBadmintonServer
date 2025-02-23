@@ -10,7 +10,8 @@ import (
 )
 
 type CourtManager struct {
-	list     []*Court
+	list []*Court
+	// court id -> match data id
 	occupied map[string]string
 }
 
@@ -114,7 +115,7 @@ func (m *CourtManager) assignCourtToMatch(app core.App, matchData *MatchData, op
 		return err
 	}
 
-	Schedule.setMatchScheduleStatus(matchData, Ready)
+	Schedule.setMatchScheduleStatus(matchData, Ready, court)
 
 	return nil
 }
@@ -125,13 +126,15 @@ func (m *CourtManager) unassignCourt(app core.App, matchData *MatchData) error {
 		return errors.New("the match is not in the correct state for court unassignment")
 	}
 
+	court := matchData.Court()
+
 	matchData, _ = WrapRecord[MatchData](matchData.Clone())
 	matchData.SetCourt(nil)
 	if err := app.Save(matchData); err != nil {
 		return err
 	}
 
-	Schedule.setMatchScheduleStatus(matchData, CourtWait)
+	Schedule.setMatchScheduleStatus(matchData, CourtWait, court)
 
 	return nil
 }
@@ -201,4 +204,10 @@ func findCourtsOfGymnasium(gym *Gymnasium) []*Court {
 		courtIds[i], _ = store.FindProxy[Court](p.Id)
 	}
 	return courtIds
+}
+
+// Returns true for status where matches with this status
+// occupy their assigned court
+func occupationalState(status ScheduleStatus) bool {
+	return status == Ready || status == InProgress
 }
