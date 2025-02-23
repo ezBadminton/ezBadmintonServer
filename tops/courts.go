@@ -37,25 +37,56 @@ func InitCourts() error {
 
 	courtStore.RegisterCreateHander(Courts.created)
 	courtStore.RegisterUpdateHandler(Courts.updated)
-	courtStore.RegisterDeleteHandler(Courts.deleted)
-
-	courtStore.RegisterFailedDeleteHandler(Courts.deleteFailed)
-
-	gymStore, err := store.FindRecordStore[Gymnasium]()
-	if err != nil {
-		return err
-	}
-
-	gymStore.RegisterDeleteHandler(Courts.gymDeleted)
-	gymStore.RegisterFailedDeleteHandler(Courts.gymDeleteFailed)
 
 	return nil
 }
 
-func (m *CourtManager) verifyCourtDeletion(court *Court) error {
+func (m *CourtManager) deleteCourt(app core.App, court *Court) error {
 	if m.isOccupied(court) {
 		return errors.New("can not delete occupied court")
 	}
+
+	if err := app.Delete(court); court != nil {
+		return err
+	}
+
+	m.list = slices.DeleteFunc(
+		m.list,
+		func(c *Court) bool { return c.Id == court.Id },
+	)
+
+	return nil
+}
+
+func (m *CourtManager) deleteGymnasium(app core.App, gym *Gymnasium) error {
+	courts := findCourtsOfGymnasium(gym)
+	for _, c := range courts {
+		if m.isOccupied(c) {
+			return errors.New("can not delete gymnasium while courts are occupied")
+		}
+	}
+
+	err := app.RunInTransaction(func(txApp core.App) error {
+		for _, c := range courts {
+			if err := txApp.Delete(c); err != nil {
+				return err
+			}
+		}
+		if err := txApp.Delete(gym); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	ids := idList(courts)
+	finder := func(c *Court) bool {
+		return slices.Contains(ids, c.Id)
+	}
+	m.list = slices.DeleteFunc(m.list, finder)
+
 	return nil
 }
 
@@ -154,47 +185,6 @@ func (m *CourtManager) updated(_, court *Court) {
 	i := slices.IndexFunc(m.list, func(c *Court) bool { return c.Id == court.Id })
 	m.list[i] = court
 	slices.SortFunc(m.list, compareCourts)
-}
-
-func (m *CourtManager) deleted(court *Court) {
-	d := court.CustomData()[DeleteVerifiedKey]
-	if d != nil {
-		// Court is being deleted through gym deletion
-		return
-	}
-
-	defer topsMu.Unlock()
-
-	m.list = slices.DeleteFunc(m.list, func(c *Court) bool { return c.Id == court.Id })
-}
-
-func (m *CourtManager) deleteFailed(court *Court) {
-	d := court.CustomData()[DeleteVerifiedKey]
-	// When it is a gym deletion the lock is kept by the gym deletion call
-	if d != nil {
-		topsMu.Unlock()
-	}
-}
-
-func (m *CourtManager) gymDeleted(gym *Gymnasium) {
-	defer topsMu.Unlock()
-
-	courts := gym.CustomData()[CourtsOfGymKey].([]*Court)
-	ids := idList(courts)
-
-	finder := func(c *Court) bool {
-		return slices.Contains(ids, c.Id)
-	}
-	m.list = slices.DeleteFunc(m.list, finder)
-}
-
-func (m *CourtManager) gymDeleteFailed(gym *Gymnasium) {
-	defer topsMu.Unlock()
-
-	courts := gym.CustomData()[CourtsOfGymKey].([]*Court)
-	for _, court := range courts {
-		court.SetRaw(DeleteVerifiedKey, nil)
-	}
 }
 
 func findCourtsOfGymnasium(gym *Gymnasium) []*Court {

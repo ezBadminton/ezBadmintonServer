@@ -12,23 +12,45 @@ import (
 )
 
 func BindCourtHooks(app core.App) {
-	url := "/api/ezbadminton/courts/{matchdata}"
+	url := "/api/ezbadminton/courts"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := e.Router.Group(url)
 		group.Bind(apis.RequireAuth())
 
-		group.POST("/assign", assignCourt)
-		group.POST("/unassign", unassignCourt)
+		group.DELETE("/{court}", deleteCourt)
+		group.DELETE("/gymnasium/{gynmasium}", deleteGymnasium)
+		group.POST("/{matchdata}/assign", assignCourt)
+		group.POST("/{matchdata}/unassign", unassignCourt)
 
 		return e.Next()
 	})
+}
 
-	cName := CName[Court]()
-	app.OnRecordDelete(cName).BindFunc(courtDelete)
+func deleteCourt(e *core.RequestEvent) error {
+	court, err := findPathId[Court]("court", e.Request)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
 
-	cName = CName[Gymnasium]()
-	app.OnRecordDelete(cName).BindFunc(gymnasiumDelete)
+	if err := tops.DeleteCourt(e.App, court); err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+
+	return e.NoContent(http.StatusOK)
+}
+
+func deleteGymnasium(e *core.RequestEvent) error {
+	gym, err := findPathId[Gymnasium]("gymnasium", e.Request)
+	if err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+
+	if err := tops.DeleteGymnasium(e.App, gym); err != nil {
+		return e.String(http.StatusBadRequest, err.Error())
+	}
+
+	return e.NoContent(http.StatusOK)
 }
 
 func assignCourt(e *core.RequestEvent) error {
@@ -57,40 +79,6 @@ func unassignCourt(e *core.RequestEvent) error {
 	return e.NoContent(http.StatusOK)
 }
 
-func courtDelete(e *core.RecordEvent) error {
-	court, _ := store.FindProxy[Court](e.Record.Id)
-
-	if err := tops.VerifyCourtDeletion(court); err != nil {
-		return err
-	}
-	return e.Next()
-}
-
-func gymnasiumDelete(e *core.RecordEvent) error {
-	gym, _ := store.FindProxy[Gymnasium](e.Record.Id)
-	if err := tops.VerifyGymnasiumDeletion(gym); err != nil {
-		return err
-	}
-
-	courts := gym.CustomData()[tops.CourtsOfGymKey].([]*Court)
-
-	app := e.App
-	err := e.App.RunInTransaction(func(txApp core.App) error {
-		e.App = txApp
-
-		for _, court := range courts {
-			if err := e.App.Delete(court); err != nil {
-				return err
-			}
-		}
-
-		return e.Next()
-	})
-	e.App = app
-
-	return err
-}
-
 func readCourtAndMatchFromRequest(e *core.RequestEvent) (*Court, *MatchData, error) {
 	matchData, err := findPathId[MatchData]("matchdata", e.Request)
 	if err != nil {
@@ -108,7 +96,7 @@ func readCourtFromBody(e *core.RequestEvent) (*Court, error) {
 		CourtId string `json:"court"`
 	}{}
 	if err := e.BindBody(&data); err != nil {
-		return nil, errors.New("body does not contain a JSON 'court' fied")
+		return nil, errors.New("the JSON body does not contain a 'court' fied")
 	}
 
 	courtId := data.CourtId

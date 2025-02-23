@@ -118,25 +118,18 @@ func UnassignCourt(app core.App, matchData *MatchData) error {
 	return Courts.unassignCourt(app, matchData)
 }
 
-func VerifyCourtDeletion(court *Court) error {
+func DeleteCourt(app core.App, court *Court) error {
+	defer topsMu.Unlock()
 	topsMu.Lock()
 
-	err := Courts.verifyCourtDeletion(court)
-	if err != nil {
-		defer topsMu.Unlock()
-	}
-	return err
+	return Courts.deleteCourt(app, court)
 }
 
-func VerifyGymnasiumDeletion(gymnasium *Gymnasium) error {
+func DeleteGymnasium(app core.App, gymnasium *Gymnasium) error {
+	defer topsMu.Unlock()
 	topsMu.Lock()
 
-	err := Courts.verifyGymnasiumDeletion(gymnasium)
-	if err != nil {
-		defer topsMu.Unlock()
-	}
-
-	return err
+	return Courts.deleteGymnasium(app, gymnasium)
 }
 
 func StartMatch(app core.App, matchData *MatchData) error {
