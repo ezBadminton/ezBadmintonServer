@@ -90,23 +90,6 @@ func (m *CourtManager) deleteGymnasium(app core.App, gym *Gymnasium) error {
 	return nil
 }
 
-func (m *CourtManager) verifyGymnasiumDeletion(gym *Gymnasium) error {
-	courts := findCourtsOfGymnasium(gym)
-	for _, court := range courts {
-		_, ok := m.occupied[court.Id]
-		if ok {
-			return errors.New("can not delete gym while courts are occupied")
-		}
-	}
-
-	for _, court := range courts {
-		court.SetRaw(DeleteVerifiedKey, struct{}{})
-	}
-	gym.SetRaw(CourtsOfGymKey, courts)
-
-	return nil
-}
-
 func (m *CourtManager) isOccupied(court *Court) bool {
 	_, ok := m.occupied[court.Id]
 	return ok

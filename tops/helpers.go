@@ -12,8 +12,6 @@ import (
 // in records that serve for passing data down
 // the hook chain
 const (
-	DeleteVerifiedKey     = "DELETE_VERIFIED"
-	CourtsOfGymKey        = "COURTS_OF_GYM"
 	RegistrationCreateKey = "CREATED_REGISTRATION"
 	RegistrationUpdateKey = "UPDATED_REGISTRATION"
 	RegistrationDeleteKey = "DELETED_REGISTRATION"
