@@ -16,20 +16,22 @@ func BindCourtHooks(app core.App) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
 
-		group.DELETE("/{court}", deleteCourt)
-		group.DELETE("/gymnasium/{gymnasium}", deleteGymnasium)
-		group.POST("/{matchdata}/assign", assignCourt)
-		group.POST("/{matchdata}/unassign", unassignCourt)
+		group.DELETE("/{court}", deleteCourt).
+			Bind(proxyId[Court]("court"))
+
+		group.DELETE("/gymnasium/{gymnasium}", deleteGymnasium).
+			Bind(proxyId[Gymnasium]("gymnasium"))
+
+		dataFetcher := proxyId[MatchData]("matchdata")
+		group.POST("/{matchdata}/assign", assignCourt).Bind(dataFetcher)
+		group.POST("/{matchdata}/unassign", unassignCourt).Bind(dataFetcher)
 
 		return e.Next()
 	})
 }
 
 func deleteCourt(e *core.RequestEvent) error {
-	court, err := findPathId[Court]("court", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	court := e.Get("court").(*Court)
 
 	if err := tops.DeleteCourt(e.App, court); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -39,10 +41,7 @@ func deleteCourt(e *core.RequestEvent) error {
 }
 
 func deleteGymnasium(e *core.RequestEvent) error {
-	gym, err := findPathId[Gymnasium]("gymnasium", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	gym := e.Get("gymnasium").(*Gymnasium)
 
 	if err := tops.DeleteGymnasium(e.App, gym); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -65,10 +64,7 @@ func assignCourt(e *core.RequestEvent) error {
 }
 
 func unassignCourt(e *core.RequestEvent) error {
-	matchData, err := findPathId[MatchData]("matchdata", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.UnassignCourt(e.App, matchData); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -78,10 +74,7 @@ func unassignCourt(e *core.RequestEvent) error {
 }
 
 func readCourtAndMatchFromRequest(e *core.RequestEvent) (*Court, *MatchData, error) {
-	matchData, err := findPathId[MatchData]("matchdata", e.Request)
-	if err != nil {
-		return nil, nil, err
-	}
+	matchData := e.Get("matchdata").(*MatchData)
 	court, err := readCourtFromBody(e)
 	if err != nil {
 		return nil, nil, err

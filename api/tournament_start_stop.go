@@ -13,6 +13,7 @@ func BindStartStopHooks(app core.App) {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
+		group.Bind(proxyId[Competition]("competition"))
 
 		group.POST("/start", startCompetition)
 		group.POST("/stop", stopCompetition)
@@ -22,12 +23,9 @@ func BindStartStopHooks(app core.App) {
 }
 
 func startCompetition(e *core.RequestEvent) error {
-	competition, err := findPathId[Competition]("competition", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	competition := e.Get("competition").(*Competition)
 
-	err = tops.StartTournament(e.App, competition.Id)
+	err := tops.StartTournament(e.App, competition.Id)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}
@@ -36,12 +34,9 @@ func startCompetition(e *core.RequestEvent) error {
 }
 
 func stopCompetition(e *core.RequestEvent) error {
-	competition, err := findPathId[Competition]("competition", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	competition := e.Get("competition").(*Competition)
 
-	err = tops.StopTournament(e.App, competition.Id)
+	err := tops.StopTournament(e.App, competition.Id)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}

@@ -14,6 +14,7 @@ func BindMatchHooks(app core.App) {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
+		group.Bind(proxyId[MatchData]("matchdata"))
 
 		group.POST("/start", startMarch)
 		group.POST("/cancel", cancelMatch)
@@ -25,10 +26,7 @@ func BindMatchHooks(app core.App) {
 }
 
 func startMarch(e *core.RequestEvent) error {
-	matchData, err := findPathId[MatchData]("matchdata", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.StartMatch(e.App, matchData); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -38,10 +36,7 @@ func startMarch(e *core.RequestEvent) error {
 }
 
 func cancelMatch(e *core.RequestEvent) error {
-	matchData, err := findPathId[MatchData]("matchdata", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.CancelMatch(e.App, matchData); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -51,10 +46,7 @@ func cancelMatch(e *core.RequestEvent) error {
 }
 
 func setMatchScore(e *core.RequestEvent) error {
-	matchData, err := findPathId[MatchData]("matchdata", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	matchData := e.Get("matchdata").(*MatchData)
 
 	points, err := readPointsFromBody(e)
 	if err != nil {
@@ -69,10 +61,7 @@ func setMatchScore(e *core.RequestEvent) error {
 }
 
 func resetMatch(e *core.RequestEvent) error {
-	matchData, err := findPathId[MatchData]("matchdata", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.ResetMatch(e.App, matchData); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())

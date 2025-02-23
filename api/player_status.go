@@ -17,6 +17,7 @@ func BindPlayerStatusHooks(app core.App) {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
+		group.Bind(proxyId[Player]("player"))
 
 		group.GET("/{status}/preview", getStatusChangeList)
 		group.POST("", setPlayerStatus)
@@ -26,10 +27,7 @@ func BindPlayerStatusHooks(app core.App) {
 }
 
 func getStatusChangeList(e *core.RequestEvent) error {
-	player, err := findPathId[Player]("player", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	player := e.Get("player").(*Player)
 
 	statusValue := e.Request.PathValue("status")
 	statusI, err := strconv.Atoi(statusValue)
@@ -47,10 +45,7 @@ func getStatusChangeList(e *core.RequestEvent) error {
 }
 
 func setPlayerStatus(e *core.RequestEvent) error {
-	player, err := findPathId[Player]("player", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	player := e.Get("player").(*Player)
 	status, err := readPlayerStatusFromBody(e)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())

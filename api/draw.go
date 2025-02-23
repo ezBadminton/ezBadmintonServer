@@ -15,6 +15,7 @@ func BindDrawHooks(app core.App) {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
+		group.Bind(proxyId[Competition]("competition"))
 
 		group.POST("/make", makeDraw)
 		group.POST("/swap", swapDrawPositions)
@@ -27,10 +28,7 @@ func BindDrawHooks(app core.App) {
 }
 
 func makeDraw(e *core.RequestEvent) error {
-	competition, err := findPathId[Competition]("competition", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	competition := e.Get("competition").(*Competition)
 
 	if err := tops.MakeDraw(e.App, competition); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -40,10 +38,7 @@ func makeDraw(e *core.RequestEvent) error {
 }
 
 func swapDrawPositions(e *core.RequestEvent) error {
-	competition, err := findPathId[Competition]("competition", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	competition := e.Get("competition").(*Competition)
 
 	data := struct {
 		Swap []string `json:"swap"`
@@ -55,7 +50,7 @@ func swapDrawPositions(e *core.RequestEvent) error {
 		return e.String(http.StatusBadRequest, "the swap list does not have 2 unique IDs")
 	}
 
-	err = tops.DrawSwap(e.App, competition, data.Swap[0], data.Swap[1])
+	err := tops.DrawSwap(e.App, competition, data.Swap[0], data.Swap[1])
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}
@@ -64,10 +59,7 @@ func swapDrawPositions(e *core.RequestEvent) error {
 }
 
 func redraw(e *core.RequestEvent) error {
-	competition, err := findPathId[Competition]("competition", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	competition := e.Get("competition").(*Competition)
 
 	if err := tops.Redraw(e.App, competition); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -77,10 +69,7 @@ func redraw(e *core.RequestEvent) error {
 }
 
 func deleteDraw(e *core.RequestEvent) error {
-	competition, err := findPathId[Competition]("competition", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	competition := e.Get("competition").(*Competition)
 
 	if err := tops.DeleteDraw(e.App, competition); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
@@ -90,10 +79,8 @@ func deleteDraw(e *core.RequestEvent) error {
 }
 
 func setSeeds(e *core.RequestEvent) error {
-	competition, err := findPathId[Competition]("competition", e.Request)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	competition := e.Get("competition").(*Competition)
+
 	seeds, err := readSeedsFromBody(e)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
