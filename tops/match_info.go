@@ -40,7 +40,7 @@ func playersInMatch(match *got.Match) []*Player {
 		if s.Player == nil {
 			continue
 		}
-		team := s.Player.(*TournamentPlayer).Team
+		team := s.Player.(TournamentPlayer).Team
 		players = append(players, team.Players()...)
 	}
 

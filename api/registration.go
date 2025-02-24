@@ -58,7 +58,7 @@ func updateTeam(e *core.RequestEvent) error {
 	team := e.Get("team").(*Team)
 	players := e.Get("players").([]*Player)
 
-	team, _ = WrapRecord[Team](team.Clone())
+	team = Clone(team)
 	team.SetPlayers(players)
 
 	if err := tops.UpdateTeam(e.App, team); err != nil {

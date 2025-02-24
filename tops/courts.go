@@ -123,7 +123,7 @@ func (m *CourtManager) assignCourtToMatch(app core.App, matchData *MatchData, op
 		return errors.New("no court is available")
 	}
 
-	matchData, _ = WrapRecord[MatchData](matchData.Clone())
+	matchData = Clone(matchData)
 	matchData.SetCourt(court)
 	if err := app.Save(matchData); err != nil {
 		return err
@@ -142,7 +142,7 @@ func (m *CourtManager) unassignCourt(app core.App, matchData *MatchData) error {
 
 	court := matchData.Court()
 
-	matchData, _ = WrapRecord[MatchData](matchData.Clone())
+	matchData = Clone(matchData)
 	matchData.SetCourt(nil)
 	if err := app.Save(matchData); err != nil {
 		return err

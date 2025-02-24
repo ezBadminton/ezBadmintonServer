@@ -33,6 +33,7 @@ func main() {
 	api.BindDrawHooks(app)
 	api.BindPlayerStatusHooks(app)
 	api.BindMatchHooks(app)
+	api.BindStartStopHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {
@@ -55,6 +56,9 @@ func main() {
 		if err := tops.InitTournaments(e.App); err != nil {
 			return err
 		}
+		if err := tops.InitPlayerTracker(); err != nil {
+			return err
+		}
 		if err := tops.InitSchedule(); err != nil {
 			return err
 		}
@@ -64,7 +68,6 @@ func main() {
 		if err := tops.InitMatches(); err != nil {
 			return err
 		}
-
 		return nil
 	})
 

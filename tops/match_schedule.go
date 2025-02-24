@@ -214,7 +214,7 @@ func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus,
 		return PlayerRest, playerScheduleStatus
 	}
 
-	panic("something went wrong while determining match schedule status")
+	return CourtWait, nil
 }
 
 // The schedule offset of a tournament is the amount

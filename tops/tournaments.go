@@ -229,14 +229,15 @@ func (s *TournamentStore) start(app core.App, competitionId string) error {
 		return err
 	}
 
-	comp, _ := WrapRecord[Competition](tournament.Competition.Clone())
-	comp.SetMatches(matchData)
+	comp := Clone(tournament.Competition)
 	err = app.RunInTransaction(func(txApp core.App) error {
 		for _, m := range matchData {
 			if err := txApp.Save(m); err != nil {
 				return err
 			}
 		}
+
+		comp.SetMatches(matchData)
 		if err := txApp.Save(comp); err != nil {
 			return err
 		}
@@ -263,7 +264,7 @@ func (s *TournamentStore) stop(app core.App, competitionId string) error {
 
 	matchData := tournament.Competition.Matches()
 
-	comp, _ := WrapRecord[Competition](tournament.Competition.Clone())
+	comp := Clone(tournament.Competition)
 	comp.SetMatches(nil)
 
 	err := app.RunInTransaction(func(txApp core.App) error {

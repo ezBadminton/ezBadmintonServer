@@ -16,7 +16,7 @@ func makeDraw(app core.App, comp *Competition) error {
 	}
 
 	draw := comp.Draw()
-	comp, _ = WrapRecord[Competition](comp.Clone())
+	comp = Clone(comp)
 
 	registrations := comp.Registrations()
 	attendingTeams := filterAttendingTeams(registrations)
@@ -63,7 +63,7 @@ func makeDraw(app core.App, comp *Competition) error {
 }
 
 func redraw(app core.App, comp *Competition) error {
-	comp, _ = WrapRecord[Competition](comp.Clone())
+	comp = Clone(comp)
 	comp.SetRngSeed(rand.Int())
 	return makeDraw(app, comp)
 }
@@ -76,7 +76,7 @@ func deleteDraw(app core.App, comp *Competition) error {
 		return errors.New("competition has no draw")
 	}
 
-	comp, _ = WrapRecord[Competition](comp.Clone())
+	comp = Clone(comp)
 	comp.SetDraw(nil)
 
 	if err := app.Save(comp); err != nil {
@@ -107,7 +107,7 @@ func drawSwap(app core.App, competition *Competition, a, b string) error {
 
 	draw[i0], draw[i1] = draw[i1], draw[i0]
 
-	competition, _ = WrapRecord[Competition](competition.Clone())
+	competition = Clone(competition)
 	competition.SetDraw(draw)
 
 	if err := app.Save(competition); err != nil {
@@ -129,7 +129,7 @@ func setSeeds(app core.App, competition *Competition, seeds []*Team) error {
 		return errors.New("can not seed unregistered team")
 	}
 
-	competition, _ = WrapRecord[Competition](competition.Clone())
+	competition = Clone(competition)
 	competition.SetSeeds(seeds)
 
 	if err := app.Save(competition); err != nil {

@@ -96,7 +96,7 @@ func setPlayerStatus(
 	var attendanceChanged bool
 	currentStatus := player.Status()
 
-	player, _ = WrapRecord[Player](player.Clone())
+	player = Clone(player)
 	player.SetStatus(newStatus)
 
 	if currentStatus == Attending && newStatus != Attending {
@@ -181,7 +181,7 @@ func setPlayerStatus(
 func addWithdrawnToData(team *Team, matchData []*MatchData) []*MatchData {
 	changedMatchData := make([]*MatchData, len(matchData))
 	for i, m := range matchData {
-		changed, _ := WrapRecord[MatchData](m.Clone())
+		changed := Clone(m)
 		updatedWithdrawList := append(changed.WithdrawnTeams(), team)
 		changed.SetWithdrawnTeams(updatedWithdrawList)
 		changedMatchData[i] = changed
@@ -192,7 +192,7 @@ func addWithdrawnToData(team *Team, matchData []*MatchData) []*MatchData {
 func removeWithdrawnFromData(team *Team, matchData []*MatchData) []*MatchData {
 	changedMatchData := make([]*MatchData, len(matchData))
 	for i, m := range matchData {
-		changed, _ := WrapRecord[MatchData](m.Clone())
+		changed := Clone(m)
 		updatedWithdrawList := slices.DeleteFunc(
 			changed.WithdrawnTeams(),
 			func(t *Team) bool { return t.Id == team.Id },

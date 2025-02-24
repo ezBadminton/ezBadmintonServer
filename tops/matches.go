@@ -22,7 +22,7 @@ func startMatch(app core.App, matchData *MatchData) error {
 
 	startTime := types.NowDateTime()
 
-	matchData, _ = WrapRecord[MatchData](matchData.Clone())
+	matchData = Clone(matchData)
 	matchData.SetStartTime(startTime)
 	if err := app.Save(matchData); err != nil {
 		return err
@@ -45,7 +45,7 @@ func cancelMatch(app core.App, matchData *MatchData) error {
 		return errors.New("the match is not in progress and can not be canceled")
 	}
 
-	matchData, _ = WrapRecord[MatchData](matchData.Clone())
+	matchData = Clone(matchData)
 	matchData.SetStartTime(types.DateTime{})
 	if err := app.Save(matchData); err != nil {
 		return err
@@ -75,7 +75,7 @@ func setMatchScore(app core.App, matchData *MatchData, points [][]int) error {
 		return errors.New("invalid score")
 	}
 
-	matchData, _ = WrapRecord[MatchData](matchData.Clone())
+	matchData = Clone(matchData)
 
 	tournament := Tournaments.byMatch[matchData.Id]
 	score, err := badminton.NewScore(points[0], points[1], tournament.ScoreSettings)
@@ -138,7 +138,7 @@ func resetMatch(app core.App, matchData *MatchData) error {
 		return errors.New("the match is in the wrong state to delete the score")
 	}
 
-	matchData, _ = WrapRecord[MatchData](matchData.Clone())
+	matchData = Clone(matchData)
 
 	currentScoreData := matchData.Sets()
 	currentCourt := matchData.Court()

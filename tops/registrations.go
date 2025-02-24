@@ -79,7 +79,7 @@ func (s *RegistrationStore) registerTeam(app core.App, team *Team, competition *
 		if err := txApp.Save(team); err != nil {
 			return err
 		}
-		competition, _ := WrapRecord[Competition](competition.Clone())
+		competition = Clone(competition)
 		registrations := competition.Registrations()
 		registrations = append(registrations, team)
 		competition.SetRegistrations(registrations)

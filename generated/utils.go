@@ -86,6 +86,16 @@ func WrapRecord[P Proxy, PP ProxyP[P]](record *core.Record) (PP, error) {
 	return p, nil
 }
 
+func Clone[P Proxy, PP ProxyP[P]](proxy PP) PP {
+	isNew := proxy.ProxyRecord().IsNew()
+	cloneRecord := proxy.ProxyRecord().Clone()
+	if !isNew {
+		cloneRecord.MarkAsNotNew()
+	}
+	cloneProxy, _ := WrapRecord[P, PP](cloneRecord)
+	return cloneProxy
+}
+
 type RelationField struct {
 	FieldName string
 	IsMulti   bool
