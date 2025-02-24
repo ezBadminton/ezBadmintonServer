@@ -1,11 +1,9 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
-	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -15,12 +13,13 @@ func BindDrawHooks(app core.App) {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
-		group.Bind(proxyId[Competition]("competition"))
+		group.Bind(pathId[Competition]("competition"))
 
 		group.POST("/make", makeDraw)
 		group.POST("/swap", swapDrawPositions)
 		group.POST("/redraw", redraw)
-		group.POST("/seeds", setSeeds)
+		group.POST("/seeds", setSeeds).
+			Bind(bodyIdList[Team]("seeds"))
 		group.DELETE("", deleteDraw)
 
 		return e.Next()
@@ -80,35 +79,11 @@ func deleteDraw(e *core.RequestEvent) error {
 
 func setSeeds(e *core.RequestEvent) error {
 	competition := e.Get("competition").(*Competition)
-
-	seeds, err := readSeedsFromBody(e)
-	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
+	seeds := e.Get("seeds").([]*Team)
 
 	if err := tops.SetSeeds(e.App, competition, seeds); err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}
 
 	return e.NoContent(http.StatusOK)
-}
-
-func readSeedsFromBody(e *core.RequestEvent) ([]*Team, error) {
-	data := struct {
-		SeedIds []string `json:"seeds"`
-	}{}
-	if err := e.BindBody(&data); err != nil {
-		return nil, errors.New("the JSON body does not contain a 'seeds' field of team IDs")
-	}
-
-	seeds := make([]*Team, 0, len(data.SeedIds))
-	for _, id := range data.SeedIds {
-		team, err := store.FindProxy[Team](id)
-		if err != nil {
-			return nil, errors.New("the team ID does not exist")
-		}
-		seeds = append(seeds, team)
-	}
-
-	return seeds, nil
 }

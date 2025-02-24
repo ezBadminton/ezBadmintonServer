@@ -13,7 +13,7 @@ func BindStartStopHooks(app core.App) {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
-		group.Bind(proxyId[Competition]("competition"))
+		group.Bind(pathId[Competition]("competition"))
 
 		group.POST("/start", startCompetition)
 		group.POST("/stop", stopCompetition)

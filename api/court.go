@@ -17,12 +17,12 @@ func BindCourtHooks(app core.App) {
 		group := rootGroup.Group(url)
 
 		group.DELETE("/{court}", deleteCourt).
-			Bind(proxyId[Court]("court"))
+			Bind(pathId[Court]("court"))
 
 		group.DELETE("/gymnasium/{gymnasium}", deleteGymnasium).
-			Bind(proxyId[Gymnasium]("gymnasium"))
+			Bind(pathId[Gymnasium]("gymnasium"))
 
-		dataFetcher := proxyId[MatchData]("matchdata")
+		dataFetcher := pathId[MatchData]("matchdata")
 		group.POST("/{matchdata}/assign", assignCourt).Bind(dataFetcher)
 		group.POST("/{matchdata}/unassign", unassignCourt).Bind(dataFetcher)
 

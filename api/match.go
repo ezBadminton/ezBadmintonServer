@@ -14,7 +14,7 @@ func BindMatchHooks(app core.App) {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
-		group.Bind(proxyId[MatchData]("matchdata"))
+		group.Bind(pathId[MatchData]("matchdata"))
 
 		group.POST("/start", startMarch)
 		group.POST("/cancel", cancelMatch)

@@ -56,7 +56,7 @@ func listStatusChangeMatches(player *Player, newStatus PlayerStatus) *StatusChan
 		return nil
 	}
 
-	regs := Registrations.registrationsOfPlayer(player.Id)
+	regs := Registrations.byPlayer[player.Id]
 	changes := make(map[*Competition][]*MatchData)
 	for _, reg := range regs {
 		tournament, ok := Tournaments.tournaments[reg.Competition.Id]

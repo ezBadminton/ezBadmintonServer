@@ -75,11 +75,25 @@ func ListRegistrations() []*Registration {
 	return Registrations.list
 }
 
-func VerifyRegistration(team *Team, competition *Competition) error {
-	defer topsMu.RUnlock()
-	topsMu.RLock()
+func RegisterTeam(app core.App, team *Team, competition *Competition) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
 
-	return Registrations.verifyRegistration(team, competition)
+	return Registrations.registerTeam(app, team, competition)
+}
+
+func UpdateTeam(app core.App, team *Team) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return Registrations.updateTeam(app, team)
+}
+
+func DeleteTeam(app core.App, team *Team) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return Registrations.deleteTeam(app, team)
 }
 
 func SetPlayerStatus(

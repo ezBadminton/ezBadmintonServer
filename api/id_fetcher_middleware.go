@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/hook"
 )
 
-func proxyId[P Proxy, PP ProxyP[P]](pathValueName string) *hook.Handler[*core.RequestEvent] {
+func pathId[P Proxy, PP ProxyP[P]](pathValueName string) *hook.Handler[*core.RequestEvent] {
 	return &hook.Handler[*core.RequestEvent]{
 		Func: func(e *core.RequestEvent) error {
 			id := e.Request.PathValue(pathValueName)
@@ -25,4 +26,66 @@ func proxyId[P Proxy, PP ProxyP[P]](pathValueName string) *hook.Handler[*core.Re
 			return e.Next()
 		},
 	}
+}
+
+func bodyId[P Proxy, PP ProxyP[P]](bodyFieldName string) *hook.Handler[*core.RequestEvent] {
+	return &hook.Handler[*core.RequestEvent]{
+		Func: func(e *core.RequestEvent) error {
+			proxies, err := readProxiesFromBody[P, PP](e, bodyFieldName)
+			if err != nil {
+				return e.String(http.StatusBadRequest, err.Error())
+			}
+
+			e.Set(bodyFieldName, proxies[0])
+
+			return e.Next()
+		},
+	}
+}
+
+func bodyIdList[P Proxy, PP ProxyP[P]](bodyFieldName string) *hook.Handler[*core.RequestEvent] {
+	return &hook.Handler[*core.RequestEvent]{
+		Func: func(e *core.RequestEvent) error {
+			proxies, err := readProxiesFromBody[P, PP](e, bodyFieldName)
+			if err != nil {
+				return e.String(http.StatusBadRequest, err.Error())
+			}
+
+			e.Set(bodyFieldName, proxies)
+
+			return e.Next()
+		},
+	}
+}
+
+func readProxiesFromBody[P Proxy, PP ProxyP[P]](e *core.RequestEvent, bodyFieldName string) ([]PP, error) {
+	data := map[string]any{}
+	e.BindBody(&data)
+
+	var idList []string
+	switch d := data[bodyFieldName].(type) {
+	case string:
+		idList = []string{d}
+	case []string:
+		if len(d) == 0 {
+			errMsg := fmt.Sprintf("the '%v' ID list is empty", bodyFieldName)
+			return nil, errors.New(errMsg)
+		}
+		idList = d
+	default:
+		errMsg := fmt.Sprintf("the body does not contain a '%v' ID field", bodyFieldName)
+		return nil, errors.New(errMsg)
+	}
+
+	proxies := make([]PP, 0, len(idList))
+	for _, id := range idList {
+		p, err := store.FindProxy[P, PP](id)
+		if err != nil {
+			errMsg := fmt.Sprintf("the ID '%v' does not exist", id)
+			return nil, errors.New(errMsg)
+		}
+		proxies = append(proxies, p)
+	}
+
+	return proxies, nil
 }

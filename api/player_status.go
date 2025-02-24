@@ -17,7 +17,7 @@ func BindPlayerStatusHooks(app core.App) {
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
-		group.Bind(proxyId[Player]("player"))
+		group.Bind(pathId[Player]("player"))
 
 		group.GET("/{status}/preview", getStatusChangeList)
 		group.POST("", setPlayerStatus)
