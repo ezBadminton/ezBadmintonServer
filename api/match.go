@@ -75,7 +75,8 @@ func readPointsFromBody(e *core.RequestEvent) ([][]int, error) {
 		Team1Points []int `json:"team1points"`
 		Team2Points []int `json:"team2points"`
 	}{}
-	if err := e.BindBody(&data); err != nil {
+	e.BindBody(&data)
+	if len(data.Team1Points) == 0 || len(data.Team2Points) == 0 {
 		return nil, errors.New("the JSON body does not contain the 'team1points' and 'team2points' fields")
 	}
 	points := [][]int{data.Team1Points, data.Team2Points}

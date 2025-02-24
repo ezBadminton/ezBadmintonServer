@@ -86,8 +86,12 @@ func readCourtFromBody(e *core.RequestEvent) (*Court, error) {
 	data := struct {
 		CourtId string `json:"court"`
 	}{}
-	if err := e.BindBody(&data); err != nil {
-		return nil, errors.New("the JSON body does not contain a 'court' fied")
+	e.BindBody(&data)
+
+	if data.CourtId == "" {
+		// No court implies to the server to
+		// select an open court automatically
+		return nil, nil
 	}
 
 	courtId := data.CourtId

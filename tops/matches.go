@@ -121,6 +121,7 @@ func setMatchScore(app core.App, matchData *MatchData, points [][]int) error {
 	match.Score = score
 	if matchStatus == InProgress {
 		match.EndTime = endTime.Time()
+		Schedule.setMatchScheduleStatus(matchData, Done, matchData.Court())
 	}
 
 	tournament.Update(nil)

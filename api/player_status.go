@@ -64,17 +64,16 @@ func readCompetitionIdsFromBody(e *core.RequestEvent) []string {
 	data := struct {
 		Competitions []string `json:"competitions"`
 	}{}
-	if err := e.BindBody(&data); err != nil {
-		return nil
-	}
+	e.BindBody(&data)
 	return data.Competitions
 }
 
 func readPlayerStatusFromBody(e *core.RequestEvent) (PlayerStatus, error) {
 	data := struct {
 		Status int `json:"status"`
-	}{}
-	if err := e.BindBody(&data); err != nil {
+	}{-999}
+	e.BindBody(&data)
+	if data.Status == -999 {
 		return 0, errors.New("the JSON body does not contain the 'status' field")
 	}
 	status := PlayerStatus(data.Status)

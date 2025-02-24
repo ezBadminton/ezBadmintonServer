@@ -202,9 +202,17 @@ func (p *Player) Club() *Club {
 }
 
 func (p *Player) SetClub(club *Club) {
-	p.Record.Set("club", club.Id)
+	var id string
+	if club != nil {
+		id = club.Id
+	}
+	p.Record.Set("club", id)
 	e := p.Expand()
-	e["club"] = club.Record
+	if club != nil {
+		e["club"] = club.Record
+	} else {
+		delete(e, "club")
+	}
 	p.SetExpand(e)
 }
 
@@ -289,9 +297,17 @@ func (p *Competition) AgeGroup() *AgeGroup {
 }
 
 func (p *Competition) SetAgeGroup(ageGroup *AgeGroup) {
-	p.Record.Set("ageGroup", ageGroup.Id)
+	var id string
+	if ageGroup != nil {
+		id = ageGroup.Id
+	}
+	p.Record.Set("ageGroup", id)
 	e := p.Expand()
-	e["ageGroup"] = ageGroup.Record
+	if ageGroup != nil {
+		e["ageGroup"] = ageGroup.Record
+	} else {
+		delete(e, "ageGroup")
+	}
 	p.SetExpand(e)
 }
 
@@ -305,9 +321,17 @@ func (p *Competition) PlayingLevel() *PlayingLevel {
 }
 
 func (p *Competition) SetPlayingLevel(playingLevel *PlayingLevel) {
-	p.Record.Set("playingLevel", playingLevel.Id)
+	var id string
+	if playingLevel != nil {
+		id = playingLevel.Id
+	}
+	p.Record.Set("playingLevel", id)
 	e := p.Expand()
-	e["playingLevel"] = playingLevel.Record
+	if playingLevel != nil {
+		e["playingLevel"] = playingLevel.Record
+	} else {
+		delete(e, "playingLevel")
+	}
 	p.SetExpand(e)
 }
 
@@ -344,9 +368,17 @@ func (p *Competition) TournamentModeSettings() *TournamentModeSettings {
 }
 
 func (p *Competition) SetTournamentModeSettings(tournamentModeSettings *TournamentModeSettings) {
-	p.Record.Set("tournamentModeSettings", tournamentModeSettings.Id)
+	var id string
+	if tournamentModeSettings != nil {
+		id = tournamentModeSettings.Id
+	}
+	p.Record.Set("tournamentModeSettings", id)
 	e := p.Expand()
-	e["tournamentModeSettings"] = tournamentModeSettings.Record
+	if tournamentModeSettings != nil {
+		e["tournamentModeSettings"] = tournamentModeSettings.Record
+	} else {
+		delete(e, "tournamentModeSettings")
+	}
 	p.SetExpand(e)
 }
 
@@ -595,9 +627,17 @@ func (p *Court) Gymnasium() *Gymnasium {
 }
 
 func (p *Court) SetGymnasium(gymnasium *Gymnasium) {
-	p.Record.Set("gymnasium", gymnasium.Id)
+	var id string
+	if gymnasium != nil {
+		id = gymnasium.Id
+	}
+	p.Record.Set("gymnasium", id)
 	e := p.Expand()
-	e["gymnasium"] = gymnasium.Record
+	if gymnasium != nil {
+		e["gymnasium"] = gymnasium.Record
+	} else {
+		delete(e, "gymnasium")
+	}
 	p.SetExpand(e)
 }
 
@@ -690,9 +730,17 @@ func (p *MatchData) Court() *Court {
 }
 
 func (p *MatchData) SetCourt(court *Court) {
-	p.Record.Set("court", court.Id)
+	var id string
+	if court != nil {
+		id = court.Id
+	}
+	p.Record.Set("court", id)
 	e := p.Expand()
-	e["court"] = court.Record
+	if court != nil {
+		e["court"] = court.Record
+	} else {
+		delete(e, "court")
+	}
 	p.SetExpand(e)
 }
 

@@ -61,7 +61,7 @@ func InitSchedule() error {
 		scheduled:      make(map[string]*ScheduledMatch),
 	}
 
-	runningTournaments := Tournaments.listRunning()
+	runningTournaments := Tournaments.listStarted()
 
 	if len(runningTournaments) == 0 {
 		return nil

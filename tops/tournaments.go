@@ -80,10 +80,10 @@ func InitTournaments(app core.App) error {
 	return nil
 }
 
-func (s *TournamentStore) listRunning() []*CompetitionTournament {
+func (s *TournamentStore) listStarted() []*CompetitionTournament {
 	tournaments := make([]*CompetitionTournament, 0, len(s.list))
 	for _, t := range s.list {
-		if t.Started && !t.Ended {
+		if t.Started {
 			tournaments = append(tournaments, t)
 		}
 	}

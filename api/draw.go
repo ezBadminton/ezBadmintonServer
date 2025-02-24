@@ -42,7 +42,8 @@ func swapDrawPositions(e *core.RequestEvent) error {
 	data := struct {
 		Swap []string `json:"swap"`
 	}{}
-	if err := e.BindBody(&data); err != nil {
+	e.BindBody(&data)
+	if len(data.Swap) == 0 {
 		return e.String(http.StatusBadRequest, "the body did not contain JSON with a 'swap' string list field")
 	}
 	if len(data.Swap) != 2 || data.Swap[0] == data.Swap[1] {

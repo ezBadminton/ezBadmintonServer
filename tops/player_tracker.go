@@ -25,7 +25,7 @@ func InitPlayerTracker() error {
 		return err
 	}
 
-	runningTournaments := Tournaments.listRunning()
+	runningTournaments := Tournaments.listStarted()
 	matches := make([]*got.Match, 0)
 	for _, t := range runningTournaments {
 		matches = append(matches, t.MatchList().Matches...)
