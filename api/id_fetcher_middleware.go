@@ -17,7 +17,7 @@ func pathId[P Proxy, PP ProxyP[P]](pathValueName string) *hook.Handler[*core.Req
 			id := e.Request.PathValue(pathValueName)
 			proxy, err := store.FindProxy[P, PP](id)
 			if err != nil {
-				errMsg := fmt.Sprintf("could not find the %v ID", pathValueName)
+				errMsg := fmt.Sprintf("the %v ID does not exist", pathValueName)
 				return e.String(http.StatusBadRequest, errMsg)
 			}
 
@@ -66,12 +66,17 @@ func readProxiesFromBody[P Proxy, PP ProxyP[P]](e *core.RequestEvent, bodyFieldN
 	switch d := data[bodyFieldName].(type) {
 	case string:
 		idList = []string{d}
-	case []string:
-		if len(d) == 0 {
+	case []any:
+		ids, err := unpackStringList(d)
+		if err != nil {
+			errMsg := fmt.Sprintf("the '%v' field is not a list of IDs", bodyFieldName)
+			return nil, errors.New(errMsg)
+		}
+		if len(ids) == 0 {
 			errMsg := fmt.Sprintf("the '%v' ID list is empty", bodyFieldName)
 			return nil, errors.New(errMsg)
 		}
-		idList = d
+		idList = ids
 	default:
 		errMsg := fmt.Sprintf("the body does not contain a '%v' ID field", bodyFieldName)
 		return nil, errors.New(errMsg)
@@ -88,4 +93,16 @@ func readProxiesFromBody[P Proxy, PP ProxyP[P]](e *core.RequestEvent, bodyFieldN
 	}
 
 	return proxies, nil
+}
+
+func unpackStringList(list []any) ([]string, error) {
+	stringList := make([]string, len(list))
+	for i, e := range list {
+		str, ok := e.(string)
+		if !ok {
+			return nil, errors.New("not a string list")
+		}
+		stringList[i] = str
+	}
+	return stringList, nil
 }

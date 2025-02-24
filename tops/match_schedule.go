@@ -55,7 +55,18 @@ type MatchScheduler struct {
 var Schedule *MatchScheduler
 
 func InitSchedule() error {
+	Schedule = &MatchScheduler{
+		roundQueue:     make([]*ScheduledRound, 0),
+		runningMatches: make([]*MatchData, 0),
+		scheduled:      make(map[string]*ScheduledMatch),
+	}
+
 	runningTournaments := Tournaments.listRunning()
+
+	if len(runningTournaments) == 0 {
+		return nil
+	}
+
 	offsets := calculateScheduleOffsets(runningTournaments)
 
 	orderedRounds := make([][]*got.Match, 0)
@@ -85,9 +96,6 @@ func InitSchedule() error {
 		}
 	}
 
-	roundQueue := make([]*ScheduledRound, len(orderedRounds))
-	runningMatches := make([]*MatchData, 0)
-	scheduledMap := make(map[string]*ScheduledMatch)
 	for i, round := range orderedRounds {
 		scheduledMatches := make([]*ScheduledMatch, len(round))
 		competition := roundCompetitions[i]
@@ -102,16 +110,16 @@ func InitSchedule() error {
 				PlayerStatus:   playerStatus,
 			}
 			if matchStatus == InProgress {
-				runningMatches = append(runningMatches, matchData)
+				Schedule.runningMatches = append(Schedule.runningMatches, matchData)
 			}
-			scheduledMap[matchData.Id] = scheduledMatches[i]
+			Schedule.scheduled[matchData.Id] = scheduledMatches[i]
 		}
 
 		id := fmt.Sprintf("s-%v-%v", competition.Id, roundIndex)
 		created := competition.Created()
 		updated := competition.Updated()
 
-		roundQueue[i] = &ScheduledRound{
+		scheduledRound := &ScheduledRound{
 			BaseTopsRecord: BaseTopsRecord{
 				Id:      id,
 				Created: created,
@@ -121,12 +129,7 @@ func InitSchedule() error {
 			RoundIndex:  roundIndex,
 			Competition: competition,
 		}
-	}
-
-	Schedule = &MatchScheduler{
-		roundQueue:     roundQueue,
-		runningMatches: runningMatches,
-		scheduled:      scheduledMap,
+		Schedule.roundQueue = append(Schedule.roundQueue, scheduledRound)
 	}
 
 	return nil

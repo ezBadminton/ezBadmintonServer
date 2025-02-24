@@ -240,6 +240,7 @@ func (s *RegistrationStore) addRegistration(reg *Registration) {
 	compPlayerRegs, ok := s.byCompetitionPlayer[comp.Id]
 	if !ok {
 		compPlayerRegs = make(map[string]*Registration)
+		s.byCompetitionPlayer[comp.Id] = compPlayerRegs
 	}
 	for _, p := range players {
 		playerRegs, ok := s.byPlayer[p.Id]
