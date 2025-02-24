@@ -7,7 +7,6 @@ import (
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
 )
 
 var stores map[string]RecordStore
@@ -103,20 +102,6 @@ Loop:
 	handler = createStoreHook(RecordStore.Deleted)
 	app.OnRecordAfterDeleteSuccess(collectionNames...).BindFunc(handler)
 
-	errHandler := errorHook(createStoreHook(RecordStore.FailedCreate))
-	app.OnRecordAfterCreateError(collectionNames...).BindFunc(errHandler)
-	errHandler = errorHook(createStoreHook(RecordStore.FailedUpdate))
-	app.OnRecordAfterUpdateError(collectionNames...).BindFunc(errHandler)
-	errHandler = errorHook(createStoreHook(RecordStore.FailedDelete))
-	app.OnRecordAfterDeleteError(collectionNames...).BindFunc(errHandler)
-
-	realtimeNotifier := createRealtimeNotifierHook(RecordStore.RealtimeUpdate)
-	app.OnRecordAfterCreateSuccess(collectionNames...).Bind(realtimeNotifier)
-	app.OnRecordAfterUpdateSuccess(collectionNames...).Bind(realtimeNotifier)
-	app.OnRecordAfterDeleteSuccess(collectionNames...).Bind(realtimeNotifier)
-
-	app.OnRealtimeMessageSend()
-
 	return nil
 }
 
@@ -146,32 +131,6 @@ func createStoreHook(handler func(RecordStore, *core.Record) error) func(*core.R
 	}
 }
 
-func errorHook(errorHook func(*core.RecordEvent) error) func(*core.RecordErrorEvent) error {
-	return func(e *core.RecordErrorEvent) error { return errorHook(&e.RecordEvent) }
-}
-
-func createRealtimeNotifierHook(handler func(RecordStore, *core.Record) error) *hook.Handler[*core.RecordEvent] {
-	return &hook.Handler[*core.RecordEvent]{
-		Func: func(e *core.RecordEvent) error {
-			if err := e.Next(); err != nil {
-				return err
-			}
-
-			collectionName := e.Record.Collection().Name
-			store, err := FindRecordStoreByCollectionName(collectionName)
-			if err != nil {
-				return err
-			}
-			if err = handler(store, e.Record); err != nil {
-				return err
-			}
-
-			return nil
-		},
-		Priority: -99,
-	}
-}
-
 type RecordStore interface {
 	FindRecord(id string) (core.RecordProxy, bool)
 	Length() int
@@ -179,10 +138,6 @@ type RecordStore interface {
 	Created(*core.Record) error
 	Updated(*core.Record) error
 	Deleted(*core.Record) error
-	FailedCreate(*core.Record) error
-	FailedUpdate(*core.Record) error
-	FailedDelete(*core.Record) error
-	RealtimeUpdate(*core.Record) error
 }
 
 type BaseRecordStore[P Proxy, PP ProxyP[P]] struct {
@@ -193,12 +148,6 @@ type BaseRecordStore[P Proxy, PP ProxyP[P]] struct {
 	createHandlers []func(PP)
 	updateHandlers []func(PP, PP)
 	deleteHandlers []func(PP)
-
-	failedCreateHandlers,
-	failedUpdateHandlers,
-	failedDeleteHandlers []func(PP)
-
-	realtimeNotifiers []func(PP)
 }
 
 func newStore[P Proxy, PP ProxyP[P]](app core.App) (*BaseRecordStore[P, PP], error) {
@@ -270,22 +219,6 @@ func (s *BaseRecordStore[P, PP]) RegisterDeleteHandler(handler func(deleted PP))
 	s.deleteHandlers = append(s.deleteHandlers, handler)
 }
 
-func (s *BaseRecordStore[P, PP]) RegisterFailedCreateHander(handler func(created PP)) {
-	s.failedCreateHandlers = append(s.failedCreateHandlers, handler)
-}
-
-func (s *BaseRecordStore[P, PP]) RegisterFailedUpdateHandler(handler func(updated PP)) {
-	s.failedUpdateHandlers = append(s.failedUpdateHandlers, handler)
-}
-
-func (s *BaseRecordStore[P, PP]) RegisterFailedDeleteHandler(handler func(deleted PP)) {
-	s.failedDeleteHandlers = append(s.failedCreateHandlers, handler)
-}
-
-func (s *BaseRecordStore[P, PP]) RegisterRealtimeNotifier(handler func(record PP)) {
-	s.realtimeNotifiers = append(s.realtimeNotifiers, handler)
-}
-
 func (s *BaseRecordStore[P, PP]) Created(record *core.Record) error {
 	s.mu.Lock()
 
@@ -349,55 +282,6 @@ func (s *BaseRecordStore[_, PP]) Deleted(record *core.Record) error {
 	relationStore.RemoveFromRelations(record)
 
 	for _, handler := range s.deleteHandlers {
-		handler(proxy)
-	}
-
-	return nil
-}
-
-func (s *BaseRecordStore[P, PP]) FailedCreate(record *core.Record) error {
-	proxy, _ := WrapRecord[P, PP](record)
-
-	for _, handler := range s.failedCreateHandlers {
-		handler(proxy)
-	}
-
-	return nil
-}
-
-func (s *BaseRecordStore[P, PP]) FailedUpdate(record *core.Record) error {
-	proxy, ok := s.FindProxy(record.Id)
-	if !ok {
-		return errors.New("the not-updated record is not part of the store")
-	}
-
-	for _, handler := range s.failedUpdateHandlers {
-		handler(proxy)
-	}
-
-	return nil
-}
-
-func (s *BaseRecordStore[P, PP]) FailedDelete(record *core.Record) error {
-	proxy, ok := s.FindProxy(record.Id)
-	if !ok {
-		return errors.New("the not-deleted record is not part of the store")
-	}
-
-	for _, handler := range s.failedDeleteHandlers {
-		handler(proxy)
-	}
-
-	return nil
-}
-
-func (s *BaseRecordStore[P, PP]) RealtimeUpdate(record *core.Record) error {
-	proxy, ok := s.FindProxy(record.Id)
-	if !ok {
-		return errors.New("the relatime updated record is not part of the store")
-	}
-
-	for _, handler := range s.realtimeNotifiers {
 		handler(proxy)
 	}
 
