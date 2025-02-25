@@ -305,6 +305,12 @@ func (s *TournamentStore) stop(app core.App, competitionId string) error {
 
 	dehydrate(tournament)
 
+	for _, m := range matchData {
+		if occupationalState(Scheduler.scheduleStatus(m)) {
+			delete(Courts.occupied, m.Court().Id)
+		}
+	}
+
 	tournament.Started = false
 	tournament.Ended = false
 
