@@ -171,8 +171,7 @@ func setPlayerStatus(
 		}
 
 		tournament := Tournaments.tournaments[registration.Competition.Id]
-		tournament.Update(nil)
-		Schedule.updateTournamentScheduleStatus(tournament)
+		Tournaments.update(tournament)
 	}
 
 	return nil

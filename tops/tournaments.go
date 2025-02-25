@@ -92,6 +92,8 @@ func (s *TournamentStore) listStarted() []*CompetitionTournament {
 }
 
 func (s *TournamentStore) setTournament(competition *Competition, tournament *CompetitionTournament) {
+	_, isUpdate := s.tournaments[competition.Id]
+
 	s.tournaments[competition.Id] = tournament
 
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
@@ -99,6 +101,22 @@ func (s *TournamentStore) setTournament(competition *Competition, tournament *Co
 	})
 	s.list = append(s.list, tournament)
 	slices.SortFunc(s.list, compareTournaments)
+
+	var realtimeEventType string
+	if isUpdate {
+		realtimeEventType = core.ModelEventTypeUpdate
+	} else {
+		realtimeEventType = core.ModelEventTypeCreate
+	}
+
+	go realtimeNotify(s.app, "tournamentplans", realtimeEventType, tournament)
+}
+
+func (s *TournamentStore) update(tournament *CompetitionTournament) {
+	tournament.Update(nil)
+	Scheduler.updateTournamentScheduleStatus(tournament)
+
+	go realtimeNotify(s.app, "tournamentplans", core.ModelEventTypeUpdate, tournament)
 }
 
 func (s *TournamentStore) removeTournament(competition *Competition) {
@@ -121,6 +139,8 @@ func (s *TournamentStore) removeTournament(competition *Competition) {
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
 		return t.Competition.Id == competition.Id
 	})
+
+	go realtimeNotify(s.app, "tournamentplans", core.ModelEventTypeDelete, tournament)
 }
 
 func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
@@ -250,6 +270,8 @@ func (s *TournamentStore) start(app core.App, competitionId string) error {
 	tournament.Started = true
 	tournament.Ended = false
 
+	Scheduler.tournamentStartStop(comp, true)
+
 	return nil
 }
 
@@ -286,6 +308,8 @@ func (s *TournamentStore) stop(app core.App, competitionId string) error {
 
 	tournament.Started = false
 	tournament.Ended = false
+
+	Scheduler.tournamentStartStop(comp, false)
 
 	return nil
 }

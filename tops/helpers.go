@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
-	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -30,12 +29,4 @@ func containsAll[S ~[]PP, P Proxy, PP ProxyP[P]](a, b S) bool {
 		}
 	}
 	return true
-}
-
-func matchesToMatchData(matches []*got.Match) []*MatchData {
-	matchData := make([]*MatchData, len(matches))
-	for i, m := range matches {
-		matchData[i] = Tournaments.matchData[m.Id()]
-	}
-	return matchData
 }

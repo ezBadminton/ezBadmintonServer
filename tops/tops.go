@@ -191,3 +191,23 @@ func DeleteTieBreaker(app core.App, tieBreaker *TieBreaker) error {
 
 	return deleteTieBreaker(app, tieBreaker)
 }
+
+func ListSchedule() []*Schedule {
+	defer topsMu.RUnlock()
+	topsMu.RLock()
+
+	return Scheduler.listSchedule()
+}
+
+func ListScheduledRounds() []*ScheduledRound {
+	defer topsMu.RUnlock()
+	topsMu.RLock()
+
+	return Scheduler.listScheduledRounds()
+}
+func ListScheduledMatches() []*ScheduledMatch {
+	defer topsMu.RUnlock()
+	topsMu.RLock()
+
+	return Scheduler.listScheduledMatches()
+}

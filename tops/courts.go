@@ -26,8 +26,10 @@ func InitCourts() error {
 	courts := slices.Clone(courtStore.RecordList)
 	slices.SortFunc(courts, compareCourts)
 	occupied := make(map[string]string)
-	for _, m := range Schedule.runningMatches {
-		occupied[m.Court().Id] = m.Id
+	for m := range Scheduler.schedule.IterateMatches() {
+		if m.ScheduleStatus == InProgress {
+			occupied[m.Match.Court().Id] = m.Id
+		}
 	}
 
 	Courts = &CourtManager{
@@ -106,7 +108,7 @@ func (m *CourtManager) nextCourt() *Court {
 }
 
 func (m *CourtManager) assignCourtToMatch(app core.App, matchData *MatchData, optCourt *Court) error {
-	matchStatus := Schedule.scheduleStatus(matchData)
+	matchStatus := Scheduler.scheduleStatus(matchData)
 	if matchStatus != CourtWait {
 		return errors.New("the match is not in the correct state for court assignment")
 	}
@@ -129,13 +131,13 @@ func (m *CourtManager) assignCourtToMatch(app core.App, matchData *MatchData, op
 		return err
 	}
 
-	Schedule.setMatchScheduleStatus(matchData, Ready, court)
+	Scheduler.setMatchScheduleStatus(matchData, Ready, court)
 
 	return nil
 }
 
 func (m *CourtManager) unassignCourt(app core.App, matchData *MatchData) error {
-	matchStatus := Schedule.scheduleStatus(matchData)
+	matchStatus := Scheduler.scheduleStatus(matchData)
 	if matchStatus != Ready {
 		return errors.New("the match is not in the correct state for court unassignment")
 	}
@@ -148,7 +150,7 @@ func (m *CourtManager) unassignCourt(app core.App, matchData *MatchData) error {
 		return err
 	}
 
-	Schedule.setMatchScheduleStatus(matchData, CourtWait, court)
+	Scheduler.setMatchScheduleStatus(matchData, CourtWait, court)
 
 	return nil
 }

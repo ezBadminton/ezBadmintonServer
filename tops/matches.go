@@ -15,7 +15,7 @@ func InitMatches() error {
 }
 
 func startMatch(app core.App, matchData *MatchData) error {
-	matchStatus := Schedule.scheduleStatus(matchData)
+	matchStatus := Scheduler.scheduleStatus(matchData)
 	if matchStatus != Ready {
 		return errors.New("the match is not in the ready state and can not be started")
 	}
@@ -34,13 +34,13 @@ func startMatch(app core.App, matchData *MatchData) error {
 	tournament := Tournaments.byMatch[matchData.Id]
 	tournament.UpdateEditableMatches()
 
-	Schedule.setMatchScheduleStatus(matchData, InProgress, nil)
+	Scheduler.setMatchScheduleStatus(matchData, InProgress, nil)
 
 	return nil
 }
 
 func cancelMatch(app core.App, matchData *MatchData) error {
-	matchStatus := Schedule.scheduleStatus(matchData)
+	matchStatus := Scheduler.scheduleStatus(matchData)
 	if matchStatus != InProgress {
 		return errors.New("the match is not in progress and can not be canceled")
 	}
@@ -57,13 +57,13 @@ func cancelMatch(app core.App, matchData *MatchData) error {
 	tournament := Tournaments.byMatch[matchData.Id]
 	tournament.UpdateEditableMatches()
 
-	Schedule.setMatchScheduleStatus(matchData, Ready, nil)
+	Scheduler.setMatchScheduleStatus(matchData, Ready, nil)
 
 	return nil
 }
 
 func setMatchScore(app core.App, matchData *MatchData, points [][]int) error {
-	matchStatus := Schedule.scheduleStatus(matchData)
+	matchStatus := Scheduler.scheduleStatus(matchData)
 	if matchStatus == Done {
 		if !isEditable(matchData) {
 			return errors.New("the match is not editable")
@@ -121,20 +121,17 @@ func setMatchScore(app core.App, matchData *MatchData, points [][]int) error {
 	match.Score = score
 	if matchStatus == InProgress {
 		match.EndTime = endTime.Time()
-		Schedule.setMatchScheduleStatus(matchData, Done, matchData.Court())
+		Scheduler.setMatchScheduleStatus(matchData, Done, matchData.Court())
+		tournament.Ended = matchesFinished(tournament.MatchList().Matches)
 	}
 
-	tournament.Update(nil)
-
-	if matchStatus == InProgress {
-		Schedule.updateTournamentScheduleStatus(tournament)
-	}
+	Tournaments.update(tournament)
 
 	return nil
 }
 
 func resetMatch(app core.App, matchData *MatchData) error {
-	matchStatus := Schedule.scheduleStatus(matchData)
+	matchStatus := Scheduler.scheduleStatus(matchData)
 	if matchStatus != Done || !isEditable(matchData) {
 		return errors.New("the match is in the wrong state to delete the score")
 	}
@@ -174,15 +171,15 @@ func resetMatch(app core.App, matchData *MatchData) error {
 	match.EndTime = time.Time{}
 	if courtOccupied {
 		match.Location = nil
-		Schedule.setMatchScheduleStatus(matchData, CourtWait, nil)
+		Scheduler.setMatchScheduleStatus(matchData, CourtWait, nil)
 	} else {
-		Schedule.setMatchScheduleStatus(matchData, Ready, currentCourt)
+		Scheduler.setMatchScheduleStatus(matchData, Ready, currentCourt)
 	}
 
 	tournament := Tournaments.byMatch[matchData.Id]
+	tournament.Ended = matchesFinished(tournament.MatchList().Matches)
 
-	tournament.Update(nil)
-	Schedule.updateTournamentScheduleStatus(tournament)
+	Tournaments.update(tournament)
 
 	return nil
 }

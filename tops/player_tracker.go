@@ -93,16 +93,16 @@ func (t *PlayerOccupationTracker) isPlaying(player *Player) (bool, *MatchData) {
 	return true, match
 }
 
-func (t *PlayerOccupationTracker) isResting(player *Player) bool {
+func (t *PlayerOccupationTracker) isResting(player *Player) (bool, time.Time) {
 	lastMatch, ok := t.lastMatches[player.Id]
 	if !ok {
-		return false
+		return false, time.Time{}
 	}
 
 	restUntil := lastMatch.EndTime().Add(t.restTime)
 	isResting := time.Now().Before(restUntil.Time())
 
-	return isResting
+	return isResting, restUntil.Time()
 }
 
 func compareMatchEndTimes(a, b *got.Match) int {

@@ -95,6 +95,8 @@ func (s *RegistrationStore) registerTeam(app core.App, team *Team, competition *
 	reg := newRegistration(team, competition, false)
 	s.addRegistration(reg)
 
+	go realtimeNotify(app, "registrations", core.ModelEventTypeCreate, reg)
+
 	return nil
 }
 
@@ -110,7 +112,6 @@ func (s *RegistrationStore) updateTeam(app core.App, team *Team) error {
 	oldTeam, _ := store.FindProxy[Team](team.Id)
 	oldPlayers := oldTeam.Players()
 
-	reg.Team = team
 	updatedPlayers := team.Players()
 
 	removedPlayers := make([]*Player, 0, 2)
@@ -145,12 +146,16 @@ func (s *RegistrationStore) updateTeam(app core.App, team *Team) error {
 		return err
 	}
 
+	reg.Team = team
+
 	for _, p := range removedPlayers {
 		s.playerRemoved(p, team)
 	}
 	for _, p := range addedPlayers {
 		s.playerAdded(p, team)
 	}
+
+	go realtimeNotify(app, "registrations", core.ModelEventTypeUpdate, reg)
 
 	return nil
 }
@@ -192,6 +197,8 @@ func (s *RegistrationStore) deleteTeam(app core.App, team *Team) error {
 		s.byPlayer[p.Id] = slices.DeleteFunc(s.byPlayer[p.Id], finder)
 		delete(s.byCompetitionPlayer[comp.Id], p.Id)
 	}
+
+	go realtimeNotify(app, "registrations", core.ModelEventTypeDelete, reg)
 
 	return nil
 }

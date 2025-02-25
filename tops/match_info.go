@@ -46,3 +46,11 @@ func playersInMatch(match *got.Match) []*Player {
 
 	return players
 }
+
+func matchesToMatchData(matches []*got.Match) []*MatchData {
+	matchData := make([]*MatchData, len(matches))
+	for i, m := range matches {
+		matchData[i] = Tournaments.matchData[m.Id()]
+	}
+	return matchData
+}

@@ -60,8 +60,7 @@ func addTieBreaker(app core.App, competition *Competition, teams []*Team) error 
 	}
 
 	insertTieBreaker(teams, groupPhase)
-	tournament.Update(nil)
-	Schedule.updateTournamentScheduleStatus(tournament)
+	Tournaments.update(tournament)
 
 	return nil
 }
@@ -91,8 +90,7 @@ func updateTieBreaker(app core.App, tieBreaker *TieBreaker, teams []*Team) error
 	}
 
 	insertTieBreaker(teams, groupKnockout.GroupPhase)
-	tournament.Update(nil)
-	Schedule.updateTournamentScheduleStatus(tournament)
+	Tournaments.update(tournament)
 
 	return nil
 }
@@ -115,8 +113,7 @@ func deleteTieBreaker(app core.App, tieBreaker *TieBreaker) error {
 
 	teams := tieBreaker.TieBreakerRanking()
 	revokeTieBreaker(teams, groupKnockout.GroupPhase)
-	tournament.Update(nil)
-	Schedule.updateTournamentScheduleStatus(tournament)
+	Tournaments.update(tournament)
 
 	return nil
 }

@@ -61,9 +61,7 @@ func main() {
 		if err := tops.InitPlayerTracker(); err != nil {
 			return err
 		}
-		if err := tops.InitSchedule(); err != nil {
-			return err
-		}
+		tops.InitScheduler(e.App)
 		if err := tops.InitCourts(); err != nil {
 			return err
 		}

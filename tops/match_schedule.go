@@ -2,10 +2,14 @@ package tops
 
 import (
 	"fmt"
+	"iter"
 	"slices"
+	"time"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	got "github.com/ezBadminton/gotournament/core"
+	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 type ScheduleStatus int
@@ -20,17 +24,52 @@ const (
 	Wait                             // Match not ready, waiting for qualifications
 )
 
-type PlayerScheduleStatus string
+type PlayerBlockMode string
 
 const (
-	Playing PlayerScheduleStatus = "playing"
-	Resting                      = "resting"
+	Playing PlayerBlockMode = "playing"
+	Resting                 = "resting"
 )
 
+type PlayerBlock struct {
+	Mode PlayerBlockMode
+
+	// Only one of these is set depending on the block mode
+	BlockingMatch *MatchData
+	RestUntil     time.Time
+}
+
+func (b *PlayerBlock) ToMap() map[string]any {
+	result := map[string]any{
+		"mode": b.Mode,
+	}
+	if b.Mode == Playing {
+		result["blockingMatch"] = b.BlockingMatch.Id
+	} else {
+		result["restUntil"] = b.RestUntil.UTC().Format(time.RFC3339)
+	}
+	return result
+}
+
 type ScheduledMatch struct {
+	BaseTopsRecord
 	Match *MatchData
 	ScheduleStatus
-	PlayerStatus map[string]PlayerScheduleStatus
+	// player id -> block
+	BlockingPlayers map[string]PlayerBlock
+}
+
+func (m *ScheduledMatch) ToMap() map[string]any {
+	blockingPlayers := make(map[string]any, len(m.BlockingPlayers))
+	for playerId, block := range m.BlockingPlayers {
+		blockingPlayers[playerId] = block.ToMap()
+	}
+	result := map[string]any{
+		"match":           m.Match.Id,
+		"status":          m.ScheduleStatus,
+		"blockingPlayers": blockingPlayers,
+	}
+	return m.BaseTopsRecord.ToMap(result)
 }
 
 // Equivalent to a Round in a MatchList except
@@ -43,28 +82,83 @@ type ScheduledRound struct {
 	Competition *Competition
 }
 
+func (r *ScheduledRound) ToMap() map[string]any {
+	matchIds := make([]string, len(r.Matches))
+	for i, m := range r.Matches {
+		matchIds[i] = m.Id
+	}
+	result := map[string]any{
+		"matches":     matchIds,
+		"roundIndex":  r.RoundIndex,
+		"competition": r.Competition.Id,
+	}
+	return r.BaseTopsRecord.ToMap(result)
+}
+
+type Schedule struct {
+	BaseTopsRecord
+	roundQueue []*ScheduledRound
+}
+
+func (s *Schedule) ToMap() map[string]any {
+	roundIds := make([]string, len(s.roundQueue))
+	for i, round := range s.roundQueue {
+		roundIds[i] = round.Id
+	}
+	result := map[string]any{
+		"roundQueue": s.roundQueue,
+	}
+	return s.BaseTopsRecord.ToMap(result)
+}
+
+func (s *Schedule) IterateMatches() iter.Seq[*ScheduledMatch] {
+	return func(yield func(*ScheduledMatch) bool) {
+		for _, round := range s.roundQueue {
+			for _, match := range round.Matches {
+				if !yield(match) {
+					return
+				}
+			}
+		}
+	}
+}
+
 // The match scheduler holds an ordered list of
 // rounds that represents the playing order.
 type MatchScheduler struct {
-	roundQueue     []*ScheduledRound
-	runningMatches []*MatchData
+	app      core.App
+	schedule *Schedule
 	// Match data id -> scheduled match
 	scheduled map[string]*ScheduledMatch
 }
 
-var Schedule *MatchScheduler
+var Scheduler *MatchScheduler
 
-func InitSchedule() error {
-	Schedule = &MatchScheduler{
-		roundQueue:     make([]*ScheduledRound, 0),
-		runningMatches: make([]*MatchData, 0),
-		scheduled:      make(map[string]*ScheduledMatch),
+func InitScheduler(app core.App) {
+	schedule := newSchedule()
+	scheduled := scheduledMap(schedule)
+
+	Scheduler = &MatchScheduler{
+		app:       app,
+		schedule:  schedule,
+		scheduled: scheduled,
+	}
+}
+
+func newSchedule() *Schedule {
+	schedule := &Schedule{
+		BaseTopsRecord: BaseTopsRecord{
+			Id:      "the-schedule", // is a singleton
+			Created: types.DateTime{},
+			Updated: types.DateTime{},
+		},
+		roundQueue: make([]*ScheduledRound, 0),
 	}
 
 	runningTournaments := Tournaments.listStarted()
 
 	if len(runningTournaments) == 0 {
-		return nil
+		return schedule
 	}
 
 	offsets := calculateScheduleOffsets(runningTournaments)
@@ -103,16 +197,21 @@ func InitSchedule() error {
 
 		for i, m := range round {
 			matchData := Tournaments.matchData[m.Id()]
-			matchStatus, playerStatus := scheduleStatus(m, competition)
+			matchStatus, blockingPlayers := scheduleStatus(m, competition)
+			id := "s-" + matchData.Id
+			created := matchData.Created()
+			updated := matchData.Updated()
+
 			scheduledMatches[i] = &ScheduledMatch{
-				Match:          matchData,
-				ScheduleStatus: matchStatus,
-				PlayerStatus:   playerStatus,
+				BaseTopsRecord: BaseTopsRecord{
+					Id:      id,
+					Created: created,
+					Updated: updated,
+				},
+				Match:           matchData,
+				ScheduleStatus:  matchStatus,
+				BlockingPlayers: blockingPlayers,
 			}
-			if matchStatus == InProgress {
-				Schedule.runningMatches = append(Schedule.runningMatches, matchData)
-			}
-			Schedule.scheduled[matchData.Id] = scheduledMatches[i]
 		}
 
 		id := fmt.Sprintf("s-%v-%v", competition.Id, roundIndex)
@@ -129,13 +228,34 @@ func InitSchedule() error {
 			RoundIndex:  roundIndex,
 			Competition: competition,
 		}
-		Schedule.roundQueue = append(Schedule.roundQueue, scheduledRound)
+		schedule.roundQueue = append(schedule.roundQueue, scheduledRound)
 	}
 
-	return nil
+	return schedule
 }
 
-// TODO schedule updates
+// match data id -> scheduled match
+func scheduledMap(schedule *Schedule) map[string]*ScheduledMatch {
+	scheduled := make(map[string]*ScheduledMatch)
+
+	for match := range schedule.IterateMatches() {
+		scheduled[match.Match.Id] = match
+	}
+
+	return scheduled
+}
+
+func (s *MatchScheduler) listSchedule() []*Schedule {
+	return []*Schedule{s.schedule}
+}
+
+func (s *MatchScheduler) listScheduledRounds() []*ScheduledRound {
+	return s.schedule.roundQueue
+}
+
+func (s *MatchScheduler) listScheduledMatches() []*ScheduledMatch {
+	return slices.Collect(s.schedule.IterateMatches())
+}
 
 func (s *MatchScheduler) scheduleStatus(matchData *MatchData) ScheduleStatus {
 	return s.scheduled[matchData.Id].ScheduleStatus
@@ -152,6 +272,8 @@ func (s *MatchScheduler) setMatchScheduleStatus(matchData *MatchData, newStatus 
 	} else if !occupationalState(currentStatus) && occupationalState(newStatus) {
 		Courts.occupied[court.Id] = matchData.Id
 	}
+
+	go realtimeNotify(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch)
 }
 
 func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionTournament) {
@@ -160,15 +282,45 @@ func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionT
 
 	for _, m := range matches {
 		matchData := Tournaments.matchData[m.Id()]
-		status, playerStatus := scheduleStatus(m, competition)
+		status, blockingPlayers := scheduleStatus(m, competition)
 		scheduledMatch := s.scheduled[matchData.Id]
 
+		oldStatus := scheduledMatch.ScheduleStatus
 		scheduledMatch.ScheduleStatus = status
-		scheduledMatch.PlayerStatus = playerStatus
+		oldBlockingPlayers := scheduledMatch.BlockingPlayers
+		scheduledMatch.BlockingPlayers = blockingPlayers
+
+		if status != oldStatus || !blockingPlayersEq(blockingPlayers, oldBlockingPlayers) {
+			go realtimeNotify(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch)
+		}
 	}
 }
 
-func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerScheduleStatus) {
+func (s *MatchScheduler) tournamentStartStop(competition *Competition, started bool) {
+	schedule := newSchedule()
+	s.schedule = schedule
+	s.scheduled = scheduledMap(schedule)
+
+	var realtimeEventType string
+	if started {
+		realtimeEventType = core.ModelEventTypeCreate
+	} else {
+		realtimeEventType = core.ModelEventTypeDelete
+	}
+
+	for _, round := range s.schedule.roundQueue {
+		if round.Competition.Id != competition.Id {
+			continue
+		}
+		for _, match := range round.Matches {
+			go realtimeNotify(s.app, "scheduled_matches", realtimeEventType, match)
+		}
+		go realtimeNotify(s.app, realtimeEventType, "scheduled_rounds", round)
+	}
+	go realtimeNotify(s.app, "schedule", core.ModelEventTypeUpdate, schedule)
+}
+
+func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerBlock) {
 	if matchFinished(match) {
 		return Done, nil
 	}
@@ -185,33 +337,39 @@ func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus,
 		return Wait, nil
 	}
 
-	playerScheduleStatus := make(map[string]PlayerScheduleStatus)
+	blockingPlayers := make(map[string]PlayerBlock)
 
 	playerWait, playerRest := false, false
 
 	for _, p := range players {
-		isPlaying, _ := PlayerTracker.isPlaying(p)
+		isPlaying, blockingMatch := PlayerTracker.isPlaying(p)
 		if !isPlaying {
 			continue
 		}
 		playerWait = true
-		playerScheduleStatus[p.Id] = Playing
+		blockingPlayers[p.Id] = PlayerBlock{
+			Mode:          Playing,
+			BlockingMatch: blockingMatch,
+		}
 	}
 
 	for _, p := range players {
-		isResting := PlayerTracker.isResting(p)
+		isResting, restUntil := PlayerTracker.isResting(p)
 		if !isResting {
 			continue
 		}
 		playerRest = true
-		playerScheduleStatus[p.Id] = Resting
+		blockingPlayers[p.Id] = PlayerBlock{
+			Mode:      Resting,
+			RestUntil: restUntil,
+		}
 	}
 
 	if playerWait {
-		return PlayerWait, playerScheduleStatus
+		return PlayerWait, blockingPlayers
 	}
 	if playerRest {
-		return PlayerRest, playerScheduleStatus
+		return PlayerRest, blockingPlayers
 	}
 
 	return CourtWait, nil
@@ -245,4 +403,29 @@ func numCompletedRounds(tournament got.MatchLister) int {
 		completed += 1
 	}
 	return completed
+}
+
+func blockingPlayersEq(a, b map[string]PlayerBlock) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for playerId, blockA := range a {
+		blockB, ok := b[playerId]
+		if !ok {
+			return false
+		}
+		if blockA.Mode != blockB.Mode {
+			return false
+		}
+		if blockA.Mode == Playing {
+			if blockA.BlockingMatch.Id != blockA.BlockingMatch.Id {
+				return false
+			}
+		} else {
+			if blockA.RestUntil != blockB.RestUntil {
+				return false
+			}
+		}
+	}
+	return true
 }
