@@ -106,7 +106,7 @@ func (s *Schedule) ToMap() map[string]any {
 		roundIds[i] = round.Id
 	}
 	result := map[string]any{
-		"roundQueue": s.roundQueue,
+		"roundQueue": roundIds,
 	}
 	return s.BaseTopsRecord.ToMap(result)
 }
@@ -149,8 +149,8 @@ func newSchedule() *Schedule {
 	schedule := &Schedule{
 		BaseTopsRecord: BaseTopsRecord{
 			Id:      "the-schedule", // is a singleton
-			Created: types.DateTime{},
-			Updated: types.DateTime{},
+			Created: types.NowDateTime(),
+			Updated: types.NowDateTime(),
 		},
 		roundQueue: make([]*ScheduledRound, 0),
 	}

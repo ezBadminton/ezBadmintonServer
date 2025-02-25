@@ -267,8 +267,7 @@ func (s *TournamentStore) start(app core.App, competitionId string) error {
 		return err
 	}
 
-	tournament.Started = true
-	tournament.Ended = false
+	hydrate(tournament)
 
 	Scheduler.tournamentStartStop(comp, true)
 

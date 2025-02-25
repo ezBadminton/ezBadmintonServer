@@ -36,6 +36,7 @@ func main() {
 	api.BindMatchHooks(app)
 	api.BindStartStopHooks(app)
 	api.BindTieBreakerHooks(app)
+	api.BindMatchScheduleHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {
