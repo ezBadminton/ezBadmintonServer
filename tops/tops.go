@@ -170,3 +170,24 @@ func ResetMatch(app core.App, matchData *MatchData) error {
 
 	return resetMatch(app, matchData)
 }
+
+func AddTieBreaker(app core.App, competition *Competition, teams []*Team) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return addTieBreaker(app, competition, teams)
+}
+
+func UpdateTieBreaker(app core.App, tieBreaker *TieBreaker, teams []*Team) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return updateTieBreaker(app, tieBreaker, teams)
+}
+
+func DeleteTieBreaker(app core.App, tieBreaker *TieBreaker) error {
+	defer topsMu.Unlock()
+	topsMu.Lock()
+
+	return deleteTieBreaker(app, tieBreaker)
+}

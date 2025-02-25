@@ -438,14 +438,18 @@ func newEntries(comp *Competition) (*got.ConstantRanking, error) {
 		return nil, ErrNoDraw
 	}
 
-	tournamentPlayers := make([]got.Player, len(draw))
-	for i, t := range draw {
-		tournamentPlayers[i] = TournamentPlayer{t}
-	}
-
-	entryRanking := got.NewConstantRanking(tournamentPlayers)
+	entryRanking := teamsToConstantRanking(draw)
 
 	return entryRanking, nil
+}
+
+func teamsToConstantRanking(teams []*Team) *got.ConstantRanking {
+	tPlayers := make([]got.Player, len(teams))
+	for i, t := range teams {
+		tPlayers[i] = TournamentPlayer{t}
+	}
+	ranking := got.NewConstantRanking(tPlayers)
+	return ranking
 }
 
 func knockoutBuilder(settings *TournamentModeSettings) got.KnockoutBuilder {
