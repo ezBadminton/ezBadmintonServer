@@ -6,7 +6,6 @@ import (
 	"github.com/ezBadminton/ezBadmintonServer/api"
 	watchers "github.com/ezBadminton/ezBadmintonServer/client_watchers"
 	_ "github.com/ezBadminton/ezBadmintonServer/migrations"
-	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
 
 	"github.com/pocketbase/pocketbase"
@@ -50,25 +49,8 @@ func main() {
 			return err
 		}
 
-		if err := store.InitStores(e.App); err != nil {
-			return err
-		}
-		if err := tops.InitRegistrations(e.App); err != nil {
-			return err
-		}
-		if err := tops.InitTournaments(e.App); err != nil {
-			return err
-		}
-		if err := tops.InitPlayerTracker(); err != nil {
-			return err
-		}
-		tops.InitScheduler(e.App)
-		if err := tops.InitCourts(); err != nil {
-			return err
-		}
-		if err := tops.InitMatches(); err != nil {
-			return err
-		}
+		tops.InitTournamentOperations(e.App)
+
 		return nil
 	})
 

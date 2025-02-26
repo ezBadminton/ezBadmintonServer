@@ -8,22 +8,121 @@ import (
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 )
 
-func makeDraw(app core.App, comp *Competition) error {
-	if len(comp.Matches()) != 0 {
-		return errors.New("can not make a draw for a running tournament")
-	}
+type DrawManager struct {
+	// Before a draw is being made
+	onDraw *hook.Hook[*CompetitionEvent]
+	// After draw has been made. After e.Next() the draw has been persisted.
+	onAfterDraw *hook.Hook[*CompetitionEvent]
 
+	// Before draw is being deleted
+	onDrawDelete *hook.Hook[*CompetitionEvent]
+	// After draw has been deleted. After e.Next() the deletion has been persisted.
+	onAfterDrawDelete *hook.Hook[*CompetitionEvent]
+
+	// Before the draw positions are swapped
+	onDrawSwap *hook.Hook[*CompetitionEvent]
+	// After the swap has been made. After e.Next() the swap has been persisted.
+	onAfterDrawSwap *hook.Hook[*CompetitionEvent]
+
+	// Before seeds are set
+	onSetSeeds *hook.Hook[*CompetitionEvent]
+	// After seeds are set. Adter e.Next() the seeds have been persisted.
+	onAfterSetSeeds *hook.Hook[*CompetitionEvent]
+}
+
+func newDrawManager() *DrawManager {
+	return &DrawManager{
+		onDraw:            &hook.Hook[*CompetitionEvent]{},
+		onAfterDraw:       &hook.Hook[*CompetitionEvent]{},
+		onDrawDelete:      &hook.Hook[*CompetitionEvent]{},
+		onAfterDrawDelete: &hook.Hook[*CompetitionEvent]{},
+		onDrawSwap:        &hook.Hook[*CompetitionEvent]{},
+		onAfterDrawSwap:   &hook.Hook[*CompetitionEvent]{},
+		onSetSeeds:        &hook.Hook[*CompetitionEvent]{},
+		onAfterSetSeeds:   &hook.Hook[*CompetitionEvent]{},
+	}
+}
+
+func (d *DrawManager) makeDraw(app core.App, comp *Competition) error {
+	event := newCompetitionEvent(app, comp)
+	return d.onDraw.Trigger(event, d.makeDrawHandler)
+
+	/*
+		if len(comp.Matches()) != 0 {
+			return errors.New("can not make a draw for a running tournament")
+		}
+	*/
+	/*
+		tournament, err := Tournaments.createTournament(comp)
+		if err != nil {
+			return err
+		}
+	*/
+
+	/*
+		Tournaments.setTournament(comp, tournament)
+	*/
+}
+
+func (d *DrawManager) deleteDraw(app core.App, comp *Competition) error {
+	event := newCompetitionEvent(app, comp)
+	return d.onDrawDelete.Trigger(event, d.deleteDrawHandler)
+	/*
+		if len(comp.Matches()) != 0 {
+			return errors.New("can not make a draw change for a running tournament")
+		}
+		if len(comp.Draw()) == 0 {
+			return errors.New("competition has no draw")
+		}
+	*/
+
+	/*
+		Tournaments.removeTournament(comp)
+	*/
+}
+
+func (d *DrawManager) drawSwap(app core.App, competition *Competition, a, b string) error {
+	event := newCompetitionEvent(app, competition)
+	return d.onDrawSwap.Trigger(event, func(e *CompetitionEvent) error {
+		return d.drawSwapHandler(e, a, b)
+	})
+	/*
+		if len(competition.Matches()) != 0 {
+			return errors.New("can not make a draw change for a running tournament")
+		}
+	*/
+
+	/*
+		tournament, _ := Tournaments.createTournament(competition)
+		Tournaments.setTournament(competition, tournament)
+	*/
+}
+
+func (d *DrawManager) setSeeds(app core.App, competition *Competition, teams []*Team) error {
+	event := newCompetitionEvent(app, competition)
+	return d.onSetSeeds.Trigger(event, func(e *CompetitionEvent) error {
+		return d.setSeedsHandler(e, teams)
+	})
+	/*
+		if len(competition.Matches()) != 0 {
+			return errors.New("can not set seeds for a running tournament")
+		}
+	*/
+}
+
+func (d *DrawManager) makeDrawHandler(e *CompetitionEvent) error {
+	comp := e.Competition
 	draw := comp.Draw()
-	comp = Clone(comp)
 
 	registrations := comp.Registrations()
-	attendingTeams := filterAttendingTeams(registrations)
-	seeded := filterAttendingTeams(comp.Seeds())
+	eligibleTeams := filterEligibleTeams(comp, registrations)
+	seeded := filterEligibleTeams(comp, comp.Seeds())
 	unseeded := make([]*Team, 0)
 
-	for _, team := range attendingTeams {
+	for _, team := range eligibleTeams {
 		isSeeded := slices.ContainsFunc(
 			seeded,
 			func(t *Team) bool { return t == team },
@@ -44,56 +143,28 @@ func makeDraw(app core.App, comp *Competition) error {
 		func(a, b *Team) bool { return a.Id == b.Id },
 	)
 	if !didChange {
-		return nil
+		return e.Next()
 	}
 
 	comp.SetDraw(newDraw)
-	tournament, err := Tournaments.createTournament(comp)
-	if err != nil {
+
+	if err := d.onAfterDraw.Trigger(e, (*CompetitionEvent).saveCompetition); err != nil {
 		return err
 	}
+	return e.Next()
+}
 
-	if err := app.Save(comp); err != nil {
+func (d *DrawManager) deleteDrawHandler(e *CompetitionEvent) error {
+	e.Competition.SetDraw(nil)
+
+	if err := d.onAfterDrawDelete.Trigger(e, (*CompetitionEvent).saveCompetition); err != nil {
 		return err
 	}
-
-	Tournaments.setTournament(comp, tournament)
-
-	return nil
+	return e.Next()
 }
 
-func redraw(app core.App, comp *Competition) error {
-	comp = Clone(comp)
-	comp.SetRngSeed(rand.Int())
-	return makeDraw(app, comp)
-}
-
-func deleteDraw(app core.App, comp *Competition) error {
-	if len(comp.Matches()) != 0 {
-		return errors.New("can not make a draw change for a running tournament")
-	}
-	if len(comp.Draw()) == 0 {
-		return errors.New("competition has no draw")
-	}
-
-	comp = Clone(comp)
-	comp.SetDraw(nil)
-
-	if err := app.Save(comp); err != nil {
-		return err
-	}
-
-	Tournaments.removeTournament(comp)
-
-	return nil
-}
-
-func drawSwap(app core.App, competition *Competition, a, b string) error {
-	if len(competition.Matches()) != 0 {
-		return errors.New("can not make a draw change for a running tournament")
-	}
-
-	draw := competition.Draw()
+func (d *DrawManager) drawSwapHandler(e *CompetitionEvent, a, b string) error {
+	draw := e.Competition.Draw()
 	if len(draw) == 0 {
 		return errors.New("there is no draw to swap")
 	}
@@ -107,51 +178,58 @@ func drawSwap(app core.App, competition *Competition, a, b string) error {
 
 	draw[i0], draw[i1] = draw[i1], draw[i0]
 
-	competition = Clone(competition)
-	competition.SetDraw(draw)
+	e.Competition.SetDraw(draw)
 
-	if err := app.Save(competition); err != nil {
+	if err := d.onAfterDrawSwap.Trigger(e, (*CompetitionEvent).saveCompetition); err != nil {
 		return err
 	}
 
-	tournament, _ := Tournaments.createTournament(competition)
-	Tournaments.setTournament(competition, tournament)
-
-	return nil
+	return e.Next()
 }
 
-func setSeeds(app core.App, competition *Competition, seeds []*Team) error {
-	if len(competition.Matches()) != 0 {
-		return errors.New("can not set seeds for a running tournament")
-	}
-	registrations := competition.Registrations()
+func (d *DrawManager) redraw(app core.App, comp *Competition) error {
+	event := newCompetitionEvent(app, comp)
+	return d.onDraw.Trigger(event, d.redrawHandler)
+}
+
+func (d *DrawManager) redrawHandler(e *CompetitionEvent) error {
+	e.Competition.SetRngSeed(rand.Int())
+	return d.makeDrawHandler(e)
+}
+
+func (d *DrawManager) setSeedsHandler(e *CompetitionEvent, seeds []*Team) error {
+	registrations := e.Competition.Registrations()
 	if !containsAll(registrations, seeds) {
 		return errors.New("can not seed unregistered team")
 	}
 
-	competition = Clone(competition)
-	competition.SetSeeds(seeds)
+	e.Competition.SetSeeds(seeds)
 
-	if err := app.Save(competition); err != nil {
+	if err := d.onAfterSetSeeds.Trigger(e, (*CompetitionEvent).saveCompetition); err != nil {
 		return err
 	}
 
-	return nil
+	return e.Next()
 }
 
-func filterAttendingTeams(teams []*Team) []*Team {
-	presentTeams := make([]*Team, 0, len(teams))
+func filterEligibleTeams(competition *Competition, teams []*Team) []*Team {
+	teamSize := competition.TeamSize()
+	eligibleTeams := make([]*Team, 0, len(teams))
 	for _, team := range teams {
-		attending := true
-		for _, player := range team.Players() {
-			if player.Status() != Attending {
-				attending = false
-				break
-			}
-		}
-		if attending {
-			presentTeams = append(presentTeams, team)
+		players := team.Players()
+		eligible := len(players) == teamSize && allPlayersAttending(players)
+		if eligible {
+			eligibleTeams = append(eligibleTeams, team)
 		}
 	}
-	return presentTeams
+	return eligibleTeams
+}
+
+func allPlayersAttending(players []*Player) bool {
+	for _, player := range players {
+		if player.Status() != Attending {
+			return false
+		}
+	}
+	return false
 }

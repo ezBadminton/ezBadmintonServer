@@ -7,18 +7,42 @@ import (
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 )
 
-func (c *CompetitionTournament) listWithdrawMatches(team *Team) []*MatchData {
-	wrapped := TournamentPlayer{team}
-	withdrawMatches := c.ListWithdrawMatches(wrapped)
-	return matchesToMatchData(withdrawMatches)
+type WithdrawalManager struct {
+	tournamentStore   *TournamentStore
+	registrationStore *RegistrationStore
+
+	// Before status change
+	onStatusChange *hook.Hook[*StatusChangeEvent]
+	// After withdrawals processed. After e.Next() the withdrawals and new status have been persisted
+	onAfterStatusChange *hook.Hook[*StatusChangeEvent]
+
+	// Before registration withdraw/reenter. After e.Next() the changed matches will be set
+	onWithdraw *hook.Hook[*WithdrawEvent]
 }
 
-func (c *CompetitionTournament) listReenterMatches(team *Team) []*MatchData {
+func newWithdrawalManager(tournamentStore *TournamentStore, registrationStore *RegistrationStore) *WithdrawalManager {
+	return &WithdrawalManager{
+		tournamentStore:     tournamentStore,
+		registrationStore:   registrationStore,
+		onStatusChange:      &hook.Hook[*StatusChangeEvent]{},
+		onAfterStatusChange: &hook.Hook[*StatusChangeEvent]{},
+		onWithdraw:          &hook.Hook[*WithdrawEvent]{},
+	}
+}
+
+func (s *WithdrawalManager) listWithdrawMatches(team *Team, wp got.WithdrawalPolicy) []*MatchData {
 	wrapped := TournamentPlayer{team}
-	reenterMatches := c.ListReenterMatches(wrapped)
-	return matchesToMatchData(reenterMatches)
+	withdrawMatches := wp.ListWithdrawMatches(wrapped)
+	return s.tournamentStore.matchesToMatchData(withdrawMatches)
+}
+
+func (s *WithdrawalManager) listReenterMatches(team *Team, wp got.WithdrawalPolicy) []*MatchData {
+	wrapped := TournamentPlayer{team}
+	reenterMatches := wp.ListReenterMatches(wrapped)
+	return s.tournamentStore.matchesToMatchData(reenterMatches)
 }
 
 type StatusChangeResult struct {
@@ -44,7 +68,7 @@ func (r *StatusChangeResult) ToMap() map[string]any {
 // When a player changes status, they withdraw or reenter from/to matches.
 // This function returns the result of a status change without actually
 // writing any changes
-func listStatusChangeMatches(player *Player, newStatus PlayerStatus) *StatusChangeResult {
+func (m *WithdrawalManager) listStatusChangeMatches(player *Player, newStatus PlayerStatus) *StatusChangeResult {
 	var withdrawing bool
 	status := player.Status()
 	if status != Attending && newStatus == Attending {
@@ -56,19 +80,19 @@ func listStatusChangeMatches(player *Player, newStatus PlayerStatus) *StatusChan
 		return nil
 	}
 
-	regs := Registrations.byPlayer[player.Id]
+	regs := m.registrationStore.byPlayer[player.Id]
 	changes := make(map[*Competition][]*MatchData)
 	for _, reg := range regs {
-		tournament, ok := Tournaments.tournaments[reg.Competition.Id]
+		tournament, ok := m.tournamentStore.tournaments[reg.Competition.Id]
 		team := reg.Team
 		if !ok || !tournament.Started || tournament.Ended {
 			continue
 		}
 		var changedMatches []*MatchData
 		if withdrawing {
-			changedMatches = tournament.listWithdrawMatches(team)
+			changedMatches = m.listWithdrawMatches(team, tournament)
 		} else {
-			changedMatches = tournament.listReenterMatches(team)
+			changedMatches = m.listReenterMatches(team, tournament)
 		}
 
 		addToChanges := len(changedMatches) > 0 || (!withdrawing && reg.Withdrawn)
@@ -86,18 +110,15 @@ func listStatusChangeMatches(player *Player, newStatus PlayerStatus) *StatusChan
 	return result
 }
 
-func setPlayerStatus(
+func (m *WithdrawalManager) setPlayerStatus(
 	app core.App,
 	player *Player,
 	newStatus PlayerStatus,
-	competitionIds []string,
+	competitions []*Competition,
 ) error {
 	var withdraw bool
 	var attendanceChanged bool
 	currentStatus := player.Status()
-
-	player = Clone(player)
-	player.SetStatus(newStatus)
 
 	if currentStatus == Attending && newStatus != Attending {
 		attendanceChanged = true
@@ -107,74 +128,76 @@ func setPlayerStatus(
 		withdraw = false
 	}
 
-	if !attendanceChanged && len(competitionIds) > 0 {
+	if !attendanceChanged && len(competitions) > 0 {
 		return errors.New("can not withdraw/reenter from competitions with this status change")
 	}
 
-	changedMatches := make(map[*Registration][]*got.Match, 0)
-	for _, id := range competitionIds {
-		tournament, ok := Tournaments.tournaments[id]
-		if !ok {
-			return errors.New("can not withdraw from competition without draw")
-		}
-		reg, ok := Registrations.byCompetitionPlayer[id][player.Id]
-		if !ok {
-			return errors.New("can not withdraw from competition where player is not registered")
-		}
-
-		tPlayer := TournamentPlayer{reg.Team}
-		var regChangedMatches []*got.Match
-		if withdraw {
-			regChangedMatches = tournament.ListWithdrawMatches(tPlayer)
-		} else {
-			regChangedMatches = tournament.ListReenterMatches(tPlayer)
-		}
-		if len(regChangedMatches) > 0 {
-			changedMatches[reg] = regChangedMatches
-		}
-	}
-
-	changedMatchData := make([]*MatchData, 0)
-	for registration, matches := range changedMatches {
-		updatedData := matchesToMatchData(matches)
-		if withdraw {
-			updatedData = addWithdrawnToData(registration.Team, updatedData)
-		} else {
-			updatedData = removeWithdrawnFromData(registration.Team, updatedData)
-		}
-		changedMatchData = append(changedMatchData, updatedData...)
-	}
-
-	err := app.RunInTransaction(func(txApp core.App) error {
-		for _, m := range changedMatchData {
-			if err := txApp.Save(m); err != nil {
-				return err
+	event := newStatusChangeEvent(app, player, newStatus, withdraw, competitions)
+	return m.onStatusChange.Trigger(event, m.statusChangeHandler)
+	/*
+		for registration, matches := range changedMatches {
+			tPlayer := TournamentPlayer{registration.Team}
+			if withdraw {
+				addWithdrawnToMatches(tPlayer, matches)
+			} else {
+				removeWithdrawnFromMatches(tPlayer, matches)
 			}
-		}
 
-		if err := txApp.Save(player); err != nil {
+			tournament := Tournaments.tournaments[registration.Competition.Id]
+			Tournaments.update(tournament)
+		}
+	*/
+}
+
+func (m *WithdrawalManager) statusChangeHandler(e *StatusChangeEvent) error {
+	for _, comp := range e.Competitions {
+		/*
+			tournament, ok := Tournaments.tournaments[comp.Id]
+			if !ok || !tournament.Started || tournament.Ended {
+				return errors.New("can not withdraw from competition that is not in progress")
+			}
+			reg, ok := Registrations.byCompetitionPlayer[comp.Id][player.Id]
+			if !ok {
+				return errors.New("can not withdraw from competition where player is not registered")
+			}
+			// Set tournament and reg in the event
+		*/
+		event := newWithdrawEvent(comp, e)
+		if err := m.onWithdraw.Trigger(event, m.withdrawHandler); err != nil {
 			return err
 		}
+		if len(event.ChangedMatches) > 0 {
+			e.Withdrawals = append(e.Withdrawals, event)
+		}
+	}
 
-		return nil
-	})
+	for _, withdrawal := range e.Withdrawals {
+		updatedData := m.tournamentStore.matchesToMatchData(withdrawal.ChangedMatches)
+		if e.Withdraw {
+			updatedData = addWithdrawnToData(withdrawal.Registration.Team, updatedData)
+		} else {
+			updatedData = removeWithdrawnFromData(withdrawal.Registration.Team, updatedData)
+		}
+		e.ChangedMatchData = append(e.ChangedMatchData, updatedData...)
+	}
+
+	err := m.onAfterStatusChange.Trigger(e,
+		(*StatusChangeEvent).saveStatusChange,
+	)
 	if err != nil {
 		return err
 	}
+	return e.Next()
+}
 
-	for registration, matches := range changedMatches {
-		tPlayer := TournamentPlayer{registration.Team}
-		if withdraw {
-			addWithdrawnToMatches(tPlayer, matches)
-		} else {
-			removeWithdrawnFromMatches(tPlayer, matches)
-		}
-
-		tournament := Tournaments.tournaments[registration.Competition.Id]
-		Tournaments.update(tournament)
+func (m *WithdrawalManager) withdrawHandler(e *WithdrawEvent) error {
+	tPlayer := TournamentPlayer{e.Registration.Team}
+	if e.StatusChangeEvent.Withdraw {
+		e.ChangedMatches = e.WithdrawalPolicy.ListWithdrawMatches(tPlayer)
+	} else {
+		e.ChangedMatches = e.WithdrawalPolicy.ListReenterMatches(tPlayer)
 	}
-
-	return nil
+	return e.Next()
 }
 
 func addWithdrawnToData(team *Team, matchData []*MatchData) []*MatchData {

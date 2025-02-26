@@ -10,204 +10,240 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-var topsMu sync.RWMutex
+type TournamentOperations struct {
+	mu sync.RWMutex
+
+	tournamentStore   *TournamentStore
+	registrationStore *RegistrationStore
+	courtStore        *CourtStore
+	scheduler         *MatchScheduler
+	matchManager      *MatchManager
+	drawManager       *DrawManager
+	withdrawalManager *WithdrawalManager
+	tieBreakerManager *TieBreakerManager
+}
+
+func InitTournamentOperations(app core.App) {
+	tournamentStore := newTournamentStore(app)
+	registrationStore := newRegistrationStore(app)
+	playerTracker := newPlayerTracker(tournamentStore)
+	scheduler := newMatchScheduler(app, tournamentStore, playerTracker)
+	courtStore := newCourtStore(scheduler)
+	matchManager := newMatchManager()
+	drawManager := newDrawManager()
+	withdrawalManager := newWithdrawalManager(tournamentStore, registrationStore)
+	tieBreakerManager := newTieBreakerManager()
+
+	tops = TournamentOperations{
+		tournamentStore:   tournamentStore,
+		registrationStore: registrationStore,
+		courtStore:        courtStore,
+		scheduler:         scheduler,
+		matchManager:      matchManager,
+		drawManager:       drawManager,
+		withdrawalManager: withdrawalManager,
+		tieBreakerManager: tieBreakerManager,
+	}
+}
+
+var tops TournamentOperations
 
 func ListTournaments() []*CompetitionTournament {
-	defer topsMu.RUnlock()
-	topsMu.RLock()
+	defer tops.mu.RUnlock()
+	tops.mu.RLock()
 
-	return Tournaments.list
+	return tops.tournamentStore.list
 }
 
-func StartTournament(app core.App, competitionId string) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+func StartTournament(app core.App, competition *Competition) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Tournaments.start(app, competitionId)
+	return tops.tournamentStore.start(app, competition)
 }
 
-func StopTournament(app core.App, competitionId string) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+func StopTournament(app core.App, competition *Competition) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Tournaments.stop(app, competitionId)
+	return tops.tournamentStore.stop(app, competition)
 }
 
 func MakeDraw(app core.App, competition *Competition) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return makeDraw(app, competition)
+	return tops.drawManager.makeDraw(app, competition)
 }
 
 func Redraw(app core.App, competition *Competition) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return redraw(app, competition)
+	return tops.drawManager.redraw(app, competition)
 }
 
 func DrawSwap(app core.App, competition *Competition, a, b string) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return drawSwap(app, competition, a, b)
+	return tops.drawManager.drawSwap(app, competition, a, b)
 }
 
 func DeleteDraw(app core.App, competition *Competition) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return deleteDraw(app, competition)
+	return tops.drawManager.deleteDraw(app, competition)
 }
 
 func SetSeeds(app core.App, competition *Competition, seeds []*Team) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return setSeeds(app, competition, seeds)
+	return tops.drawManager.setSeeds(app, competition, seeds)
 }
 
 func ListRegistrations() []*Registration {
-	defer topsMu.RUnlock()
-	topsMu.RLock()
+	defer tops.mu.RUnlock()
+	tops.mu.RLock()
 
-	return Registrations.list
+	return tops.registrationStore.list
 }
 
 func RegisterTeam(app core.App, team *Team, competition *Competition) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Registrations.registerTeam(app, team, competition)
+	return tops.registrationStore.registerTeam(app, team, competition)
 }
 
 func UpdateTeam(app core.App, team *Team) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Registrations.updateTeam(app, team)
+	return tops.registrationStore.updateTeam(app, team)
 }
 
 func DeleteTeam(app core.App, team *Team) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Registrations.deleteTeam(app, team)
+	return tops.registrationStore.deleteTeam(app, team)
 }
 
 func SetPlayerStatus(
 	app core.App,
 	player *Player,
 	newStatus PlayerStatus,
-	competitionIds []string,
+	competitions []*Competition,
 ) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return setPlayerStatus(app, player, newStatus, competitionIds)
+	return tops.withdrawalManager.setPlayerStatus(app, player, newStatus, competitions)
 }
 
 func ListPlayerStatusChanges(player *Player, newStatus PlayerStatus) *StatusChangeResult {
-	defer topsMu.RUnlock()
-	topsMu.RLock()
+	defer tops.mu.RUnlock()
+	tops.mu.RLock()
 
-	return listStatusChangeMatches(player, newStatus)
+	return tops.withdrawalManager.listStatusChangeMatches(player, newStatus)
 }
 
 func AssignCourtToMatch(app core.App, matchData *MatchData, court *Court) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Courts.assignCourtToMatch(app, matchData, court)
+	return tops.courtStore.assignCourtToMatch(app, matchData, court)
 }
 
 func UnassignCourt(app core.App, matchData *MatchData) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Courts.unassignCourt(app, matchData)
+	return tops.courtStore.unassignCourt(app, matchData)
 }
 
 func DeleteCourt(app core.App, court *Court) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Courts.deleteCourt(app, court)
+	return tops.courtStore.deleteCourt(app, court)
 }
 
 func DeleteGymnasium(app core.App, gymnasium *Gymnasium) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return Courts.deleteGymnasium(app, gymnasium)
+	return tops.courtStore.deleteGymnasium(app, gymnasium)
 }
 
 func StartMatch(app core.App, matchData *MatchData) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return startMatch(app, matchData)
+	return tops.matchManager.startMatch(app, matchData)
 }
 
 func CancelMatch(app core.App, matchData *MatchData) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return cancelMatch(app, matchData)
+	return tops.matchManager.cancelMatch(app, matchData)
 }
 
 func SetMatchScore(app core.App, matchData *MatchData, score [][]int) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return setMatchScore(app, matchData, score)
+	return tops.matchManager.setMatchScore(app, matchData, score)
 }
 
 func ResetMatch(app core.App, matchData *MatchData) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return resetMatch(app, matchData)
+	return tops.matchManager.resetMatch(app, matchData)
 }
 
 func AddTieBreaker(app core.App, competition *Competition, teams []*Team) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return addTieBreaker(app, competition, teams)
+	return tops.tieBreakerManager.addTieBreaker(app, competition, teams)
 }
 
 func UpdateTieBreaker(app core.App, tieBreaker *TieBreaker, teams []*Team) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return updateTieBreaker(app, tieBreaker, teams)
+	return tops.tieBreakerManager.updateTieBreaker(app, tieBreaker, teams)
 }
 
 func DeleteTieBreaker(app core.App, tieBreaker *TieBreaker) error {
-	defer topsMu.Unlock()
-	topsMu.Lock()
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
 
-	return deleteTieBreaker(app, tieBreaker)
+	return tops.tieBreakerManager.deleteTieBreaker(app, tieBreaker)
 }
 
 func ListSchedule() []*Schedule {
-	defer topsMu.RUnlock()
-	topsMu.RLock()
+	defer tops.mu.RUnlock()
+	tops.mu.RLock()
 
-	return Scheduler.listSchedule()
+	return tops.scheduler.listSchedule()
 }
 
 func ListScheduledRounds() []*ScheduledRound {
-	defer topsMu.RUnlock()
-	topsMu.RLock()
+	defer tops.mu.RUnlock()
+	tops.mu.RLock()
 
-	return Scheduler.listScheduledRounds()
+	return tops.scheduler.listScheduledRounds()
 }
 func ListScheduledMatches() []*ScheduledMatch {
-	defer topsMu.RUnlock()
-	topsMu.RLock()
+	defer tops.mu.RUnlock()
+	tops.mu.RLock()
 
-	return Scheduler.listScheduledMatches()
+	return tops.scheduler.listScheduledMatches()
 }

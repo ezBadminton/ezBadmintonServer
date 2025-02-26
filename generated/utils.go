@@ -87,6 +87,9 @@ func WrapRecord[P Proxy, PP ProxyP[P]](record *core.Record) (PP, error) {
 }
 
 func Clone[P Proxy, PP ProxyP[P]](proxy PP) PP {
+	if proxy == nil {
+		return nil
+	}
 	isNew := proxy.ProxyRecord().IsNew()
 	cloneRecord := proxy.ProxyRecord().Clone()
 	if !isNew {

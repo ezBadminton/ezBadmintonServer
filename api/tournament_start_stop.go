@@ -25,7 +25,7 @@ func BindStartStopHooks(app core.App) {
 func startCompetition(e *core.RequestEvent) error {
 	competition := e.Get("competition").(*Competition)
 
-	err := tops.StartTournament(e.App, competition.Id)
+	err := tops.StartTournament(e.App, competition)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}
@@ -36,7 +36,7 @@ func startCompetition(e *core.RequestEvent) error {
 func stopCompetition(e *core.RequestEvent) error {
 	competition := e.Get("competition").(*Competition)
 
-	err := tops.StopTournament(e.App, competition.Id)
+	err := tops.StopTournament(e.App, competition)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}

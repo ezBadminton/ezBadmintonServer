@@ -7,23 +7,62 @@ import (
 	"github.com/ezBadminton/ezBadmintonServer/store"
 	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 )
 
-func addTieBreaker(app core.App, competition *Competition, teams []*Team) error {
-	tournament := Tournaments.tournaments[competition.Id]
-	if tournament == nil || !tournament.Started {
-		return errors.New("can not add tie breaker to tournament that is not running")
-	}
+type TieBreakerManager struct {
+	// Before tie breaker add
+	onAdd *hook.Hook[*TieBreakerEvent]
+	// After tie breaker created. After e.Next() the tie breaker has been persisted
+	onAfterAdd *hook.Hook[*TieBreakerEvent]
 
-	groupKnockout, ok := tournament.Tournament.(*got.GroupKnockout)
-	if !ok {
-		return errors.New("only group knockout tournaments can have tie-breakers added")
-	}
-	if groupKnockout.KnockOut.MatchList().MatchesStarted() {
-		return errors.New("can not add a tie breaker after the knock out phase started")
-	}
+	// Before tie breaker update
+	onUpdate *hook.Hook[*TieBreakerEvent]
+	// After tie breaker updated. After e.Next() the tie breaker update has been persisted
+	onAfterUpdate *hook.Hook[*TieBreakerEvent]
 
-	groupPhase := groupKnockout.GroupPhase
+	// Before tie breaker delete. After e.Next() the tie breaker deletion has been persisted
+	onDelete *hook.Hook[*TieBreakerEvent]
+}
+
+func newTieBreakerManager() *TieBreakerManager {
+	return &TieBreakerManager{
+		onAdd:         &hook.Hook[*TieBreakerEvent]{},
+		onAfterAdd:    &hook.Hook[*TieBreakerEvent]{},
+		onUpdate:      &hook.Hook[*TieBreakerEvent]{},
+		onAfterUpdate: &hook.Hook[*TieBreakerEvent]{},
+		onDelete:      &hook.Hook[*TieBreakerEvent]{},
+	}
+}
+
+func (m *TieBreakerManager) addTieBreaker(app core.App, competition *Competition, teams []*Team) error {
+	event := newTieBreakerEvent(app, competition, teams)
+	return m.onAdd.Trigger(event, m.tieBreakerAddHandler)
+	/*
+			tournament := Tournaments.tournaments[competition.Id]
+			if tournament == nil || !tournament.Started {
+				return errors.New("can not add tie breaker to tournament that is not running")
+			}
+
+		groupKnockout, ok := tournament.Tournament.(*got.GroupKnockout)
+		if !ok {
+			return errors.New("only group knockout tournaments can have tie-breakers added")
+		}
+		if groupKnockout.KnockOut.MatchList().MatchesStarted() {
+			return errors.New("can not add a tie breaker after the knock out phase started")
+		}
+			// Set event GroupPhase
+	*/
+
+	/*
+		insertTieBreaker(teams, groupPhase)
+		Tournaments.update(tournament)
+	*/
+}
+
+func (m *TieBreakerManager) tieBreakerAddHandler(e *TieBreakerEvent) error {
+	groupPhase := e.GroupPhase
+	teams := e.Teams
 
 	ties := make([][]*got.Slot, 0)
 	for _, group := range groupPhase.Groups {
@@ -38,84 +77,78 @@ func addTieBreaker(app core.App, competition *Competition, teams []*Team) error 
 		return err
 	}
 
-	tieBreaker, err := NewProxy[TieBreaker](app)
+	tieBreaker, err := NewProxy[TieBreaker](e.App)
 	if err != nil {
 		return err
 	}
 	tieBreaker.SetTieBreakerRanking(teams)
+	e.TieBreaker = tieBreaker
 
-	compTieBreakers := competition.TieBreakers()
-	compTieBreakers = append(compTieBreakers, tieBreaker)
-	competition = Clone(competition)
-	competition.SetTieBreakers(compTieBreakers)
-
-	err = app.RunInTransaction(func(txApp core.App) error {
-		if err := txApp.Save(tieBreaker); err != nil {
-			return err
-		}
-		return txApp.Save(competition)
-	})
-	if err != nil {
+	if err := m.onAfterAdd.Trigger(e, (*TieBreakerEvent).saveNewTieBreaker); err != nil {
 		return err
 	}
-
-	insertTieBreaker(teams, groupPhase)
-	Tournaments.update(tournament)
-
-	return nil
+	return e.Next()
 }
 
-func updateTieBreaker(app core.App, tieBreaker *TieBreaker, teams []*Team) error {
+func (m *TieBreakerManager) updateTieBreaker(app core.App, tieBreaker *TieBreaker, teams []*Team) error {
 	competition, err := findCompetitionOfTieBreaker(tieBreaker)
 	if err != nil {
 		return err
 	}
+	event := newTieBreakerEvent(app, competition, teams)
+	event.TieBreaker = tieBreaker
+	return m.onUpdate.Trigger(event, m.tieBreakerUpdateHandler)
 
-	tournament := Tournaments.tournaments[competition.Id]
-	groupKnockout := tournament.Tournament.(*got.GroupKnockout)
+	/*
+		tournament := Tournaments.tournaments[competition.Id]
+		groupKnockout := tournament.Tournament.(*got.GroupKnockout)
 
-	if groupKnockout.KnockOut.MatchList().MatchesStarted() {
-		return errors.New("can not update a tie breaker after the knock out phase started")
-	}
+		if groupKnockout.KnockOut.MatchList().MatchesStarted() {
+			return errors.New("can not update a tie breaker after the knock out phase started")
+		}
+	*/
+	/*
+		insertTieBreaker(teams, groupPhase)
+		Tournaments.update(tournament)
+	*/
+}
+
+func (m *TieBreakerManager) tieBreakerUpdateHandler(e *TieBreakerEvent) error {
+	tieBreaker := Clone(e.TieBreaker)
 	tieBreakerTeams := tieBreaker.TieBreakerRanking()
-	if len(tieBreakerTeams) != len(teams) || !containsAll(tieBreakerTeams, teams) {
+	if len(tieBreakerTeams) != len(e.Teams) || !containsAll(tieBreakerTeams, e.Teams) {
 		return errors.New("only update the order of a tie breaker, not the contained teams")
 	}
 
-	tieBreaker = Clone(tieBreaker)
-	tieBreaker.SetTieBreakerRanking(teams)
+	tieBreaker.SetTieBreakerRanking(e.Teams)
+	e.TieBreaker = tieBreaker
 
-	if err := app.Save(tieBreaker); err != nil {
+	if err := m.onAfterUpdate.Trigger(e, (*TieBreakerEvent).saveUpdatedTieBreaker); err != nil {
 		return err
 	}
-
-	insertTieBreaker(teams, groupKnockout.GroupPhase)
-	Tournaments.update(tournament)
-
-	return nil
+	return e.Next()
 }
 
-func deleteTieBreaker(app core.App, tieBreaker *TieBreaker) error {
+func (m *TieBreakerManager) deleteTieBreaker(app core.App, tieBreaker *TieBreaker) error {
 	competition, err := findCompetitionOfTieBreaker(tieBreaker)
 	if err != nil {
 		return err
 	}
+	event := newTieBreakerEvent(app, competition, tieBreaker.TieBreakerRanking())
+	event.TieBreaker = tieBreaker
+	return m.onDelete.Trigger(event, (*TieBreakerEvent).saveDeletedTieBreaker)
+	/*
+		tournament := Tournaments.tournaments[competition.Id]
+		groupKnockout := tournament.Tournament.(*got.GroupKnockout)
+		if groupKnockout.KnockOut.MatchList().MatchesStarted() {
+			return errors.New("can not delete a tie breaker after the knock out phase started")
+		}
+	*/
 
-	tournament := Tournaments.tournaments[competition.Id]
-	groupKnockout := tournament.Tournament.(*got.GroupKnockout)
-	if groupKnockout.KnockOut.MatchList().MatchesStarted() {
-		return errors.New("can not delete a tie breaker after the knock out phase started")
-	}
-
-	if err := app.Delete(tieBreaker); err != nil {
-		return err
-	}
-
-	teams := tieBreaker.TieBreakerRanking()
-	revokeTieBreaker(teams, groupKnockout.GroupPhase)
-	Tournaments.update(tournament)
-
-	return nil
+	/*
+		revokeTieBreaker(teams, groupKnockout.GroupPhase)
+		Tournaments.update(tournament)
+	*/
 }
 
 func insertTieBreaker(tieBreaker []*Team, tournament *got.GroupPhase) {

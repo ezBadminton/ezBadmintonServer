@@ -29,8 +29,8 @@ func (r *BaseTopsRecord) ToMap(with map[string]any) map[string]any {
 }
 
 func TopsRecordListResponse[S ~[]T, T TopsRecord](records S, e *core.RequestEvent) error {
-	defer topsMu.RUnlock()
-	topsMu.RLock()
+	defer tops.mu.RUnlock()
+	tops.mu.RLock()
 
 	data := make([]map[string]any, len(records))
 	for i, r := range records {

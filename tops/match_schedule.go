@@ -9,6 +9,7 @@ import (
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
@@ -126,26 +127,31 @@ func (s *Schedule) IterateMatches() iter.Seq[*ScheduledMatch] {
 // The match scheduler holds an ordered list of
 // rounds that represents the playing order.
 type MatchScheduler struct {
-	app      core.App
-	schedule *Schedule
+	app             core.App
+	tournamentStore *TournamentStore
+	playerTracker   *PlayerTracker
+	schedule        *Schedule
 	// Match data id -> scheduled match
 	scheduled map[string]*ScheduledMatch
+
+	// Before status is set. After e.Next() the status has been set.
+	onStatusSet *hook.Hook[*ScheduleEvent]
 }
 
-var Scheduler *MatchScheduler
-
-func InitScheduler(app core.App) {
-	schedule := newSchedule()
-	scheduled := scheduledMap(schedule)
-
-	Scheduler = &MatchScheduler{
-		app:       app,
-		schedule:  schedule,
-		scheduled: scheduled,
+func newMatchScheduler(app core.App, tournamentStore *TournamentStore, playerTracker *PlayerTracker) *MatchScheduler {
+	scheduler := &MatchScheduler{
+		app:             app,
+		tournamentStore: tournamentStore,
+		playerTracker:   playerTracker,
+		onStatusSet:     &hook.Hook[*ScheduleEvent]{},
 	}
+
+	scheduler.schedule = scheduler.newSchedule()
+	scheduler.scheduled = scheduledMap(scheduler.schedule)
+	return scheduler
 }
 
-func newSchedule() *Schedule {
+func (s *MatchScheduler) newSchedule() *Schedule {
 	schedule := &Schedule{
 		BaseTopsRecord: BaseTopsRecord{
 			Id:      "the-schedule", // is a singleton
@@ -155,7 +161,7 @@ func newSchedule() *Schedule {
 		roundQueue: make([]*ScheduledRound, 0),
 	}
 
-	runningTournaments := Tournaments.listStarted()
+	runningTournaments := s.tournamentStore.listStarted()
 
 	if len(runningTournaments) == 0 {
 		return schedule
@@ -196,8 +202,8 @@ func newSchedule() *Schedule {
 		roundIndex := roundIndexes[i]
 
 		for i, m := range round {
-			matchData := Tournaments.matchData[m.Id()]
-			matchStatus, blockingPlayers := scheduleStatus(m, competition)
+			matchData := s.tournamentStore.matchData[m.Id()]
+			matchStatus, blockingPlayers := s.scheduleStatus(m, competition)
 			id := "s-" + matchData.Id
 			created := matchData.Created()
 			updated := matchData.Updated()
@@ -257,23 +263,27 @@ func (s *MatchScheduler) listScheduledMatches() []*ScheduledMatch {
 	return slices.Collect(s.schedule.IterateMatches())
 }
 
-func (s *MatchScheduler) scheduleStatus(matchData *MatchData) ScheduleStatus {
-	return s.scheduled[matchData.Id].ScheduleStatus
-}
-
 func (s *MatchScheduler) setMatchScheduleStatus(matchData *MatchData, newStatus ScheduleStatus, court *Court) {
 	scheduledMatch := s.scheduled[matchData.Id]
-	currentStatus := scheduledMatch.ScheduleStatus
-
-	scheduledMatch.ScheduleStatus = newStatus
-
-	if occupationalState(currentStatus) && !occupationalState(newStatus) {
-		delete(Courts.occupied, court.Id)
-	} else if !occupationalState(currentStatus) && occupationalState(newStatus) {
-		Courts.occupied[court.Id] = matchData.Id
+	event := newScheduleEvent(scheduledMatch, newStatus)
+	if err := s.onStatusSet.Trigger(event, s.statusSetHandler); err != nil {
+		return
 	}
 
+	/*
+		if occupationalState(currentStatus) && !occupationalState(newStatus) {
+			delete(Courts.occupied, court.Id)
+		} else if !occupationalState(currentStatus) && occupationalState(newStatus) {
+			Courts.occupied[court.Id] = matchData.Id
+		}
+	*/
+
 	go realtimeNotify(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch)
+}
+
+func (s *MatchScheduler) statusSetHandler(e *ScheduleEvent) error {
+	e.Match.ScheduleStatus = e.ScheduleStatus
+	return e.Next()
 }
 
 func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionTournament) {
@@ -281,8 +291,8 @@ func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionT
 	matches := tournament.MatchList().Matches
 
 	for _, m := range matches {
-		matchData := Tournaments.matchData[m.Id()]
-		status, blockingPlayers := scheduleStatus(m, competition)
+		matchData := s.tournamentStore.matchData[m.Id()]
+		status, blockingPlayers := s.scheduleStatus(m, competition)
 		scheduledMatch := s.scheduled[matchData.Id]
 
 		oldStatus := scheduledMatch.ScheduleStatus
@@ -297,7 +307,7 @@ func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionT
 }
 
 func (s *MatchScheduler) tournamentStartStop(competition *Competition, started bool) {
-	schedule := newSchedule()
+	schedule := s.newSchedule()
 	s.schedule = schedule
 	s.scheduled = scheduledMap(schedule)
 
@@ -320,7 +330,7 @@ func (s *MatchScheduler) tournamentStartStop(competition *Competition, started b
 	go realtimeNotify(s.app, "schedule", core.ModelEventTypeUpdate, schedule)
 }
 
-func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerBlock) {
+func (s *MatchScheduler) scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerBlock) {
 	if matchFinished(match) {
 		return Done, nil
 	}
@@ -342,7 +352,7 @@ func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus,
 	playerWait, playerRest := false, false
 
 	for _, p := range players {
-		isPlaying, blockingMatch := PlayerTracker.isPlaying(p)
+		isPlaying, blockingMatch := s.playerTracker.isPlaying(p)
 		if !isPlaying {
 			continue
 		}
@@ -354,7 +364,7 @@ func scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus,
 	}
 
 	for _, p := range players {
-		isResting, restUntil := PlayerTracker.isResting(p)
+		isResting, restUntil := s.playerTracker.isResting(p)
 		if !isResting {
 			continue
 		}

@@ -67,13 +67,12 @@ func readProxiesFromBody[P Proxy, PP ProxyP[P]](e *core.RequestEvent, bodyFieldN
 	case string:
 		idList = []string{d}
 	case []any:
+		if len(d) == 0 {
+			return []PP{}, nil
+		}
 		ids, err := unpackStringList(d)
 		if err != nil {
 			errMsg := fmt.Sprintf("the '%v' field is not a list of IDs", bodyFieldName)
-			return nil, errors.New(errMsg)
-		}
-		if len(ids) == 0 {
-			errMsg := fmt.Sprintf("the '%v' ID list is empty", bodyFieldName)
 			return nil, errors.New(errMsg)
 		}
 		idList = ids

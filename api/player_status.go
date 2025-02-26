@@ -20,7 +20,8 @@ func BindPlayerStatusHooks(app core.App) {
 		group.Bind(pathId[Player]("player"))
 
 		group.GET("/{status}/preview", getStatusChangeList)
-		group.POST("", setPlayerStatus)
+		group.POST("", setPlayerStatus).
+			Bind(bodyIdList[Competition]("competitions"))
 
 		return e.Next()
 	})
@@ -50,22 +51,14 @@ func setPlayerStatus(e *core.RequestEvent) error {
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}
-	competitionIds := readCompetitionIdsFromBody(e)
+	competitions := e.Get("competitions").([]*Competition)
 
-	err = tops.SetPlayerStatus(e.App, player, status, competitionIds)
+	err = tops.SetPlayerStatus(e.App, player, status, competitions)
 	if err != nil {
 		return e.String(http.StatusBadRequest, err.Error())
 	}
 
 	return e.NoContent(http.StatusOK)
-}
-
-func readCompetitionIdsFromBody(e *core.RequestEvent) []string {
-	data := struct {
-		Competitions []string `json:"competitions"`
-	}{}
-	e.BindBody(&data)
-	return data.Competitions
 }
 
 func readPlayerStatusFromBody(e *core.RequestEvent) (PlayerStatus, error) {

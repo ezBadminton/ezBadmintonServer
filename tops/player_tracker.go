@@ -9,23 +9,19 @@ import (
 	got "github.com/ezBadminton/gotournament/core"
 )
 
-type PlayerOccupationTracker struct {
+type PlayerTracker struct {
 	// player id -> currently played match
 	inMatch map[string]*MatchData
 	// player id -> last ended match
-	lastMatches map[string]*MatchData
-	restTime    time.Duration
+	lastMatches     map[string]*MatchData
+	restTime        time.Duration
+	tournamentStore *TournamentStore
 }
 
-var PlayerTracker *PlayerOccupationTracker
+func newPlayerTracker(tournamentStore *TournamentStore) *PlayerTracker {
+	tournamentEventStore, _ := store.FindRecordStore[TournamentEvent]()
 
-func InitPlayerTracker() error {
-	tournamentEventStore, err := store.FindRecordStore[TournamentEvent]()
-	if err != nil {
-		return err
-	}
-
-	runningTournaments := Tournaments.listStarted()
+	runningTournaments := tournamentStore.listStarted()
 	matches := make([]*got.Match, 0)
 	for _, t := range runningTournaments {
 		matches = append(matches, t.MatchList().Matches...)
@@ -35,23 +31,24 @@ func InitPlayerTracker() error {
 	tournamentEvent := tournamentEventStore.RecordList[0]
 	restMinutes := tournamentEvent.PlayerRestTime()
 
-	PlayerTracker = &PlayerOccupationTracker{
-		inMatch:     collectCurrentMatches(matches),
-		lastMatches: collectLastMatches(matches),
-		restTime:    time.Duration(restMinutes) * time.Minute,
+	playerTracker := &PlayerTracker{
+		restTime:        time.Duration(restMinutes) * time.Minute,
+		tournamentStore: tournamentStore,
 	}
+	playerTracker.inMatch = playerTracker.collectCurrentMatches(matches)
+	playerTracker.lastMatches = playerTracker.collectLastMatches(matches)
 
-	return nil
+	return playerTracker
 }
 
-func collectCurrentMatches(matches []*got.Match) map[string]*MatchData {
+func (t *PlayerTracker) collectCurrentMatches(matches []*got.Match) map[string]*MatchData {
 	inMatch := make(map[string]*MatchData)
 	for _, m := range matches {
 		if !matchRunning(m) {
 			continue
 		}
 
-		matchData := Tournaments.matchData[m.Id()]
+		matchData := t.tournamentStore.matchData[m.Id()]
 		players := playersInMatch(m)
 
 		for _, p := range players {
@@ -63,14 +60,14 @@ func collectCurrentMatches(matches []*got.Match) map[string]*MatchData {
 
 // Goes through the sortedMatches (sorted by end time) and
 // maps each player ID to their last ended match
-func collectLastMatches(sortedMatches []*got.Match) map[string]*MatchData {
+func (t *PlayerTracker) collectLastMatches(sortedMatches []*got.Match) map[string]*MatchData {
 	lastMatches := make(map[string]*MatchData)
 	for _, m := range sortedMatches {
 		if m.EndTime.IsZero() {
 			break
 		}
 
-		matchData := Tournaments.matchData[m.Id()]
+		matchData := t.tournamentStore.matchData[m.Id()]
 		players := playersInMatch(m)
 
 		for _, p := range players {
@@ -85,7 +82,7 @@ func collectLastMatches(sortedMatches []*got.Match) map[string]*MatchData {
 
 // TODO: track ending matches
 
-func (t *PlayerOccupationTracker) isPlaying(player *Player) (bool, *MatchData) {
+func (t *PlayerTracker) isPlaying(player *Player) (bool, *MatchData) {
 	match, ok := t.inMatch[player.Id]
 	if !ok {
 		return false, nil
@@ -93,7 +90,7 @@ func (t *PlayerOccupationTracker) isPlaying(player *Player) (bool, *MatchData) {
 	return true, match
 }
 
-func (t *PlayerOccupationTracker) isResting(player *Player) (bool, time.Time) {
+func (t *PlayerTracker) isResting(player *Player) (bool, time.Time) {
 	lastMatch, ok := t.lastMatches[player.Id]
 	if !ok {
 		return false, time.Time{}
