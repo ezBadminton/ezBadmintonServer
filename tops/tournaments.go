@@ -89,6 +89,7 @@ func newTournamentStore(
 		onAfterStart: &hook.Hook[*PlanEvent]{},
 		onStop:       &hook.Hook[*PlanEvent]{},
 		onAfterStop:  &hook.Hook[*PlanEvent]{},
+		onUpdate:     &hook.Hook[*PlanEvent]{},
 	}
 
 	err := s.addTournaments(compStore.RecordList...)
@@ -201,7 +202,9 @@ func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
 		if err != nil {
 			return err
 		}
-		s.hydrate(tournament)
+		if err := s.hydrate(tournament); err != nil {
+			return err
+		}
 		s.tournaments[comp.Id] = tournament
 		s.list = append(s.list, tournament)
 	}
@@ -603,8 +606,10 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 		match := matches[i]
 
 		sets := data.Sets()
-		if err := hydrateScore(match, sets, scoreSettings); err != nil {
-			return err
+		if len(sets) > 0 {
+			if err := hydrateScore(match, sets, scoreSettings); err != nil {
+				return err
+			}
 		}
 
 		court := data.Court()
