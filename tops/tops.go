@@ -16,14 +16,15 @@ type TournamentOperations struct {
 	// guarantee correct state
 	mu sync.RWMutex
 
-	tournamentStore   *TournamentStore
-	registrationStore *RegistrationStore
-	courtStore        *CourtStore
-	scheduler         *MatchScheduler
-	matchManager      *MatchManager
-	drawManager       *DrawManager
-	withdrawalManager *WithdrawalManager
-	tieBreakerManager *TieBreakerManager
+	tournamentStore      *TournamentStore
+	registrationStore    *RegistrationStore
+	courtStore           *CourtStore
+	scheduler            *MatchScheduler
+	matchManager         *MatchManager
+	drawManager          *DrawManager
+	withdrawalManager    *WithdrawalManager
+	tieBreakerManager    *TieBreakerManager
+	eventSettingsManager *EventSettingsManager
 }
 
 func InitTournamentOperations(app core.App) {
@@ -31,6 +32,7 @@ func InitTournamentOperations(app core.App) {
 	withdrawalManager := newWithdrawalManager()
 	tieBreakerManager := newTieBreakerManager()
 	courtStore := newCourtStore()
+	eventSettingsManager := newEventSettingsManager()
 	registrationStore := newRegistrationStore(app, withdrawalManager)
 	drawManager := newDrawManager(registrationStore)
 	tournamentStore := newTournamentStore(app, drawManager, matchManager, courtStore, registrationStore, withdrawalManager, tieBreakerManager)
@@ -41,14 +43,15 @@ func InitTournamentOperations(app core.App) {
 	withdrawalManager.init(tournamentStore, registrationStore)
 
 	tops = TournamentOperations{
-		tournamentStore:   tournamentStore,
-		registrationStore: registrationStore,
-		courtStore:        courtStore,
-		scheduler:         scheduler,
-		matchManager:      matchManager,
-		drawManager:       drawManager,
-		withdrawalManager: withdrawalManager,
-		tieBreakerManager: tieBreakerManager,
+		tournamentStore:      tournamentStore,
+		registrationStore:    registrationStore,
+		courtStore:           courtStore,
+		scheduler:            scheduler,
+		matchManager:         matchManager,
+		drawManager:          drawManager,
+		withdrawalManager:    withdrawalManager,
+		tieBreakerManager:    tieBreakerManager,
+		eventSettingsManager: eventSettingsManager,
 	}
 }
 
@@ -247,9 +250,17 @@ func ListScheduledRounds() []*ScheduledRound {
 
 	return tops.scheduler.listScheduledRounds()
 }
+
 func ListScheduledMatches() []*ScheduledMatch {
 	defer tops.mu.RUnlock()
 	tops.mu.RLock()
 
 	return tops.scheduler.listScheduledMatches()
+}
+
+func ChangeEventSettings(e *core.RecordRequestEvent) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.eventSettingsManager.changeSettings(e)
 }

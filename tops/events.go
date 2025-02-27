@@ -314,6 +314,21 @@ func newWithdrawEvent(competition *Competition, event *StatusChangeEvent) *Withd
 	}
 }
 
+type SettingsEvent struct {
+	*core.RecordRequestEvent
+
+	OldSettings *TournamentEvent
+	NewSettings *TournamentEvent
+}
+
+func newSettingsEvent(requestEvent *core.RecordRequestEvent, old, new *TournamentEvent) *SettingsEvent {
+	return &SettingsEvent{
+		RecordRequestEvent: requestEvent,
+		OldSettings:        old,
+		NewSettings:        new,
+	}
+}
+
 func saveEventData(app core.App, e hook.Resolver, dataProxy core.RecordProxy) error {
 	if err := app.Save(dataProxy.ProxyRecord()); err != nil {
 		return err
