@@ -1,6 +1,7 @@
 package tops
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 	"slices"
@@ -9,7 +10,6 @@ import (
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
@@ -133,22 +133,43 @@ type MatchScheduler struct {
 	schedule        *Schedule
 	// Match data id -> scheduled match
 	scheduled map[string]*ScheduledMatch
-
-	// Before status is set. After e.Next() the status has been set.
-	onStatusSet *hook.Hook[*ScheduleEvent]
 }
 
-func newMatchScheduler(app core.App, tournamentStore *TournamentStore, playerTracker *PlayerTracker) *MatchScheduler {
-	scheduler := &MatchScheduler{
+func newMatchScheduler(
+	app core.App,
+	tournamentStore *TournamentStore,
+	playerTracker *PlayerTracker,
+	courtStore *CourtStore,
+	matchManager *MatchManager,
+) *MatchScheduler {
+	s := &MatchScheduler{
 		app:             app,
 		tournamentStore: tournamentStore,
 		playerTracker:   playerTracker,
-		onStatusSet:     &hook.Hook[*ScheduleEvent]{},
 	}
 
-	scheduler.schedule = scheduler.newSchedule()
-	scheduler.scheduled = scheduledMap(scheduler.schedule)
-	return scheduler
+	s.schedule = s.newSchedule()
+	s.scheduled = scheduledMap(s.schedule)
+
+	tournamentStore.onAfterStart.BindFunc(s.handleTournamentStart)
+	tournamentStore.onUpdate.BindFunc(s.handleTournamentPlanUpdate)
+	tournamentStore.onAfterStop.BindFunc(s.handleTournamentStop)
+
+	courtStore.onCourtAssign.BindFunc(s.verifyCourtAssignment)
+	courtStore.onAfterCourtAssign.BindFunc(s.handleCourtAssignment)
+	courtStore.onCourtUnassign.BindFunc(s.verifyCourtUnassignment)
+	courtStore.onAfterCourtUnassign.BindFunc(s.handleCourtUnassignment)
+
+	matchManager.onStart.BindFunc(s.verifyMatchStart)
+	matchManager.onAfterStart.BindFunc(s.handleMatchStart)
+	matchManager.onCancel.BindFunc(s.verifyMatchCancel)
+	matchManager.onAfterCancel.BindFunc(s.handleMatchCancel)
+	matchManager.onScoreSet.BindFunc(s.verifyScoreSet)
+	matchManager.onAfterScoreSet.BindFunc(s.handleScoreSet)
+	matchManager.onReset.BindFunc(s.verifyMatchReset)
+	matchManager.onAfterReset.BindFunc(s.handleMatchReset)
+
+	return s
 }
 
 func (s *MatchScheduler) newSchedule() *Schedule {
@@ -263,27 +284,11 @@ func (s *MatchScheduler) listScheduledMatches() []*ScheduledMatch {
 	return slices.Collect(s.schedule.IterateMatches())
 }
 
-func (s *MatchScheduler) setMatchScheduleStatus(matchData *MatchData, newStatus ScheduleStatus, court *Court) {
+func (s *MatchScheduler) setMatchScheduleStatus(matchData *MatchData, newStatus ScheduleStatus) {
 	scheduledMatch := s.scheduled[matchData.Id]
-	event := newScheduleEvent(scheduledMatch, newStatus)
-	if err := s.onStatusSet.Trigger(event, s.statusSetHandler); err != nil {
-		return
-	}
-
-	/*
-		if occupationalState(currentStatus) && !occupationalState(newStatus) {
-			delete(Courts.occupied, court.Id)
-		} else if !occupationalState(currentStatus) && occupationalState(newStatus) {
-			Courts.occupied[court.Id] = matchData.Id
-		}
-	*/
+	scheduledMatch.ScheduleStatus = newStatus
 
 	go realtimeNotify(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch)
-}
-
-func (s *MatchScheduler) statusSetHandler(e *ScheduleEvent) error {
-	e.Match.ScheduleStatus = e.ScheduleStatus
-	return e.Next()
 }
 
 func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionTournament) {
@@ -383,6 +388,135 @@ func (s *MatchScheduler) scheduleStatus(match *got.Match, competition *Competiti
 	}
 
 	return CourtWait, nil
+}
+
+func (s *MatchScheduler) handleTournamentStart(e *PlanEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	s.tournamentStartStop(e.Competition, true)
+	return nil
+}
+
+func (s *MatchScheduler) handleTournamentPlanUpdate(e *PlanEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	s.updateTournamentScheduleStatus(e.Tournament)
+	return nil
+}
+
+func (s *MatchScheduler) handleTournamentStop(e *PlanEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	s.tournamentStartStop(e.Competition, false)
+	return nil
+}
+
+func (s *MatchScheduler) verifyCourtAssignment(e *CourtEvent) error {
+	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
+	if matchStatus != CourtWait {
+		return errors.New("the match is not in the CourtWait status. Court can not be assigned.")
+	}
+	return e.Next()
+}
+
+func (s *MatchScheduler) verifyCourtUnassignment(e *CourtEvent) error {
+	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
+	if matchStatus != Ready {
+		return errors.New("the match is not in the Ready status. Court can not be unassigned.")
+	}
+	return e.Next()
+}
+
+func (s *MatchScheduler) handleCourtAssignment(e *CourtEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	s.setMatchScheduleStatus(e.MatchData, Ready)
+	return nil
+}
+
+func (s *MatchScheduler) handleCourtUnassignment(e *CourtEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	s.setMatchScheduleStatus(e.MatchData, CourtWait)
+	return nil
+}
+
+func (s *MatchScheduler) verifyMatchStart(e *MatchEvent) error {
+	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
+	if matchStatus != Ready {
+		return errors.New("the match is not in the ready state and can not be started")
+	}
+	return e.Next()
+}
+
+func (s *MatchScheduler) handleMatchStart(e *MatchEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	s.setMatchScheduleStatus(e.MatchData, InProgress)
+	return nil
+}
+
+func (s *MatchScheduler) verifyMatchCancel(e *MatchEvent) error {
+	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
+	if matchStatus != InProgress {
+		return errors.New("the match is not in progress and can not be canceled")
+	}
+	return e.Next()
+}
+
+func (s *MatchScheduler) handleMatchCancel(e *MatchEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	s.setMatchScheduleStatus(e.MatchData, Ready)
+	return nil
+}
+
+func (s *MatchScheduler) verifyScoreSet(e *ScoreEvent) error {
+	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
+	if matchStatus != InProgress && matchStatus != Done {
+		return errors.New("the match is not in progress or done and can not have its score set/edited")
+	}
+	return e.Next()
+}
+
+func (s *MatchScheduler) handleScoreSet(e *ScoreEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
+	if matchStatus == InProgress {
+		s.setMatchScheduleStatus(e.MatchData, Done)
+	}
+	return e.Next()
+}
+
+func (s *MatchScheduler) verifyMatchReset(e *ScoreEvent) error {
+	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
+	if matchStatus != Done {
+		return errors.New("the match is not done and can not have its score reset")
+	}
+	return e.Next()
+}
+
+func (s *MatchScheduler) handleMatchReset(e *ScoreEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	if e.MatchData.Court() == nil {
+		s.setMatchScheduleStatus(e.MatchData, CourtWait)
+	} else {
+		s.setMatchScheduleStatus(e.MatchData, Ready)
+	}
+	return nil
 }
 
 // The schedule offset of a tournament is the amount

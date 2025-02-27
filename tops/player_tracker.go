@@ -18,7 +18,11 @@ type PlayerTracker struct {
 	tournamentStore *TournamentStore
 }
 
-func newPlayerTracker(tournamentStore *TournamentStore) *PlayerTracker {
+func newPlayerTracker(
+	tournamentStore *TournamentStore,
+	courtStore *CourtStore,
+	matchManager *MatchManager,
+) *PlayerTracker {
 	tournamentEventStore, _ := store.FindRecordStore[TournamentEvent]()
 
 	runningTournaments := tournamentStore.listStarted()
@@ -31,24 +35,31 @@ func newPlayerTracker(tournamentStore *TournamentStore) *PlayerTracker {
 	tournamentEvent := tournamentEventStore.RecordList[0]
 	restMinutes := tournamentEvent.PlayerRestTime()
 
-	playerTracker := &PlayerTracker{
+	t := &PlayerTracker{
 		restTime:        time.Duration(restMinutes) * time.Minute,
 		tournamentStore: tournamentStore,
+		inMatch:         collectCurrentMatches(matches, tournamentStore),
+		lastMatches:     collectLastMatches(matches, tournamentStore),
 	}
-	playerTracker.inMatch = playerTracker.collectCurrentMatches(matches)
-	playerTracker.lastMatches = playerTracker.collectLastMatches(matches)
 
-	return playerTracker
+	courtStore.onAfterCourtAssign.BindFunc(t.handleCourtAssignment)
+	courtStore.onAfterCourtUnassign.BindFunc(t.handleCourtUnassignment)
+
+	matchManager.onAfterScoreSet.BindFunc(t.handleScoreSet)
+
+	tournamentStore.onAfterStop.BindFunc(t.handleTournamentStop)
+
+	return t
 }
 
-func (t *PlayerTracker) collectCurrentMatches(matches []*got.Match) map[string]*MatchData {
+func collectCurrentMatches(matches []*got.Match, tournamentStore *TournamentStore) map[string]*MatchData {
 	inMatch := make(map[string]*MatchData)
 	for _, m := range matches {
 		if !matchRunning(m) {
 			continue
 		}
 
-		matchData := t.tournamentStore.matchData[m.Id()]
+		matchData := tournamentStore.matchData[m.Id()]
 		players := playersInMatch(m)
 
 		for _, p := range players {
@@ -60,14 +71,14 @@ func (t *PlayerTracker) collectCurrentMatches(matches []*got.Match) map[string]*
 
 // Goes through the sortedMatches (sorted by end time) and
 // maps each player ID to their last ended match
-func (t *PlayerTracker) collectLastMatches(sortedMatches []*got.Match) map[string]*MatchData {
+func collectLastMatches(sortedMatches []*got.Match, tournamentStore *TournamentStore) map[string]*MatchData {
 	lastMatches := make(map[string]*MatchData)
 	for _, m := range sortedMatches {
 		if m.EndTime.IsZero() {
 			break
 		}
 
-		matchData := t.tournamentStore.matchData[m.Id()]
+		matchData := tournamentStore.matchData[m.Id()]
 		players := playersInMatch(m)
 
 		for _, p := range players {
@@ -100,6 +111,64 @@ func (t *PlayerTracker) isResting(player *Player) (bool, time.Time) {
 	isResting := time.Now().Before(restUntil.Time())
 
 	return isResting, restUntil.Time()
+}
+
+func (t *PlayerTracker) handleCourtAssignment(e *CourtEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	players := playersInMatch(e.Match)
+	for _, p := range players {
+		t.inMatch[p.Id] = e.MatchData
+	}
+	return nil
+}
+
+func (t *PlayerTracker) handleCourtUnassignment(e *CourtEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	players := playersInMatch(e.Match)
+	for _, p := range players {
+		delete(t.inMatch, p.Id)
+	}
+	return nil
+}
+
+func (t *PlayerTracker) handleScoreSet(e *ScoreEvent) error {
+	matchEnding := e.MatchData.EndTime().IsZero()
+
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	if !matchEnding {
+		return nil
+	}
+	players := playersInMatch(e.Match)
+	for _, p := range players {
+		delete(t.inMatch, p.Id)
+		t.lastMatches[p.Id] = e.MatchData
+	}
+	return nil
+}
+
+func (t *PlayerTracker) handleTournamentStop(e *PlanEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	matches := e.Tournament.MatchList().Matches
+	for _, match := range matches {
+		if match.Location == nil || !match.EndTime.IsZero() {
+			continue
+		}
+		players := playersInMatch(match)
+		for _, p := range players {
+			delete(t.inMatch, p.Id)
+		}
+	}
+
+	return nil
 }
 
 func compareMatchEndTimes(a, b *got.Match) int {

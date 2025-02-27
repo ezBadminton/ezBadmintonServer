@@ -33,8 +33,8 @@ type DrawManager struct {
 	onAfterSetSeeds *hook.Hook[*CompetitionEvent]
 }
 
-func newDrawManager() *DrawManager {
-	return &DrawManager{
+func newDrawManager(registrationStore *RegistrationStore) *DrawManager {
+	m := &DrawManager{
 		onDraw:            &hook.Hook[*CompetitionEvent]{},
 		onAfterDraw:       &hook.Hook[*CompetitionEvent]{},
 		onDrawDelete:      &hook.Hook[*CompetitionEvent]{},
@@ -44,44 +44,20 @@ func newDrawManager() *DrawManager {
 		onSetSeeds:        &hook.Hook[*CompetitionEvent]{},
 		onAfterSetSeeds:   &hook.Hook[*CompetitionEvent]{},
 	}
+
+	registrationStore.onAfterDelete.BindFunc(m.handleUnregistration)
+
+	return m
 }
 
 func (d *DrawManager) makeDraw(app core.App, comp *Competition) error {
 	event := newCompetitionEvent(app, comp)
 	return d.onDraw.Trigger(event, d.makeDrawHandler)
-
-	/*
-		if len(comp.Matches()) != 0 {
-			return errors.New("can not make a draw for a running tournament")
-		}
-	*/
-	/*
-		tournament, err := Tournaments.createTournament(comp)
-		if err != nil {
-			return err
-		}
-	*/
-
-	/*
-		Tournaments.setTournament(comp, tournament)
-	*/
 }
 
 func (d *DrawManager) deleteDraw(app core.App, comp *Competition) error {
 	event := newCompetitionEvent(app, comp)
 	return d.onDrawDelete.Trigger(event, d.deleteDrawHandler)
-	/*
-		if len(comp.Matches()) != 0 {
-			return errors.New("can not make a draw change for a running tournament")
-		}
-		if len(comp.Draw()) == 0 {
-			return errors.New("competition has no draw")
-		}
-	*/
-
-	/*
-		Tournaments.removeTournament(comp)
-	*/
 }
 
 func (d *DrawManager) drawSwap(app core.App, competition *Competition, a, b string) error {
@@ -89,16 +65,6 @@ func (d *DrawManager) drawSwap(app core.App, competition *Competition, a, b stri
 	return d.onDrawSwap.Trigger(event, func(e *CompetitionEvent) error {
 		return d.drawSwapHandler(e, a, b)
 	})
-	/*
-		if len(competition.Matches()) != 0 {
-			return errors.New("can not make a draw change for a running tournament")
-		}
-	*/
-
-	/*
-		tournament, _ := Tournaments.createTournament(competition)
-		Tournaments.setTournament(competition, tournament)
-	*/
 }
 
 func (d *DrawManager) setSeeds(app core.App, competition *Competition, teams []*Team) error {
@@ -106,11 +72,6 @@ func (d *DrawManager) setSeeds(app core.App, competition *Competition, teams []*
 	return d.onSetSeeds.Trigger(event, func(e *CompetitionEvent) error {
 		return d.setSeedsHandler(e, teams)
 	})
-	/*
-		if len(competition.Matches()) != 0 {
-			return errors.New("can not set seeds for a running tournament")
-		}
-	*/
 }
 
 func (d *DrawManager) makeDrawHandler(e *CompetitionEvent) error {
@@ -212,6 +173,15 @@ func (d *DrawManager) setSeedsHandler(e *CompetitionEvent, seeds []*Team) error 
 	return e.Next()
 }
 
+func (d *DrawManager) handleUnregistration(e *RegistrationEvent) error {
+	if isInDraw(e.Registration) {
+		if err := d.deleteDraw(e.App, e.Competition); err != nil {
+			return err
+		}
+	}
+	return e.Next()
+}
+
 func filterEligibleTeams(competition *Competition, teams []*Team) []*Team {
 	teamSize := competition.TeamSize()
 	eligibleTeams := make([]*Team, 0, len(teams))
@@ -232,4 +202,14 @@ func allPlayersAttending(players []*Player) bool {
 		}
 	}
 	return false
+}
+
+func isInDraw(reg *Registration) bool {
+	team := reg.Team
+	comp := reg.Competition
+	isInDraw := slices.ContainsFunc(
+		comp.Draw(),
+		func(t *Team) bool { return t.Id == team.Id },
+	)
+	return isInDraw
 }

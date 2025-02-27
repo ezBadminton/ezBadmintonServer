@@ -23,14 +23,17 @@ type WithdrawalManager struct {
 	onWithdraw *hook.Hook[*WithdrawEvent]
 }
 
-func newWithdrawalManager(tournamentStore *TournamentStore, registrationStore *RegistrationStore) *WithdrawalManager {
+func newWithdrawalManager() *WithdrawalManager {
 	return &WithdrawalManager{
-		tournamentStore:     tournamentStore,
-		registrationStore:   registrationStore,
 		onStatusChange:      &hook.Hook[*StatusChangeEvent]{},
 		onAfterStatusChange: &hook.Hook[*StatusChangeEvent]{},
 		onWithdraw:          &hook.Hook[*WithdrawEvent]{},
 	}
+}
+
+func (s *WithdrawalManager) init(tournamentStore *TournamentStore, registrationStore *RegistrationStore) {
+	s.tournamentStore = tournamentStore
+	s.registrationStore = registrationStore
 }
 
 func (s *WithdrawalManager) listWithdrawMatches(team *Team, wp got.WithdrawalPolicy) []*MatchData {
@@ -134,32 +137,11 @@ func (m *WithdrawalManager) setPlayerStatus(
 
 	event := newStatusChangeEvent(app, player, newStatus, withdraw, competitions)
 	return m.onStatusChange.Trigger(event, m.statusChangeHandler)
-	/*
-		for registration, matches := range changedMatches {
-			tPlayer := TournamentPlayer{registration.Team}
-			if withdraw {
-				addWithdrawnToMatches(tPlayer, matches)
-			} else {
-				removeWithdrawnFromMatches(tPlayer, matches)
-			}
-
-			tournament := Tournaments.tournaments[registration.Competition.Id]
-			Tournaments.update(tournament)
-		}
-	*/
 }
 
 func (m *WithdrawalManager) statusChangeHandler(e *StatusChangeEvent) error {
 	for _, comp := range e.Competitions {
 		/*
-			tournament, ok := Tournaments.tournaments[comp.Id]
-			if !ok || !tournament.Started || tournament.Ended {
-				return errors.New("can not withdraw from competition that is not in progress")
-			}
-			reg, ok := Registrations.byCompetitionPlayer[comp.Id][player.Id]
-			if !ok {
-				return errors.New("can not withdraw from competition where player is not registered")
-			}
 			// Set tournament and reg in the event
 		*/
 		event := newWithdrawEvent(comp, e)
@@ -223,20 +205,4 @@ func removeWithdrawnFromData(team *Team, matchData []*MatchData) []*MatchData {
 		changedMatchData[i] = changed
 	}
 	return changedMatchData
-}
-
-func addWithdrawnToMatches(team TournamentPlayer, matches []*got.Match) {
-	for _, m := range matches {
-		m.WithdrawnPlayers = append(m.WithdrawnPlayers, team)
-	}
-}
-
-func removeWithdrawnFromMatches(team TournamentPlayer, matches []*got.Match) {
-	for _, m := range matches {
-		updatedWithdrawList := slices.DeleteFunc(
-			m.WithdrawnPlayers,
-			func(t got.Player) bool { return t.Id() == team.Id() },
-		)
-		m.WithdrawnPlayers = updatedWithdrawList
-	}
 }

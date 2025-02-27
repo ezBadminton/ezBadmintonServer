@@ -16,38 +16,17 @@ func BindCourtHooks(app core.App) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
 
-		group.DELETE("/{court}", deleteCourt).
-			Bind(pathId[Court]("court"))
-
-		group.DELETE("/gymnasium/{gymnasium}", deleteGymnasium).
-			Bind(pathId[Gymnasium]("gymnasium"))
-
 		dataFetcher := pathId[MatchData]("matchdata")
 		group.POST("/{matchdata}/assign", assignCourt).Bind(dataFetcher)
 		group.POST("/{matchdata}/unassign", unassignCourt).Bind(dataFetcher)
 
 		return e.Next()
 	})
-}
 
-func deleteCourt(e *core.RequestEvent) error {
-	court := e.Get("court").(*Court)
-
-	if err := tops.DeleteCourt(e.App, court); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
-
-	return e.NoContent(http.StatusOK)
-}
-
-func deleteGymnasium(e *core.RequestEvent) error {
-	gym := e.Get("gymnasium").(*Gymnasium)
-
-	if err := tops.DeleteGymnasium(e.App, gym); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
-	}
-
-	return e.NoContent(http.StatusOK)
+	cName := CName[Court]()
+	app.OnRecordDeleteRequest(cName).BindFunc(tops.DeleteCourt)
+	cName = CName[Gymnasium]()
+	app.OnRecordDeleteRequest(cName).BindFunc(tops.DeleteGymnasium)
 }
 
 func assignCourt(e *core.RequestEvent) error {

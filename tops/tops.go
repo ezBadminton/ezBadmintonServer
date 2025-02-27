@@ -11,6 +11,9 @@ import (
 )
 
 type TournamentOperations struct {
+	// All exported methods of the tournament operations
+	// have to be sequentialized by this mutex lock to
+	// guarantee correct state
 	mu sync.RWMutex
 
 	tournamentStore   *TournamentStore
@@ -24,15 +27,18 @@ type TournamentOperations struct {
 }
 
 func InitTournamentOperations(app core.App) {
-	tournamentStore := newTournamentStore(app)
-	registrationStore := newRegistrationStore(app)
-	playerTracker := newPlayerTracker(tournamentStore)
-	scheduler := newMatchScheduler(app, tournamentStore, playerTracker)
-	courtStore := newCourtStore(scheduler)
 	matchManager := newMatchManager()
-	drawManager := newDrawManager()
-	withdrawalManager := newWithdrawalManager(tournamentStore, registrationStore)
+	withdrawalManager := newWithdrawalManager()
 	tieBreakerManager := newTieBreakerManager()
+	courtStore := newCourtStore()
+	registrationStore := newRegistrationStore(app, withdrawalManager)
+	drawManager := newDrawManager(registrationStore)
+	tournamentStore := newTournamentStore(app, drawManager, matchManager, courtStore, registrationStore, withdrawalManager, tieBreakerManager)
+	playerTracker := newPlayerTracker(tournamentStore, courtStore, matchManager)
+	scheduler := newMatchScheduler(app, tournamentStore, playerTracker, courtStore, matchManager)
+
+	courtStore.init(scheduler, matchManager, tournamentStore)
+	withdrawalManager.init(tournamentStore, registrationStore)
 
 	tops = TournamentOperations{
 		tournamentStore:   tournamentStore,
@@ -165,18 +171,18 @@ func UnassignCourt(app core.App, matchData *MatchData) error {
 	return tops.courtStore.unassignCourt(app, matchData)
 }
 
-func DeleteCourt(app core.App, court *Court) error {
+func DeleteCourt(e *core.RecordRequestEvent) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()
 
-	return tops.courtStore.deleteCourt(app, court)
+	return tops.courtStore.deleteCourt(e)
 }
 
-func DeleteGymnasium(app core.App, gymnasium *Gymnasium) error {
+func DeleteGymnasium(e *core.RecordRequestEvent) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()
 
-	return tops.courtStore.deleteGymnasium(app, gymnasium)
+	return tops.courtStore.deleteGymnasium(e)
 }
 
 func StartMatch(app core.App, matchData *MatchData) error {

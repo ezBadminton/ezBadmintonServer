@@ -55,12 +55,12 @@ type RegistrationStore struct {
 	onAfterDelete *hook.Hook[*RegistrationEvent]
 }
 
-func newRegistrationStore(app core.App) *RegistrationStore {
+func newRegistrationStore(app core.App, withdrawalManager *WithdrawalManager) *RegistrationStore {
 	teamStore, _ := store.FindRecordStore[Team]()
 
 	teams := teamStore.RecordList
 
-	rStore := &RegistrationStore{
+	s := &RegistrationStore{
 		app:                 app,
 		list:                make([]*Registration, 0),
 		byPlayer:            make(map[string][]*Registration),
@@ -76,9 +76,11 @@ func newRegistrationStore(app core.App) *RegistrationStore {
 		onAfterDelete:       &hook.Hook[*RegistrationEvent]{},
 	}
 
-	rStore.addTeams(teams...)
+	s.addTeams(teams...)
 
-	return rStore
+	withdrawalManager.onWithdraw.BindFunc(s.verifyWithdrawal)
+
+	return s
 }
 
 func (s *RegistrationStore) addTeams(teams ...*Team) {
@@ -167,14 +169,6 @@ func (s *RegistrationStore) updateHandler(e *RegistrationEvent) error {
 		}
 	}
 
-	/*
-		_, isActive := s.isRegistrationActive(reg)
-
-		if len(removedPlayers) != len(addedPlayers) && isActive {
-			return errors.New("can not add/remove team members while team is active in a tournament")
-		}
-	*/
-
 	err := s.onAfterUpdate.Trigger(e,
 		(*RegistrationEvent).saveUpdatedRegistration,
 		s.updateStoreHandler,
@@ -207,19 +201,6 @@ func (s *RegistrationStore) deleteTeam(app core.App, team *Team) error {
 		event.Competition = event.Registration.Competition
 	}
 	return s.onDelete.Trigger(event, s.deleteHandler)
-	/*
-		isInDraw, isActive := s.isRegistrationActive(reg)
-		if isActive {
-			return errors.New("can not delete team while it is active in a tournament")
-		}
-	*/
-	/*
-		if isInDraw {
-			if err := deleteDraw(txApp, comp); err != nil {
-				return err
-			}
-		}
-	*/
 }
 
 func (s *RegistrationStore) deleteHandler(e *RegistrationEvent) error {
@@ -284,23 +265,6 @@ func (s *RegistrationStore) verifyRegistration(team *Team, competition *Competit
 	return nil
 }
 
-/*
-func (s *RegistrationStore) isRegistrationActive(reg *Registration) (bool, bool) {
-	team := reg.Team
-	comp := reg.Competition
-	tournament := Tournaments.tournaments[comp.Id]
-
-	isInDraw := slices.ContainsFunc(
-		comp.Draw(),
-		func(t *Team) bool { return t.Id == team.Id },
-	)
-
-	isActive := isInDraw && tournament.Started
-
-	return isInDraw, isActive
-}
-*/
-
 func (s *RegistrationStore) addRegistration(reg *Registration) {
 	comp := reg.Competition
 	players := reg.Team.Players()
@@ -354,6 +318,15 @@ func (s *RegistrationStore) playerRemoved(player *Player, team *Team) {
 	)
 
 	delete(s.byCompetitionPlayer[comp.Id], player.Id)
+}
+
+func (s *RegistrationStore) verifyWithdrawal(e *WithdrawEvent) error {
+	reg, ok := s.byCompetitionPlayer[e.Competition.Id][e.StatusChangeEvent.Player.Id]
+	if !ok {
+		return errors.New("can not withdraw from competition where player is not registered")
+	}
+	e.Registration = reg
+	return e.Next()
 }
 
 func newRegistration(team *Team, competition *Competition, withdrawn bool) *Registration {

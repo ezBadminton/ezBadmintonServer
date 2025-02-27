@@ -26,39 +26,50 @@ type CourtStore struct {
 	onAfterCourtUnassign *hook.Hook[*CourtEvent]
 }
 
-func newCourtStore(scheduler *MatchScheduler) *CourtStore {
-	courtProxyStore, _ := store.FindRecordStore[Court]()
-
-	courts := slices.Clone(courtProxyStore.RecordList)
-	slices.SortFunc(courts, compareCourts)
-	occupied := make(map[string]string)
-	for m := range scheduler.schedule.IterateMatches() {
-		if m.ScheduleStatus == InProgress {
-			occupied[m.Match.Court().Id] = m.Id
-		}
-	}
-
-	courtStore := &CourtStore{
-		list:                 courts,
-		occupied:             occupied,
+func newCourtStore() *CourtStore {
+	return &CourtStore{
 		onCourtAssign:        &hook.Hook[*CourtEvent]{},
 		onAfterCourtAssign:   &hook.Hook[*CourtEvent]{},
 		onCourtUnassign:      &hook.Hook[*CourtEvent]{},
 		onAfterCourtUnassign: &hook.Hook[*CourtEvent]{},
 	}
-
-	courtProxyStore.RegisterCreateHander(courtStore.created)
-	courtProxyStore.RegisterUpdateHandler(courtStore.updated)
-
-	return courtStore
 }
 
-func (s *CourtStore) deleteCourt(app core.App, court *Court) error {
+func (s *CourtStore) init(
+	scheduler *MatchScheduler,
+	matchManager *MatchManager,
+	tournamentStore *TournamentStore,
+) {
+	courtProxyStore, _ := store.FindRecordStore[Court]()
+
+	s.list = slices.Clone(courtProxyStore.RecordList)
+	slices.SortFunc(s.list, compareCourts)
+	s.occupied = make(map[string]string)
+	for m := range scheduler.schedule.IterateMatches() {
+		if m.ScheduleStatus == InProgress {
+			s.occupied[m.Match.Court().Id] = m.Id
+		}
+	}
+
+	courtProxyStore.RegisterCreateHander(s.created)
+	courtProxyStore.RegisterUpdateHandler(s.updated)
+
+	matchManager.onAfterScoreSet.BindFunc(s.handleScoreSet)
+	matchManager.onAfterReset.BindFunc(s.handleMatchReset)
+
+	tournamentStore.onAfterStop.BindFunc(s.handleTournamentStop)
+}
+
+func (s *CourtStore) deleteCourt(e *core.RecordRequestEvent) error {
+	court, err := store.FindProxy[Court](e.Record.Id)
+	if err != nil {
+		return err
+	}
 	if s.isOccupied(court) {
 		return errors.New("can not delete occupied court")
 	}
 
-	if err := app.Delete(court); court != nil {
+	if err := e.Next(); err != nil {
 		return err
 	}
 
@@ -70,7 +81,11 @@ func (s *CourtStore) deleteCourt(app core.App, court *Court) error {
 	return nil
 }
 
-func (s *CourtStore) deleteGymnasium(app core.App, gym *Gymnasium) error {
+func (s *CourtStore) deleteGymnasium(e *core.RecordRequestEvent) error {
+	gym, err := store.FindProxy[Gymnasium](e.Record.Id)
+	if err != nil {
+		return err
+	}
 	courts := findCourtsOfGymnasium(gym)
 	for _, c := range courts {
 		if s.isOccupied(c) {
@@ -78,17 +93,17 @@ func (s *CourtStore) deleteGymnasium(app core.App, gym *Gymnasium) error {
 		}
 	}
 
-	err := app.RunInTransaction(func(txApp core.App) error {
+	app := e.App
+	err = e.App.RunInTransaction(func(txApp core.App) error {
+		e.App = txApp
 		for _, c := range courts {
 			if err := txApp.Delete(c); err != nil {
 				return err
 			}
 		}
-		if err := txApp.Delete(gym); err != nil {
-			return err
-		}
-		return nil
+		return e.Next()
 	})
+	e.App = app
 	if err != nil {
 		return err
 	}
@@ -120,16 +135,6 @@ func (s *CourtStore) nextCourt() *Court {
 func (s *CourtStore) assignCourtToMatch(app core.App, matchData *MatchData, optCourt *Court) error {
 	event := newCourtEvent(app, matchData, optCourt)
 	return s.onCourtAssign.Trigger(event, s.courtAssignmentHandler)
-	/*
-		matchStatus := Scheduler.scheduleStatus(matchData)
-		if matchStatus != CourtWait {
-			return errors.New("the match is not in the correct state for court assignment")
-		}
-	*/
-
-	/*
-		Scheduler.setMatchScheduleStatus(matchData, Ready, court)
-	*/
 }
 
 func (s *CourtStore) courtAssignmentHandler(e *CourtEvent) error {
@@ -148,25 +153,24 @@ func (s *CourtStore) courtAssignmentHandler(e *CourtEvent) error {
 	e.MatchData.SetCourt(court)
 	e.Court = court
 
-	if err := s.onAfterCourtAssign.Trigger(e, (*CourtEvent).saveMatchData); err != nil {
+	err := s.onAfterCourtAssign.Trigger(e,
+		(*CourtEvent).saveMatchData,
+		s.storeAssignment,
+	)
+	if err != nil {
 		return err
 	}
+	return e.Next()
+}
 
+func (s *CourtStore) storeAssignment(e *CourtEvent) error {
+	s.occupied[e.Court.Id] = e.MatchData.Id
 	return e.Next()
 }
 
 func (s *CourtStore) unassignCourt(app core.App, matchData *MatchData) error {
 	event := newCourtEvent(app, matchData, nil)
 	return s.onCourtUnassign.Trigger(event, s.courtUnassignmentHandler)
-	/*
-		matchStatus := Scheduler.scheduleStatus(matchData)
-		if matchStatus != Ready {
-			return errors.New("the match is not in the correct state for court unassignment")
-		}
-	*/
-	/*
-		Scheduler.setMatchScheduleStatus(matchData, CourtWait, court)
-	*/
 }
 
 func (s *CourtStore) courtUnassignmentHandler(e *CourtEvent) error {
@@ -174,11 +178,66 @@ func (s *CourtStore) courtUnassignmentHandler(e *CourtEvent) error {
 	e.MatchData.SetCourt(nil)
 	e.Court = court
 
-	if err := s.onAfterCourtUnassign.Trigger(e, (*CourtEvent).saveMatchData); err != nil {
+	err := s.onAfterCourtUnassign.Trigger(e,
+		(*CourtEvent).saveMatchData,
+		s.storeUnassignment,
+	)
+	if err != nil {
+		return err
+	}
+	return e.Next()
+}
+
+func (s *CourtStore) storeUnassignment(e *CourtEvent) error {
+	delete(s.occupied, e.Court.Id)
+	return e.Next()
+}
+
+func (s *CourtStore) handleScoreSet(e *ScoreEvent) error {
+	matchEnding := e.MatchData.EndTime().IsZero()
+	if err := e.Next(); err != nil {
+		return err
+	}
+	if matchEnding {
+		delete(s.occupied, e.MatchData.Court().Id)
+	}
+	return nil
+}
+
+// Allow the match to retake the court it had if it
+// is not occupied
+func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
+	currentCourt := e.MatchData.Court()
+	courtOccupied := s.isOccupied(currentCourt)
+	if courtOccupied {
+		e.MatchData.SetCourt(nil)
+	}
+
+	if err := e.Next(); err != nil {
 		return err
 	}
 
-	return e.Next()
+	if !courtOccupied {
+		s.occupied[currentCourt.Id] = e.MatchData.Id
+	}
+	return nil
+}
+
+func (s *CourtStore) handleTournamentStop(e *PlanEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	for _, m := range e.MatchData {
+		court := m.Court()
+		if court == nil {
+			continue
+		}
+		if m.Id == s.occupied[court.Id] {
+			delete(s.occupied, court.Id)
+		}
+	}
+	return nil
 }
 
 func (s *CourtStore) created(court *Court) {
@@ -205,10 +264,4 @@ func findCourtsOfGymnasium(gym *Gymnasium) []*Court {
 		courtIds[i], _ = store.FindProxy[Court](p.Id)
 	}
 	return courtIds
-}
-
-// Returns true for status where matches with this status
-// occupy their assigned court
-func occupationalState(status ScheduleStatus) bool {
-	return status == Ready || status == InProgress
 }

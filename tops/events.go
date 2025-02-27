@@ -5,6 +5,7 @@ import (
 	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/hook"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 type CompetitionEvent struct {
@@ -31,6 +32,7 @@ type MatchEvent struct {
 
 	App       core.App
 	MatchData *MatchData
+	Match     *got.Match
 }
 
 func newMatchEvent(app core.App, matchData *MatchData) *MatchEvent {
@@ -58,21 +60,6 @@ func newCourtEvent(app core.App, matchData *MatchData, court *Court) *CourtEvent
 	}
 }
 
-type ScheduleEvent struct {
-	hook.Event
-
-	Match *ScheduledMatch
-	ScheduleStatus
-}
-
-func newScheduleEvent(match *ScheduledMatch, status ScheduleStatus) *ScheduleEvent {
-	return &ScheduleEvent{
-		Event:          hook.Event{},
-		Match:          match,
-		ScheduleStatus: status,
-	}
-}
-
 type ScoreEvent struct {
 	*MatchEvent
 
@@ -85,6 +72,9 @@ func NewScoreEvent(app core.App, matchData *MatchData) *ScoreEvent {
 
 func (e *ScoreEvent) saveScoreData() error {
 	curScore := e.MatchData.Sets()
+	if e.MatchData.EndTime().IsZero() {
+		e.MatchData.SetEndTime(types.NowDateTime())
+	}
 	err := e.App.RunInTransaction(func(txApp core.App) error {
 		for _, s := range e.ScoreData {
 			if err := txApp.Save(s); err != nil {
