@@ -5,6 +5,7 @@ import (
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 )
 
 func idFinder[P Proxy, PP ProxyP[P]](id string) func(p PP) bool {
@@ -29,4 +30,11 @@ func containsAll[S ~[]PP, P Proxy, PP ProxyP[P]](a, b S) bool {
 		}
 	}
 	return true
+}
+
+func priorityHandler[R hook.Resolver](handler func(R) error, priority int) *hook.Handler[R] {
+	return &hook.Handler[R]{
+		Func:     handler,
+		Priority: priority,
+	}
 }

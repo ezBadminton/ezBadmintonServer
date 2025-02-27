@@ -45,9 +45,12 @@ func newPlayerTracker(
 	courtStore.onAfterCourtAssign.BindFunc(t.handleCourtAssignment)
 	courtStore.onAfterCourtUnassign.BindFunc(t.handleCourtUnassignment)
 
-	matchManager.onAfterScoreSet.BindFunc(t.handleScoreSet)
+	// The handler priority is set to 1 here so they are executed before the
+	// scheduler handles the same event (with default prio 0). The scheduler
+	// needs the player tracker to be updated before it updates the schedule.
+	matchManager.onAfterScoreSet.Bind(priorityHandler(t.handleScoreSet, 1))
 
-	tournamentStore.onAfterStop.BindFunc(t.handleTournamentStop)
+	tournamentStore.onAfterStop.Bind(priorityHandler(t.handleTournamentStop, 1))
 
 	return t
 }

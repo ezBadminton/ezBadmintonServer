@@ -55,12 +55,12 @@ type TournamentStore struct {
 
 	// Before tournament start
 	onStart *hook.Hook[*PlanEvent]
-	// After match data created. After e.Next() the match data has been persisted
+	// After match data created. After e.Next() the match data has been persisted and the tournament hydrated
 	onAfterStart *hook.Hook[*PlanEvent]
 
 	// Before tournament stop
 	onStop *hook.Hook[*PlanEvent]
-	// After match data to delete is set. After e.Next() the match data deletion has been persisted
+	// After match data to delete is set. After e.Next() the match data deletion has been persisted. Dehydration happens after the hook
 	onAfterStop *hook.Hook[*PlanEvent]
 
 	// Before tournament plan update. After e.Next() the tournament has been updated
@@ -334,17 +334,10 @@ func (s *TournamentStore) stop(app core.App, competition *Competition) error {
 func (s *TournamentStore) stopHandler(e *PlanEvent) error {
 	e.MatchData = e.Competition.Matches()
 
-	err := s.onAfterStop.Trigger(e,
-		(*PlanEvent).saveStoppedPlan,
-		s.dehydrateHandler,
-	)
+	err := s.onAfterStop.Trigger(e, (*PlanEvent).saveStoppedPlan)
 	if err != nil {
 		return err
 	}
-	return e.Next()
-}
-
-func (s *TournamentStore) dehydrateHandler(e *PlanEvent) error {
 	s.dehydrate(e.Tournament)
 	return e.Next()
 }
@@ -475,8 +468,7 @@ func (s *TournamentStore) handleCourtAssignment(e *CourtEvent) error {
 		return err
 	}
 
-	match := s.matches[e.MatchData.Id]
-	hydrateCourt(match, e.MatchData.Court())
+	hydrateCourt(e.Match, e.MatchData.Court())
 	return nil
 }
 
