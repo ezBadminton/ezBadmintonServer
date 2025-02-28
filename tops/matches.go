@@ -96,10 +96,22 @@ func (m *MatchManager) scoreSetHandler(e *ScoreEvent, points [][]int) error {
 	}
 	e.ScoreData = scoreData
 
-	if err := m.onAfterScoreSet.Trigger(e, (*ScoreEvent).saveScoreData); err != nil {
+	err := m.onAfterScoreSet.Trigger(e,
+		m.handleEndTimeSet,
+		(*ScoreEvent).saveScoreData,
+	)
+	if err != nil {
 		return err
 	}
 
+	return e.Next()
+}
+
+func (m *MatchManager) handleEndTimeSet(e *ScoreEvent) error {
+	// Do not overwrite the end time on score edit
+	if e.MatchData.EndTime().IsZero() {
+		e.MatchData.SetEndTime(types.NowDateTime())
+	}
 	return e.Next()
 }
 

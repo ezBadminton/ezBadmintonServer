@@ -25,6 +25,7 @@ type TournamentOperations struct {
 	withdrawalManager    *WithdrawalManager
 	tieBreakerManager    *TieBreakerManager
 	eventSettingsManager *EventSettingsManager
+	playerTracker        *PlayerTracker
 }
 
 func InitTournamentOperations(app core.App) {
@@ -33,14 +34,26 @@ func InitTournamentOperations(app core.App) {
 	tieBreakerManager := newTieBreakerManager()
 	courtStore := newCourtStore()
 	eventSettingsManager := newEventSettingsManager()
+	playerTracker := newPlayerTracker()
+	scheduler := newMatchScheduler(app)
 	registrationStore := newRegistrationStore(app, withdrawalManager)
 	drawManager := newDrawManager(registrationStore)
-	tournamentStore := newTournamentStore(app, drawManager, matchManager, courtStore, registrationStore, withdrawalManager, tieBreakerManager)
-	playerTracker := newPlayerTracker(tournamentStore, courtStore, matchManager)
-	scheduler := newMatchScheduler(app, tournamentStore, playerTracker, courtStore, matchManager)
+	tournamentStore := newTournamentStore(
+		app,
+		drawManager,
+		matchManager,
+		courtStore,
+		registrationStore,
+		withdrawalManager,
+		tieBreakerManager,
+		scheduler,
+		playerTracker,
+	)
 
+	scheduler.init(tournamentStore, courtStore, matchManager, playerTracker)
 	courtStore.init(scheduler, matchManager, tournamentStore)
 	withdrawalManager.init(tournamentStore, registrationStore)
+	playerTracker.init(tournamentStore, courtStore, matchManager, eventSettingsManager, scheduler)
 
 	tops = TournamentOperations{
 		tournamentStore:      tournamentStore,
@@ -52,6 +65,7 @@ func InitTournamentOperations(app core.App) {
 		withdrawalManager:    withdrawalManager,
 		tieBreakerManager:    tieBreakerManager,
 		eventSettingsManager: eventSettingsManager,
+		playerTracker:        playerTracker,
 	}
 }
 

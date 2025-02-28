@@ -75,6 +75,8 @@ func newTournamentStore(
 	registrationStore *RegistrationStore,
 	withdrawalManager *WithdrawalManager,
 	tieBreakerManager *TieBreakerManager,
+	scheduler *MatchScheduler,
+	playerTracker *PlayerTracker,
 ) *TournamentStore {
 	compStore, _ := store.FindRecordStore[Competition]()
 
@@ -128,6 +130,14 @@ func newTournamentStore(
 	tieBreakerManager.onAfterUpdate.BindFunc(s.handleTieBreakerChange)
 	tieBreakerManager.onDelete.BindFunc(s.verifyTieBreakerChange)
 	tieBreakerManager.onDelete.BindFunc(s.handleTieBreakerDelete)
+
+	// Priority for setting the started tournament(s)/match data in the events
+	scheduler.onReschedule.Bind(priorityHandler(s.handleReschedule, -1))
+	scheduler.onStatusChange.Bind(priorityHandler(s.handleScheduleStatus, -1))
+
+	// Priority for setting the tournament in the events
+	playerTracker.onRestEnd.Bind(priorityHandler(s.handleRestEnd, -1))
+	playerTracker.onRestChanged.Bind(priorityHandler(s.handleRestSettingsChange, -1))
 
 	return s
 }
@@ -558,6 +568,34 @@ func (s *TournamentStore) handleTieBreakerDelete(e *TieBreakerEvent) error {
 	tournament := s.tournaments[e.Competition.Id]
 	s.update(tournament)
 	return nil
+}
+
+func (s *TournamentStore) handleReschedule(e *RescheduleEvent) error {
+	e.StartedTournaments = s.listStarted()
+	return e.Next()
+}
+
+func (s *TournamentStore) handleScheduleStatus(e *ScheduleStatusEvent) error {
+	e.MatchData = s.matchData[e.Match.Id()]
+	return e.Next()
+}
+
+func (s *TournamentStore) handleRestEnd(e *PlayerRestEvent) error {
+	e.Tournament = s.byMatch[e.MatchData.Id]
+	return e.Next()
+}
+
+func (s *TournamentStore) handleRestSettingsChange(e *MatchRestEvent) error {
+	tournamentSet := make(map[*CompetitionTournament]any)
+	for _, m := range e.MatchData {
+		t := s.byMatch[m.Id]
+		tournamentSet[t] = struct{}{}
+	}
+	e.Tournaments = make([]*CompetitionTournament, 0, len(tournamentSet))
+	for t := range tournamentSet {
+		e.Tournaments = append(e.Tournaments, t)
+	}
+	return e.Next()
 }
 
 func createMatchData(app core.App, tournament got.MatchLister) ([]*MatchData, error) {

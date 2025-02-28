@@ -209,18 +209,25 @@ func (s *CourtStore) handleScoreSet(e *ScoreEvent) error {
 func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
 	currentCourt := e.MatchData.Court()
 	courtOccupied := s.isOccupied(currentCourt)
+
+	var err error
 	if courtOccupied {
 		e.MatchData.SetCourt(nil)
+		err = e.Next()
+	} else {
+		// Re-assign the court (skip onCourtAssign)
+		courtEvent := newCourtEvent(e.App, e.MatchData, currentCourt)
+		err = s.onAfterCourtAssign.Trigger(courtEvent,
+			func(ce *CourtEvent) error {
+				if err := e.Next(); err != nil {
+					return err
+				}
+				return ce.Next()
+			},
+			s.storeAssignment,
+		)
 	}
-
-	if err := e.Next(); err != nil {
-		return err
-	}
-
-	if !courtOccupied {
-		s.occupied[currentCourt.Id] = e.MatchData.Id
-	}
-	return nil
+	return err
 }
 
 func (s *CourtStore) handleTournamentStop(e *PlanEvent) error {

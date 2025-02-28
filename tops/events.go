@@ -1,11 +1,12 @@
 package tops
 
 import (
+	"time"
+
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 type CompetitionEvent struct {
@@ -72,9 +73,6 @@ func NewScoreEvent(app core.App, matchData *MatchData) *ScoreEvent {
 
 func (e *ScoreEvent) saveScoreData() error {
 	curScore := e.MatchData.Sets()
-	if e.MatchData.EndTime().IsZero() {
-		e.MatchData.SetEndTime(types.NowDateTime())
-	}
 	err := e.App.RunInTransaction(func(txApp core.App) error {
 		for _, s := range e.ScoreData {
 			if err := txApp.Save(s); err != nil {
@@ -315,7 +313,8 @@ func newWithdrawEvent(competition *Competition, event *StatusChangeEvent) *Withd
 }
 
 type SettingsEvent struct {
-	*core.RecordRequestEvent
+	hook.Event
+	RecordRequestEvent *core.RecordRequestEvent
 
 	OldSettings *TournamentEvent
 	NewSettings *TournamentEvent
@@ -323,9 +322,80 @@ type SettingsEvent struct {
 
 func newSettingsEvent(requestEvent *core.RecordRequestEvent, old, new *TournamentEvent) *SettingsEvent {
 	return &SettingsEvent{
+		Event:              hook.Event{},
 		RecordRequestEvent: requestEvent,
 		OldSettings:        old,
 		NewSettings:        new,
+	}
+}
+
+type PlayerRestEvent struct {
+	hook.Event
+
+	Players    []*Player
+	MatchData  *MatchData
+	Tournament *CompetitionTournament
+}
+
+func newPlayerRestEvent(players []*Player, matchData *MatchData) *PlayerRestEvent {
+	return &PlayerRestEvent{
+		Event:     hook.Event{},
+		Players:   players,
+		MatchData: matchData,
+	}
+}
+
+// The rest time changed and the rest period of the
+// MatchData got extended/reduced. Matches that remain
+// in their rest period before and after the change are
+// not listed.
+type MatchRestEvent struct {
+	hook.Event
+
+	MatchData   []*MatchData
+	Tournaments []*CompetitionTournament
+}
+
+func newMatchRestEvent(matchData []*MatchData) *MatchRestEvent {
+	return &MatchRestEvent{
+		Event:     hook.Event{},
+		MatchData: matchData,
+	}
+}
+
+type RescheduleEvent struct {
+	hook.Event
+
+	Schedule           *Schedule
+	StartedTournaments []*CompetitionTournament
+}
+
+func newRescheduleEvent(schedule *Schedule) *RescheduleEvent {
+	return &RescheduleEvent{
+		Event:    hook.Event{},
+		Schedule: schedule,
+	}
+}
+
+type ScheduleStatusEvent struct {
+	hook.Event
+
+	Match          *got.Match
+	MatchData      *MatchData
+	Competition    *Competition
+	Status         ScheduleStatus
+	BlockingStatus map[string]PlayerBlock
+
+	PlayersInMatch map[*Player]*MatchData
+	PlayersResting map[*Player]time.Time
+}
+
+func newScheduleStatusEvent(match *got.Match, competition *Competition) *ScheduleStatusEvent {
+	return &ScheduleStatusEvent{
+		Event:       hook.Event{},
+		Match:       match,
+		Competition: competition,
+		Status:      -1,
 	}
 }
 

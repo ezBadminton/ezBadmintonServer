@@ -10,6 +10,7 @@ import (
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	got "github.com/ezBadminton/gotournament/core"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
@@ -127,27 +128,34 @@ func (s *Schedule) IterateMatches() iter.Seq[*ScheduledMatch] {
 // The match scheduler holds an ordered list of
 // rounds that represents the playing order.
 type MatchScheduler struct {
-	app             core.App
-	tournamentStore *TournamentStore
-	playerTracker   *PlayerTracker
-	schedule        *Schedule
+	app      core.App
+	schedule *Schedule
 	// Match data id -> scheduled match
 	scheduled map[string]*ScheduledMatch
+
+	// Before a match schedule is (re-)made. After e.Next() the schedule is complete.
+	onReschedule *hook.Hook[*RescheduleEvent]
+	// Before a match's schedule status is determined. After e.Next() the status is determined.
+	onStatusChange *hook.Hook[*ScheduleStatusEvent]
 }
 
 func newMatchScheduler(
 	app core.App,
-	tournamentStore *TournamentStore,
-	playerTracker *PlayerTracker,
-	courtStore *CourtStore,
-	matchManager *MatchManager,
 ) *MatchScheduler {
 	s := &MatchScheduler{
-		app:             app,
-		tournamentStore: tournamentStore,
-		playerTracker:   playerTracker,
+		app:            app,
+		onReschedule:   &hook.Hook[*RescheduleEvent]{},
+		onStatusChange: &hook.Hook[*ScheduleStatusEvent]{},
 	}
+	return s
+}
 
+func (s *MatchScheduler) init(
+	tournamentStore *TournamentStore,
+	courtStore *CourtStore,
+	matchManager *MatchManager,
+	playerTracker *PlayerTracker,
+) {
 	s.schedule = s.newSchedule()
 	s.scheduled = scheduledMap(s.schedule)
 
@@ -169,7 +177,9 @@ func newMatchScheduler(
 	matchManager.onReset.BindFunc(s.verifyMatchReset)
 	matchManager.onAfterReset.BindFunc(s.handleMatchReset)
 
-	return s
+	// Priority after TournamentStore
+	playerTracker.onRestEnd.Bind(priorityHandler(s.handleRestEnd, 1))
+	playerTracker.onRestChanged.Bind(priorityHandler(s.handleRestSettingsChange, 1))
 }
 
 func (s *MatchScheduler) newSchedule() *Schedule {
@@ -182,13 +192,21 @@ func (s *MatchScheduler) newSchedule() *Schedule {
 		roundQueue: make([]*ScheduledRound, 0),
 	}
 
-	runningTournaments := s.tournamentStore.listStarted()
+	event := newRescheduleEvent(schedule)
+	if err := s.onReschedule.Trigger(event, s.rescheduleHandler); err != nil {
+		return nil
+	}
+	return event.Schedule
+}
 
-	if len(runningTournaments) == 0 {
-		return schedule
+func (s *MatchScheduler) rescheduleHandler(e *RescheduleEvent) error {
+	startedTournaments := e.StartedTournaments
+
+	if len(startedTournaments) == 0 {
+		return e.Next()
 	}
 
-	offsets := calculateScheduleOffsets(runningTournaments)
+	offsets := calculateScheduleOffsets(startedTournaments)
 
 	orderedRounds := make([][]*got.Match, 0)
 	roundIndexes := make([]int, 0)
@@ -197,7 +215,7 @@ func (s *MatchScheduler) newSchedule() *Schedule {
 	keepGoing := true
 	for roundI := 0; keepGoing; roundI += 1 {
 		keepGoing = false
-		for tournI, tournament := range runningTournaments {
+		for tournI, tournament := range startedTournaments {
 			tournRoundI := roundI + offsets[tournI]
 			if tournRoundI < 0 {
 				continue
@@ -223,8 +241,7 @@ func (s *MatchScheduler) newSchedule() *Schedule {
 		roundIndex := roundIndexes[i]
 
 		for i, m := range round {
-			matchData := s.tournamentStore.matchData[m.Id()]
-			matchStatus, blockingPlayers := s.scheduleStatus(m, competition)
+			matchData, matchStatus, blockingPlayers := s.scheduleStatus(m, competition)
 			id := "s-" + matchData.Id
 			created := matchData.Created()
 			updated := matchData.Updated()
@@ -255,10 +272,10 @@ func (s *MatchScheduler) newSchedule() *Schedule {
 			RoundIndex:  roundIndex,
 			Competition: competition,
 		}
-		schedule.roundQueue = append(schedule.roundQueue, scheduledRound)
+		e.Schedule.roundQueue = append(e.Schedule.roundQueue, scheduledRound)
 	}
 
-	return schedule
+	return e.Next()
 }
 
 // match data id -> scheduled match
@@ -296,8 +313,7 @@ func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionT
 	matches := tournament.MatchList().Matches
 
 	for _, m := range matches {
-		matchData := s.tournamentStore.matchData[m.Id()]
-		status, blockingPlayers := s.scheduleStatus(m, competition)
+		matchData, status, blockingPlayers := s.scheduleStatus(m, competition)
 		scheduledMatch := s.scheduled[matchData.Id]
 
 		oldStatus := scheduledMatch.ScheduleStatus
@@ -335,32 +351,40 @@ func (s *MatchScheduler) tournamentStartStop(competition *Competition, started b
 	go realtimeNotify(s.app, "schedule", core.ModelEventTypeUpdate, schedule)
 }
 
-func (s *MatchScheduler) scheduleStatus(match *got.Match, competition *Competition) (ScheduleStatus, map[string]PlayerBlock) {
+func (s *MatchScheduler) scheduleStatus(match *got.Match, competition *Competition) (*MatchData, ScheduleStatus, map[string]PlayerBlock) {
+	event := newScheduleStatusEvent(match, competition)
+	s.onStatusChange.Trigger(event, s.scheduleStatusHandler)
+	return event.MatchData, event.Status, event.BlockingStatus
+}
+
+func (s *MatchScheduler) scheduleStatusHandler(e *ScheduleStatusEvent) error {
+	match := e.Match
 	if matchFinished(match) {
-		return Done, nil
+		e.Status = Done
+		return e.Next()
 	}
 	if matchStarted(match) {
-		return InProgress, nil
+		e.Status = InProgress
+		return e.Next()
 	}
 	if hasCourt(match) {
-		return Ready, nil
+		e.Status = Ready
+		return e.Next()
 	}
 
+	competition := e.Competition
 	players := playersInMatch(match)
 
 	if len(players) < competition.TeamSize()*2 {
-		return Wait, nil
+		e.Status = Wait
+		return e.Next()
 	}
 
 	blockingPlayers := make(map[string]PlayerBlock)
 
 	playerWait, playerRest := false, false
 
-	for _, p := range players {
-		isPlaying, blockingMatch := s.playerTracker.isPlaying(p)
-		if !isPlaying {
-			continue
-		}
+	for p, blockingMatch := range e.PlayersInMatch {
 		playerWait = true
 		blockingPlayers[p.Id] = PlayerBlock{
 			Mode:          Playing,
@@ -368,11 +392,7 @@ func (s *MatchScheduler) scheduleStatus(match *got.Match, competition *Competiti
 		}
 	}
 
-	for _, p := range players {
-		isResting, restUntil := s.playerTracker.isResting(p)
-		if !isResting {
-			continue
-		}
+	for p, restUntil := range e.PlayersResting {
 		playerRest = true
 		blockingPlayers[p.Id] = PlayerBlock{
 			Mode:      Resting,
@@ -381,13 +401,18 @@ func (s *MatchScheduler) scheduleStatus(match *got.Match, competition *Competiti
 	}
 
 	if playerWait {
-		return PlayerWait, blockingPlayers
+		e.Status = PlayerWait
+		e.BlockingStatus = blockingPlayers
+		return e.Next()
 	}
 	if playerRest {
-		return PlayerRest, blockingPlayers
+		e.Status = PlayerRest
+		e.BlockingStatus = blockingPlayers
+		return e.Next()
 	}
 
-	return CourtWait, nil
+	e.Status = CourtWait
+	return e.Next()
 }
 
 func (s *MatchScheduler) handleTournamentStart(e *PlanEvent) error {
@@ -517,6 +542,18 @@ func (s *MatchScheduler) handleMatchReset(e *ScoreEvent) error {
 		s.setMatchScheduleStatus(e.MatchData, Ready)
 	}
 	return nil
+}
+
+func (s *MatchScheduler) handleRestEnd(e *PlayerRestEvent) error {
+	s.updateTournamentScheduleStatus(e.Tournament)
+	return e.Next()
+}
+
+func (s *MatchScheduler) handleRestSettingsChange(e *MatchRestEvent) error {
+	for _, t := range e.Tournaments {
+		s.updateTournamentScheduleStatus(t)
+	}
+	return e.Next()
 }
 
 // The schedule offset of a tournament is the amount

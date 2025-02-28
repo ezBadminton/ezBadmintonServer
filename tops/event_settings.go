@@ -20,7 +20,13 @@ func newEventSettingsManager() *EventSettingsManager {
 
 func (m *EventSettingsManager) changeSettings(e *core.RecordRequestEvent) error {
 	old, _ := store.FindProxy[TournamentEvent](e.Record.Id)
+	old = Clone(old)
 	new, _ := WrapRecord[TournamentEvent](e.Record)
 	event := newSettingsEvent(e, old, new)
-	return m.onSettingsChange.Trigger(event)
+	return m.onSettingsChange.Trigger(event, func(se *SettingsEvent) error {
+		if err := e.Next(); err != nil {
+			return err
+		}
+		return se.Next()
+	})
 }
