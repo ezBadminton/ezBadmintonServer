@@ -18,15 +18,17 @@ func newEventSettingsManager() *EventSettingsManager {
 	}
 }
 
-func (m *EventSettingsManager) changeSettings(e *core.RecordRequestEvent) error {
-	old, _ := store.FindProxy[TournamentEvent](e.Record.Id)
+func (m *EventSettingsManager) changeSettings(re *core.RecordRequestEvent) error {
+	old, _ := store.FindProxy[TournamentEvent](re.Record.Id)
 	old = Clone(old)
-	new, _ := WrapRecord[TournamentEvent](e.Record)
-	event := newSettingsEvent(e, old, new)
-	return m.onSettingsChange.Trigger(event, func(se *SettingsEvent) error {
-		if err := e.Next(); err != nil {
-			return err
-		}
-		return se.Next()
+	new, _ := WrapRecord[TournamentEvent](re.Record)
+
+	se := newSettingsEvent(re, old, new)
+	err := m.onSettingsChange.Trigger(se, func(se *SettingsEvent) error {
+		se.syncRequest(re)
+		defer se.syncToRequest(re)
+		return re.Next()
 	})
+	se.syncRequest(re)
+	return err
 }

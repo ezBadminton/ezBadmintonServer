@@ -180,6 +180,12 @@ func initRelations() error {
 	return nil
 }
 
+func (s *BaseRecordStore[P, PP]) ListRecords() []PP {
+	defer s.mu.RUnlock()
+	s.mu.RLock()
+	return slices.Clone(s.RecordList)
+}
+
 func (s *BaseRecordStore[_, _]) FindRecord(id string) (core.RecordProxy, bool) {
 	defer s.mu.RUnlock()
 	s.mu.RLock()
@@ -226,11 +232,11 @@ func (s *BaseRecordStore[P, PP]) Created(record *core.Record) error {
 	s.RecordMap[record.Id] = proxy
 	s.RecordList = append(s.RecordList, proxy)
 
-	s.mu.Unlock()
-
 	if err := ExpandRelations(proxy); err != nil {
 		return err
 	}
+
+	s.mu.Unlock()
 
 	for _, handler := range s.createHandlers {
 		handler(proxy)
@@ -250,11 +256,11 @@ func (s *BaseRecordStore[P, PP]) Updated(record *core.Record) error {
 	old, _ := WrapRecord[P, PP](record.Clone())
 	*proxy.ProxyRecord() = *record
 
-	s.mu.Unlock()
-
 	if err := ExpandRelations(proxy); err != nil {
 		return err
 	}
+
+	s.mu.Unlock()
 
 	for _, handler := range s.updateHandlers {
 		handler(old, proxy)

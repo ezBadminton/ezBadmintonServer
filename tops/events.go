@@ -314,19 +314,27 @@ func newWithdrawEvent(competition *Competition, event *StatusChangeEvent) *Withd
 
 type SettingsEvent struct {
 	hook.Event
-	RecordRequestEvent *core.RecordRequestEvent
 
+	App         core.App
 	OldSettings *TournamentEvent
 	NewSettings *TournamentEvent
 }
 
-func newSettingsEvent(requestEvent *core.RecordRequestEvent, old, new *TournamentEvent) *SettingsEvent {
+func newSettingsEvent(parent *core.RecordRequestEvent, old, new *TournamentEvent) *SettingsEvent {
 	return &SettingsEvent{
-		Event:              hook.Event{},
-		RecordRequestEvent: requestEvent,
-		OldSettings:        old,
-		NewSettings:        new,
+		Event:       hook.Event{},
+		App:         parent.App,
+		OldSettings: old,
+		NewSettings: new,
 	}
+}
+
+func (e *SettingsEvent) syncRequest(re *core.RecordRequestEvent) {
+	re.App = e.App
+}
+
+func (e *SettingsEvent) syncToRequest(re *core.RecordRequestEvent) {
+	e.App = re.App
 }
 
 type PlayerRestEvent struct {
@@ -397,6 +405,44 @@ func newScheduleStatusEvent(match *got.Match, competition *Competition) *Schedul
 		Competition: competition,
 		Status:      -1,
 	}
+}
+
+type CategorizationEvent struct {
+	hook.Event
+
+	App                  core.App
+	UseAgeGroups         bool
+	UsePlayingLevels     bool
+	AgeGroupsFlipped     bool
+	PlayingLevelsFlipped bool
+	Competitions         []*Competition
+}
+
+func newCategorizationEvent(
+	parent *SettingsEvent,
+	useAgeGroups,
+	usePlayingLevels,
+	ageGroupsFlipped,
+	playingLevelsFlipped bool,
+	competitions []*Competition,
+) *CategorizationEvent {
+	return &CategorizationEvent{
+		Event:                hook.Event{},
+		App:                  parent.App,
+		UseAgeGroups:         useAgeGroups,
+		UsePlayingLevels:     usePlayingLevels,
+		AgeGroupsFlipped:     ageGroupsFlipped,
+		PlayingLevelsFlipped: playingLevelsFlipped,
+		Competitions:         competitions,
+	}
+}
+
+func (e *CategorizationEvent) syncParent(parent *SettingsEvent) {
+	parent.App = e.App
+}
+
+func (e *CategorizationEvent) syncToParent(parent *SettingsEvent) {
+	e.App = parent.App
 }
 
 func saveEventData(app core.App, e hook.Resolver, dataProxy core.RecordProxy) error {
