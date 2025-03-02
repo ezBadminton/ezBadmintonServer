@@ -34,7 +34,9 @@
 // generated code in your code: https://pocketbase.io/docs/go-record-proxy/
 package pb_schema
 
-import "github.com/pocketbase/pocketbase/tools/types"
+import (
+	"github.com/pocketbase/pocketbase/tools/types"
+)
 
 type Users struct {
 	// collection-name: users
@@ -64,6 +66,36 @@ type PlayingLevel struct {
 	index   int
 	created types.DateTime
 	updated types.DateTime
+}
+
+func (_ *PlayingLevel) CategoryGetter() func(*Competition) string {
+	return func(c *Competition) string {
+		playingLevel := c.playingLevel
+		if playingLevel == nil {
+			return ""
+		}
+		return playingLevel.Id
+	}
+}
+
+func (_ *PlayingLevel) ComplementCategoryGetter() func(*Competition) string {
+	return (*AgeGroup).CategoryGetter(nil)
+}
+
+func (p *PlayingLevel) AssignToCompetition(competition *Competition) {
+	competition.playingLevel = p
+}
+
+func (p *PlayingLevel) IsInUse(settings *TournamentEvent) bool {
+	return settings.usePlayingLevels
+}
+
+func (p *PlayingLevel) IsOfCategory(competition *Competition) bool {
+	return competition.playingLevel.Id == p.Id
+}
+
+func (_ *PlayingLevel) Disable(settings *TournamentEvent) {
+	settings.usePlayingLevels = false
 }
 
 type Club struct {
@@ -198,6 +230,36 @@ type AgeGroup struct {
 	type_   int
 	created types.DateTime
 	updated types.DateTime
+}
+
+func (_ *AgeGroup) CategoryGetter() func(*Competition) string {
+	return func(c *Competition) string {
+		ageGroup := c.ageGroup
+		if ageGroup == nil {
+			return ""
+		}
+		return ageGroup.Id
+	}
+}
+
+func (_ *AgeGroup) ComplementCategoryGetter() func(*Competition) string {
+	return (*PlayingLevel).CategoryGetter(nil)
+}
+
+func (a *AgeGroup) AssignToCompetition(competition *Competition) {
+	competition.ageGroup = a
+}
+
+func (_ *AgeGroup) IsInUse(settings *TournamentEvent) bool {
+	return settings.useAgeGroups
+}
+
+func (a *AgeGroup) IsOfCategory(competition *Competition) bool {
+	return competition.ageGroup.Id == a.Id
+}
+
+func (_ *AgeGroup) Disable(settings *TournamentEvent) {
+	settings.useAgeGroups = false
 }
 
 type TournamentEvent struct {

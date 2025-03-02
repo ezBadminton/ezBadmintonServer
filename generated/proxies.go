@@ -50,6 +50,36 @@ type PlayingLevel struct {
 	core.BaseRecordProxy
 }
 
+func (_ *PlayingLevel) CategoryGetter() func(*Competition) string {
+	return func(c *Competition) string {
+		playingLevel := c.PlayingLevel()
+		if playingLevel == nil {
+			return ""
+		}
+		return playingLevel.Id
+	}
+}
+
+func (_ *PlayingLevel) ComplementCategoryGetter() func(*Competition) string {
+	return (*AgeGroup).CategoryGetter(nil)
+}
+
+func (p *PlayingLevel) AssignToCompetition(competition *Competition) {
+	competition.SetPlayingLevel(p)
+}
+
+func (p *PlayingLevel) IsInUse(settings *TournamentEvent) bool {
+	return settings.UsePlayingLevels()
+}
+
+func (p *PlayingLevel) IsOfCategory(competition *Competition) bool {
+	return competition.PlayingLevel().Id == p.Id
+}
+
+func (_ *PlayingLevel) Disable(settings *TournamentEvent) {
+	settings.SetUsePlayingLevels(false)
+}
+
 func (p *PlayingLevel) CollectionName() string {
 	return "playing_levels"
 }
@@ -913,6 +943,36 @@ var zzAgeGroupTypeSelectIotaMap = map[AgeGroupType]string{
 
 type AgeGroup struct {
 	core.BaseRecordProxy
+}
+
+func (_ *AgeGroup) CategoryGetter() func(*Competition) string {
+	return func(c *Competition) string {
+		ageGroup := c.AgeGroup()
+		if ageGroup == nil {
+			return ""
+		}
+		return ageGroup.Id
+	}
+}
+
+func (_ *AgeGroup) ComplementCategoryGetter() func(*Competition) string {
+	return (*PlayingLevel).CategoryGetter(nil)
+}
+
+func (a *AgeGroup) AssignToCompetition(competition *Competition) {
+	competition.SetAgeGroup(a)
+}
+
+func (_ *AgeGroup) IsInUse(settings *TournamentEvent) bool {
+	return settings.UseAgeGroups()
+}
+
+func (a *AgeGroup) IsOfCategory(competition *Competition) bool {
+	return competition.AgeGroup().Id == a.Id
+}
+
+func (_ *AgeGroup) Disable(settings *TournamentEvent) {
+	settings.SetUseAgeGroups(false)
 }
 
 func (p *AgeGroup) CollectionName() string {

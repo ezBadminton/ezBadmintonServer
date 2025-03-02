@@ -77,6 +77,7 @@ func newTournamentStore(
 	tieBreakerManager *TieBreakerManager,
 	scheduler *MatchScheduler,
 	playerTracker *PlayerTracker,
+	categorizationManager *CategorizationManager,
 ) *TournamentStore {
 	compStore, _ := store.FindRecordStore[Competition]()
 
@@ -138,6 +139,9 @@ func newTournamentStore(
 	// Priority for setting the tournament in the events
 	playerTracker.onRestEnd.Bind(priorityHandler(s.handleRestEnd, -1))
 	playerTracker.onRestChanged.Bind(priorityHandler(s.handleRestSettingsChange, -1))
+
+	categorizationManager.onCategorizationChange.BindFunc(s.verifyCategorizationChange)
+	categorizationManager.onCategoryDelete.BindFunc(s.verifyCategoryDelete)
 
 	return s
 }
@@ -594,6 +598,29 @@ func (s *TournamentStore) handleRestSettingsChange(e *MatchRestEvent) error {
 	e.Tournaments = make([]*CompetitionTournament, 0, len(tournamentSet))
 	for t := range tournamentSet {
 		e.Tournaments = append(e.Tournaments, t)
+	}
+	return e.Next()
+}
+
+func (s *TournamentStore) verifyCategorizationChange(e *CategorizationEvent) error {
+	for _, t := range s.list {
+		if t.Started {
+			return errors.New("can not edit the categorization after tournaments have been started")
+		}
+	}
+	return e.Next()
+}
+
+func (s *TournamentStore) verifyCategoryDelete(e *CategoryDeleteEvent) error {
+	competitionStore, _ := store.FindRecordStore[Competition]()
+	for _, c := range competitionStore.ListRecords() {
+		if !e.Category.IsOfCategory(c) {
+			continue
+		}
+		tournament, ok := s.tournaments[c.Id]
+		if ok && tournament.Started {
+			return errors.New("can not delete the category of a tournament after it has been started")
+		}
 	}
 	return e.Next()
 }

@@ -419,7 +419,7 @@ type CategorizationEvent struct {
 }
 
 func newCategorizationEvent(
-	parent *SettingsEvent,
+	app core.App,
 	useAgeGroups,
 	usePlayingLevels,
 	ageGroupsFlipped,
@@ -428,7 +428,7 @@ func newCategorizationEvent(
 ) *CategorizationEvent {
 	return &CategorizationEvent{
 		Event:                hook.Event{},
-		App:                  parent.App,
+		App:                  app,
 		UseAgeGroups:         useAgeGroups,
 		UsePlayingLevels:     usePlayingLevels,
 		AgeGroupsFlipped:     ageGroupsFlipped,
@@ -437,11 +437,44 @@ func newCategorizationEvent(
 	}
 }
 
-func (e *CategorizationEvent) syncParent(parent *SettingsEvent) {
+func (e *CategorizationEvent) syncSettingsParent(parent *SettingsEvent) {
 	parent.App = e.App
 }
 
-func (e *CategorizationEvent) syncToParent(parent *SettingsEvent) {
+func (e *CategorizationEvent) syncToSettingsParent(parent *SettingsEvent) {
+	e.App = parent.App
+}
+
+func (e *CategorizationEvent) syncDeleteParent(parent *CategoryDeleteEvent) {
+	parent.App = e.App
+}
+
+func (e *CategorizationEvent) syncToDeleteParent(parent *CategoryDeleteEvent) {
+	e.App = parent.App
+}
+
+type CategoryDeleteEvent struct {
+	hook.Event
+
+	App         core.App
+	Category    Category
+	Replacement Category
+}
+
+func newCategoryDeleteEvent(app core.App, category, replacement Category) *CategoryDeleteEvent {
+	return &CategoryDeleteEvent{
+		Event:       hook.Event{},
+		App:         app,
+		Category:    category,
+		Replacement: replacement,
+	}
+}
+
+func (e *CategoryDeleteEvent) syncParent(parent *core.RecordRequestEvent) {
+	parent.App = e.App
+}
+
+func (e *CategoryDeleteEvent) syncToParent(parent *core.RecordRequestEvent) {
 	e.App = parent.App
 }
 
