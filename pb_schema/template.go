@@ -91,6 +91,9 @@ func (p *PlayingLevel) IsInUse(settings *TournamentEvent) bool {
 }
 
 func (p *PlayingLevel) IsOfCategory(competition *Competition) bool {
+	if competition.playingLevel == nil {
+		return false
+	}
 	return competition.playingLevel.Id == p.Id
 }
 
@@ -255,6 +258,9 @@ func (_ *AgeGroup) IsInUse(settings *TournamentEvent) bool {
 }
 
 func (a *AgeGroup) IsOfCategory(competition *Competition) bool {
+	if competition.ageGroup == nil {
+		return false
+	}
 	return competition.ageGroup.Id == a.Id
 }
 
