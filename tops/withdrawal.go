@@ -55,7 +55,10 @@ type StatusChangeResult struct {
 
 func (r *StatusChangeResult) ToMap() map[string]any {
 	if r == nil {
-		return map[string]any{"changes": []string{}}
+		return map[string]any{
+			"withdrawing": true,
+			"changes":     map[string]any{},
+		}
 	}
 
 	changes := make(map[string]any, len(r.Changes))

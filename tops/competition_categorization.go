@@ -155,7 +155,7 @@ func (m *CategorizationManager) handleCategorizationDisable(e *CategorizationEve
 	return e.Next()
 }
 
-func (m *CategorizationManager) handleCategoryDelete(re *core.RecordRequestEvent) error {
+func (m *CategorizationManager) deleteCategory(re *core.RecordRequestEvent) error {
 	deleted := store.FindRecord(re.Record).(Category)
 	replacement, _ := re.RequestEvent.Get("replacement").(Category)
 

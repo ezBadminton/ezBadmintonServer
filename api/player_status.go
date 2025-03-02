@@ -10,8 +10,6 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-const CompetitionsKey = "COMPETITIONS"
-
 func BindPlayerStatusHooks(app core.App) {
 	url := "/playerstatus/{player}"
 

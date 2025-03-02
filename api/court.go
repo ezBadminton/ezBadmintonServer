@@ -11,14 +11,14 @@ import (
 )
 
 func BindCourtHooks(app core.App) {
-	url := "/courts"
+	url := "/courts/{matchdata}"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := rootGroup.Group(url)
+		group.Bind(pathId[MatchData]("matchdata"))
 
-		dataFetcher := pathId[MatchData]("matchdata")
-		group.POST("/{matchdata}/assign", assignCourt).Bind(dataFetcher)
-		group.POST("/{matchdata}/unassign", unassignCourt).Bind(dataFetcher)
+		group.POST("/assign", assignCourt)
+		group.POST("/unassign", unassignCourt)
 
 		return e.Next()
 	})

@@ -33,7 +33,10 @@ type DrawManager struct {
 	onAfterSetSeeds *hook.Hook[*CompetitionEvent]
 }
 
-func newDrawManager(registrationStore *RegistrationStore) *DrawManager {
+func newDrawManager(
+	registrationStore *RegistrationStore,
+	tournamentModeSettingsManager *TournamentModeSettingsManager,
+) *DrawManager {
 	m := &DrawManager{
 		onDraw:            &hook.Hook[*CompetitionEvent]{},
 		onAfterDraw:       &hook.Hook[*CompetitionEvent]{},
@@ -46,6 +49,8 @@ func newDrawManager(registrationStore *RegistrationStore) *DrawManager {
 	}
 
 	registrationStore.onAfterDelete.BindFunc(m.handleUnregistration)
+
+	tournamentModeSettingsManager.onSet.BindFunc(m.handleModeSettingsUpdate)
 
 	return m
 }
@@ -182,6 +187,13 @@ func (d *DrawManager) handleUnregistration(e *RegistrationEvent) error {
 	return e.Next()
 }
 
+func (d *DrawManager) handleModeSettingsUpdate(e *TournamentModeSettingsEvent) error {
+	if len(e.Competition.Draw()) == 0 {
+		return e.Next()
+	}
+	return d.deleteDraw(e.App, e.Competition)
+}
+
 func filterEligibleTeams(competition *Competition, teams []*Team) []*Team {
 	teamSize := competition.TeamSize()
 	eligibleTeams := make([]*Team, 0, len(teams))
@@ -201,7 +213,7 @@ func allPlayersAttending(players []*Player) bool {
 			return false
 		}
 	}
-	return false
+	return true
 }
 
 func isInDraw(reg *Registration) bool {

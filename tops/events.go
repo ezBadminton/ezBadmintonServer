@@ -215,6 +215,7 @@ func (e *PlanEvent) saveStartedPlan() error {
 	if err != nil {
 		return err
 	}
+	e.Tournament.Competition = e.Competition
 	return e.Next()
 }
 
@@ -476,6 +477,23 @@ func (e *CategoryDeleteEvent) syncParent(parent *core.RecordRequestEvent) {
 
 func (e *CategoryDeleteEvent) syncToParent(parent *core.RecordRequestEvent) {
 	e.App = parent.App
+}
+
+type TournamentModeSettingsEvent struct {
+	hook.Event
+
+	App         core.App
+	Settings    *TournamentModeSettings
+	Competition *Competition
+}
+
+func newTournamentModeSettingsEvent(app core.App, settings *TournamentModeSettings, competition *Competition) *TournamentModeSettingsEvent {
+	return &TournamentModeSettingsEvent{
+		Event:       hook.Event{},
+		App:         app,
+		Settings:    settings,
+		Competition: competition,
+	}
 }
 
 func saveEventData(app core.App, e hook.Resolver, dataProxy core.RecordProxy) error {

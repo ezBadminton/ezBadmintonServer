@@ -16,17 +16,18 @@ type TournamentOperations struct {
 	// guarantee correct state
 	mu sync.RWMutex
 
-	tournamentStore       *TournamentStore
-	registrationStore     *RegistrationStore
-	courtStore            *CourtStore
-	scheduler             *MatchScheduler
-	matchManager          *MatchManager
-	drawManager           *DrawManager
-	withdrawalManager     *WithdrawalManager
-	tieBreakerManager     *TieBreakerManager
-	eventSettingsManager  *EventSettingsManager
-	playerTracker         *PlayerTracker
-	categorizationManager *CategorizationManager
+	tournamentStore               *TournamentStore
+	registrationStore             *RegistrationStore
+	courtStore                    *CourtStore
+	scheduler                     *MatchScheduler
+	matchManager                  *MatchManager
+	drawManager                   *DrawManager
+	withdrawalManager             *WithdrawalManager
+	tieBreakerManager             *TieBreakerManager
+	eventSettingsManager          *EventSettingsManager
+	playerTracker                 *PlayerTracker
+	categorizationManager         *CategorizationManager
+	tournamentModeSettingsManager *TournamentModeSettingsManager
 }
 
 func InitTournamentOperations(app core.App) {
@@ -35,11 +36,12 @@ func InitTournamentOperations(app core.App) {
 	tieBreakerManager := newTieBreakerManager()
 	courtStore := newCourtStore()
 	eventSettingsManager := newEventSettingsManager()
+	tournamentModeSettingsManager := newTournamentModeSettingsManager()
 	playerTracker := newPlayerTracker()
 	scheduler := newMatchScheduler(app)
 	categorizationManager := newCategorizationManager(eventSettingsManager)
 	registrationStore := newRegistrationStore(app, withdrawalManager)
-	drawManager := newDrawManager(registrationStore)
+	drawManager := newDrawManager(registrationStore, tournamentModeSettingsManager)
 	tournamentStore := newTournamentStore(
 		app,
 		drawManager,
@@ -51,6 +53,7 @@ func InitTournamentOperations(app core.App) {
 		scheduler,
 		playerTracker,
 		categorizationManager,
+		tournamentModeSettingsManager,
 	)
 
 	scheduler.init(tournamentStore, courtStore, matchManager, playerTracker)
@@ -59,17 +62,18 @@ func InitTournamentOperations(app core.App) {
 	playerTracker.init(tournamentStore, courtStore, matchManager, eventSettingsManager, scheduler)
 
 	tops = TournamentOperations{
-		tournamentStore:       tournamentStore,
-		registrationStore:     registrationStore,
-		courtStore:            courtStore,
-		scheduler:             scheduler,
-		matchManager:          matchManager,
-		drawManager:           drawManager,
-		withdrawalManager:     withdrawalManager,
-		tieBreakerManager:     tieBreakerManager,
-		eventSettingsManager:  eventSettingsManager,
-		playerTracker:         playerTracker,
-		categorizationManager: categorizationManager,
+		tournamentStore:               tournamentStore,
+		registrationStore:             registrationStore,
+		courtStore:                    courtStore,
+		scheduler:                     scheduler,
+		matchManager:                  matchManager,
+		drawManager:                   drawManager,
+		withdrawalManager:             withdrawalManager,
+		tieBreakerManager:             tieBreakerManager,
+		eventSettingsManager:          eventSettingsManager,
+		playerTracker:                 playerTracker,
+		categorizationManager:         categorizationManager,
+		tournamentModeSettingsManager: tournamentModeSettingsManager,
 	}
 }
 
@@ -287,5 +291,12 @@ func DeleteCategory(e *core.RecordRequestEvent) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()
 
-	return tops.categorizationManager.handleCategoryDelete(e)
+	return tops.categorizationManager.deleteCategory(e)
+}
+
+func SetTournamentModeSettings(e *core.RecordRequestEvent) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.tournamentModeSettingsManager.setSettings(e)
 }
