@@ -346,7 +346,7 @@ func (s *MatchScheduler) tournamentStartStop(competition *Competition, started b
 		for _, match := range round.Matches {
 			go realtimeNotify(s.app, "scheduled_matches", realtimeEventType, match)
 		}
-		go realtimeNotify(s.app, realtimeEventType, "scheduled_rounds", round)
+		go realtimeNotify(s.app, "scheduled_rounds", realtimeEventType, round)
 	}
 	go realtimeNotify(s.app, "schedule", core.ModelEventTypeUpdate, schedule)
 }
