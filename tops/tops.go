@@ -28,6 +28,7 @@ type TournamentOperations struct {
 	playerTracker                 *PlayerTracker
 	categorizationManager         *CategorizationManager
 	tournamentModeSettingsManager *TournamentModeSettingsManager
+	competitionManager            *CompetitionManager
 }
 
 func InitTournamentOperations(app core.App) {
@@ -37,10 +38,11 @@ func InitTournamentOperations(app core.App) {
 	courtStore := newCourtStore()
 	eventSettingsManager := newEventSettingsManager()
 	tournamentModeSettingsManager := newTournamentModeSettingsManager()
+	competitionManager := newCompetitionManager()
 	playerTracker := newPlayerTracker()
 	scheduler := newMatchScheduler(app)
 	categorizationManager := newCategorizationManager(eventSettingsManager)
-	registrationStore := newRegistrationStore(app, withdrawalManager)
+	registrationStore := newRegistrationStore(app, withdrawalManager, competitionManager)
 	drawManager := newDrawManager(registrationStore, tournamentModeSettingsManager)
 	tournamentStore := newTournamentStore(
 		app,
@@ -54,6 +56,7 @@ func InitTournamentOperations(app core.App) {
 		playerTracker,
 		categorizationManager,
 		tournamentModeSettingsManager,
+		competitionManager,
 	)
 
 	scheduler.init(tournamentStore, courtStore, matchManager, playerTracker)
@@ -74,6 +77,7 @@ func InitTournamentOperations(app core.App) {
 		playerTracker:                 playerTracker,
 		categorizationManager:         categorizationManager,
 		tournamentModeSettingsManager: tournamentModeSettingsManager,
+		competitionManager:            competitionManager,
 	}
 }
 
@@ -299,4 +303,11 @@ func SetTournamentModeSettings(e *core.RecordRequestEvent) error {
 	tops.mu.Lock()
 
 	return tops.tournamentModeSettingsManager.setSettings(e)
+}
+
+func DeleteCompetition(e *core.RecordRequestEvent) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.competitionManager.deleteCompetition(e)
 }

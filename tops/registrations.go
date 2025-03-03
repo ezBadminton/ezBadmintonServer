@@ -55,7 +55,11 @@ type RegistrationStore struct {
 	onAfterDelete *hook.Hook[*RegistrationEvent]
 }
 
-func newRegistrationStore(app core.App, withdrawalManager *WithdrawalManager) *RegistrationStore {
+func newRegistrationStore(
+	app core.App,
+	withdrawalManager *WithdrawalManager,
+	competitionManager *CompetitionManager,
+) *RegistrationStore {
 	teamStore, _ := store.FindRecordStore[Team]()
 
 	teams := teamStore.RecordList
@@ -79,6 +83,8 @@ func newRegistrationStore(app core.App, withdrawalManager *WithdrawalManager) *R
 	s.addTeams(teams...)
 
 	withdrawalManager.onWithdraw.BindFunc(s.verifyWithdrawal)
+
+	competitionManager.onDelete.BindFunc(s.handleCompetitonDeletion)
 
 	return s
 }
@@ -110,6 +116,9 @@ func (s *RegistrationStore) registerHandler(e *RegistrationEvent) error {
 	if err != nil {
 		return err
 	}
+
+	e.Registration.BaseTopsRecord.Created = e.Team.Created()
+	e.Registration.BaseTopsRecord.Updated = e.Team.Updated()
 
 	go realtimeNotify(e.App, "registrations", core.ModelEventTypeCreate, reg)
 
@@ -318,6 +327,32 @@ func (s *RegistrationStore) playerRemoved(player *Player, team *Team) {
 	)
 
 	delete(s.byCompetitionPlayer[comp.Id], player.Id)
+}
+
+func (s *RegistrationStore) handleCompetitonDeletion(ce *CompetitionEvent) error {
+	if err := ce.Next(); err != nil {
+		return err
+	}
+
+	registrations := ce.Competition.Registrations()
+	for _, team := range registrations {
+		re := newRegistrationEvent(ce.App, ce.Competition, team)
+		re.Registration = s.byTeam[team.Id]
+
+		err := s.onAfterDelete.Trigger(re,
+			(*RegistrationEvent).saveDeletedRegistration,
+			s.deleteStoreHandler,
+			func(re *RegistrationEvent) error {
+				re.syncParent(ce)
+				return nil
+			},
+		)
+		re.syncParent(ce)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *RegistrationStore) verifyWithdrawal(e *WithdrawEvent) error {

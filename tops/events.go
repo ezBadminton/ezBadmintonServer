@@ -28,6 +28,14 @@ func (e *CompetitionEvent) saveCompetition() error {
 	return saveEventData(e.App, e, e.Competition)
 }
 
+func (e *CompetitionEvent) syncParent(parent *core.RecordRequestEvent) {
+	parent.App = e.App
+}
+
+func (e *CompetitionEvent) syncToParent(parent *core.RecordRequestEvent) {
+	e.App = parent.App
+}
+
 type MatchEvent struct {
 	hook.Event
 
@@ -141,6 +149,11 @@ func (e *RegistrationEvent) saveDeletedRegistration() error {
 		return err
 	}
 	return e.Next()
+}
+
+func (e *RegistrationEvent) syncParent(parent *CompetitionEvent) {
+	parent.App = e.App
+	parent.Competition = e.Competition
 }
 
 type TieBreakerEvent struct {

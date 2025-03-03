@@ -40,6 +40,7 @@ func main() {
 	api.BindEventSettingsHooks(app)
 	api.BindCategoryHooks(app)
 	api.BindTournamentModeSettingsHooks(app)
+	api.BindCompetitionHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if watchClient {

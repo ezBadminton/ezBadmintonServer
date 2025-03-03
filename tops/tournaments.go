@@ -79,6 +79,7 @@ func newTournamentStore(
 	playerTracker *PlayerTracker,
 	categorizationManager *CategorizationManager,
 	tournamentModeSettingsManager *TournamentModeSettingsManager,
+	competitionManager *CompetitionManager,
 ) *TournamentStore {
 	compStore, _ := store.FindRecordStore[Competition]()
 
@@ -146,6 +147,9 @@ func newTournamentStore(
 
 	// Priority for verifying before the update deletes a draw (DrawManager)
 	tournamentModeSettingsManager.onSet.Bind(priorityHandler(s.verifyModeSettingsUpdate, -1))
+
+	// Priority for verifying before the delete deletes registrations
+	competitionManager.onDelete.Bind(priorityHandler(s.verifyCompetitonDelete, -1))
 
 	return s
 }
@@ -633,6 +637,14 @@ func (s *TournamentStore) verifyModeSettingsUpdate(e *TournamentModeSettingsEven
 	tournament, ok := s.tournaments[e.Competition.Id]
 	if ok && tournament.Started {
 		return errors.New("can not edit the tournament mode settings of tournament after is has been started")
+	}
+	return e.Next()
+}
+
+func (s *TournamentStore) verifyCompetitonDelete(e *CompetitionEvent) error {
+	tournament, ok := s.tournaments[e.Competition.Id]
+	if ok && tournament.Started {
+		return errors.New("can not delete a competition that has a started tournament")
 	}
 	return e.Next()
 }
