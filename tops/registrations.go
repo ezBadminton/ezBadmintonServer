@@ -98,11 +98,12 @@ func (s *RegistrationStore) addTeams(teams ...*Team) {
 
 func (s *RegistrationStore) registerTeam(app core.App, team *Team, competition *Competition) error {
 	event := newRegistrationEvent(app, competition, team)
+	event.AddedPlayers = team.Players()
 	return s.onRegistration.Trigger(event, s.registerHandler)
 }
 
 func (s *RegistrationStore) registerHandler(e *RegistrationEvent) error {
-	if err := s.verifyRegistration(e.Team, e.Competition); err != nil {
+	if err := s.verifyRegistration(e); err != nil {
 		return err
 	}
 
@@ -147,9 +148,6 @@ func (s *RegistrationStore) updateHandler(e *RegistrationEvent) error {
 	if reg == nil {
 		return errors.New("can not update unregistered team")
 	}
-	if err := s.verifyRegistration(team, reg.Competition); err != nil {
-		return err
-	}
 
 	oldTeam, _ := store.FindProxy[Team](team.Id)
 	oldPlayers := oldTeam.Players()
@@ -176,6 +174,10 @@ func (s *RegistrationStore) updateHandler(e *RegistrationEvent) error {
 		if isNew {
 			e.AddedPlayers = append(e.AddedPlayers, new)
 		}
+	}
+
+	if err := s.verifyRegistration(e); err != nil {
+		return err
 	}
 
 	err := s.onAfterUpdate.Trigger(e,
@@ -254,17 +256,17 @@ func (s *RegistrationStore) deleteStoreHandler(e *RegistrationEvent) error {
 	return e.Next()
 }
 
-func (s *RegistrationStore) verifyRegistration(team *Team, competition *Competition) error {
-	players := team.Players()
+func (s *RegistrationStore) verifyRegistration(e *RegistrationEvent) error {
+	players := e.Team.Players()
 	if len(players) == 0 {
 		return errors.New("can not have a team without players")
 	}
-	if len(players) > competition.TeamSize() {
+	if len(players) > e.Competition.TeamSize() {
 		return errors.New("the team has too many players to be registered in this competition")
 	}
 
-	playerRegs, _ := s.byCompetitionPlayer[competition.Id]
-	for _, p := range players {
+	playerRegs, _ := s.byCompetitionPlayer[e.Competition.Id]
+	for _, p := range e.AddedPlayers {
 		_, ok := playerRegs[p.Id]
 		if ok {
 			return errors.New("a player of this team is already registered for this competition")
