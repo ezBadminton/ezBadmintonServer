@@ -3,7 +3,6 @@ package api
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/store"
@@ -18,7 +17,7 @@ func pathId[P Proxy, PP ProxyP[P]](pathValueName string) *hook.Handler[*core.Req
 			proxy, err := store.FindProxy[P, PP](id)
 			if err != nil {
 				errMsg := fmt.Sprintf("the %v ID does not exist", pathValueName)
-				return e.String(http.StatusBadRequest, errMsg)
+				return e.BadRequestError(errMsg, err)
 			}
 
 			e.Set(pathValueName, proxy)
@@ -33,7 +32,7 @@ func bodyId[P Proxy, PP ProxyP[P]](bodyFieldName string) *hook.Handler[*core.Req
 		Func: func(e *core.RequestEvent) error {
 			proxies, err := readProxiesFromBody[P, PP](e, bodyFieldName)
 			if err != nil {
-				return e.String(http.StatusBadRequest, err.Error())
+				return e.BadRequestError(err.Error(), err)
 			}
 
 			e.Set(bodyFieldName, proxies[0])
@@ -48,7 +47,7 @@ func bodyIdList[P Proxy, PP ProxyP[P]](bodyFieldName string) *hook.Handler[*core
 		Func: func(e *core.RequestEvent) error {
 			proxies, err := readProxiesFromBody[P, PP](e, bodyFieldName)
 			if err != nil {
-				return e.String(http.StatusBadRequest, err.Error())
+				return e.BadRequestError(err.Error(), err)
 			}
 
 			e.Set(bodyFieldName, proxies)

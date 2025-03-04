@@ -29,7 +29,7 @@ func startMarch(e *core.RequestEvent) error {
 	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.StartMatch(e.App, matchData); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -39,7 +39,7 @@ func cancelMatch(e *core.RequestEvent) error {
 	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.CancelMatch(e.App, matchData); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -50,11 +50,11 @@ func setMatchScore(e *core.RequestEvent) error {
 
 	points, err := readPointsFromBody(e)
 	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	if err := tops.SetMatchScore(e.App, matchData, points); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -64,7 +64,7 @@ func resetMatch(e *core.RequestEvent) error {
 	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.ResetMatch(e.App, matchData); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)

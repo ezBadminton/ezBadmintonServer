@@ -34,7 +34,7 @@ func addTieBreaker(e *core.RequestEvent) error {
 	teams := e.Get("teams").([]*Team)
 
 	if err := tops.AddTieBreaker(e.App, competition, teams); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -45,7 +45,7 @@ func updateTieBreaker(e *core.RequestEvent) error {
 	teams := e.Get("teams").([]*Team)
 
 	if err := tops.UpdateTieBreaker(e.App, tieBreaker, teams); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -55,7 +55,7 @@ func deleteTieBreaker(e *core.RequestEvent) error {
 	tieBreaker := e.Get("tiebreaker").(*TieBreaker)
 
 	if err := tops.DeleteTieBreaker(e.App, tieBreaker); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)

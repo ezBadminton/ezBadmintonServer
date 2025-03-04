@@ -233,8 +233,6 @@ func (s *RegistrationStore) deleteHandler(e *RegistrationEvent) error {
 		return err
 	}
 
-	go realtimeNotify(app, "registrations", core.ModelEventTypeDelete, e.Registration)
-
 	return e.Next()
 }
 
@@ -253,6 +251,9 @@ func (s *RegistrationStore) deleteStoreHandler(e *RegistrationEvent) error {
 		s.byPlayer[p.Id] = slices.DeleteFunc(s.byPlayer[p.Id], finder)
 		delete(s.byCompetitionPlayer[comp.Id], p.Id)
 	}
+
+	go realtimeNotify(e.App, "registrations", core.ModelEventTypeDelete, e.Registration)
+
 	return e.Next()
 }
 

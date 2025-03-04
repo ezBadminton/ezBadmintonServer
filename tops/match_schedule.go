@@ -340,6 +340,9 @@ func (s *MatchScheduler) tournamentStartStop(competition *Competition, started b
 	}
 
 	go func() {
+		defer tops.mu.RUnlock()
+		tops.mu.RLock()
+
 		for _, round := range s.schedule.roundQueue {
 			if round.Competition.Id != competition.Id {
 				continue

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
@@ -48,7 +49,7 @@ func registerTeam(e *core.RequestEvent) error {
 	team.SetPlayers(players)
 
 	if err := tops.RegisterTeam(e.App, team, competition); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -62,7 +63,7 @@ func updateTeam(e *core.RequestEvent) error {
 	team.SetPlayers(players)
 
 	if err := tops.UpdateTeam(e.App, team); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError("400", errors.New("could not update team"))
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -72,7 +73,7 @@ func deleteTeam(e *core.RequestEvent) error {
 	team := e.Get("team").(*Team)
 
 	if err := tops.DeleteTeam(e.App, team); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)

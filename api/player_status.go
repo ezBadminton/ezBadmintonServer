@@ -31,11 +31,11 @@ func getStatusChangeList(e *core.RequestEvent) error {
 	statusValue := e.Request.PathValue("status")
 	statusI, err := strconv.Atoi(statusValue)
 	if err != nil {
-		return e.String(http.StatusBadRequest, "could not parse player status integer value")
+		return e.BadRequestError("400", errors.New("could not parse player status integer value"))
 	}
 	status := PlayerStatus(statusI)
 	if err := validatePlayerStatus(status); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	changes := tops.ListPlayerStatusChanges(player, status)
@@ -47,13 +47,13 @@ func setPlayerStatus(e *core.RequestEvent) error {
 	player := e.Get("player").(*Player)
 	status, err := readPlayerStatusFromBody(e)
 	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 	competitions := e.Get("competitions").([]*Competition)
 
 	err = tops.SetPlayerStatus(e.App, player, status, competitions)
 	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)

@@ -27,7 +27,7 @@ func startCompetition(e *core.RequestEvent) error {
 
 	err := tops.StartTournament(e.App, competition)
 	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -38,7 +38,7 @@ func stopCompetition(e *core.RequestEvent) error {
 
 	err := tops.StopTournament(e.App, competition)
 	if err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)

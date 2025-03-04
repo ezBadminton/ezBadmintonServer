@@ -32,11 +32,11 @@ func BindCourtHooks(app core.App) {
 func assignCourt(e *core.RequestEvent) error {
 	court, matchData, err := readCourtAndMatchFromRequest(e)
 	if err != nil {
-		e.String(http.StatusBadRequest, err.Error())
+		e.BadRequestError(err.Error(), err)
 	}
 
 	if err := tops.AssignCourtToMatch(e.App, matchData, court); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
@@ -46,7 +46,7 @@ func unassignCourt(e *core.RequestEvent) error {
 	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.UnassignCourt(e.App, matchData); err != nil {
-		return e.String(http.StatusBadRequest, err.Error())
+		return e.BadRequestError(err.Error(), err)
 	}
 
 	return e.NoContent(http.StatusOK)
