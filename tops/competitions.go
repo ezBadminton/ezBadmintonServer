@@ -25,6 +25,7 @@ func (m *CompetitionManager) deleteCompetition(re *core.RecordRequestEvent) erro
 		re.App = txApp
 		ce := newCompetitionEvent(re.App, competition)
 		err := m.onDelete.Trigger(ce,
+			m.cleanUpModeSettings,
 			func(ce *CompetitionEvent) error {
 				ce.syncParent(re)
 				defer ce.syncToParent(re)
@@ -36,4 +37,22 @@ func (m *CompetitionManager) deleteCompetition(re *core.RecordRequestEvent) erro
 	})
 	re.App = app
 	return err
+}
+
+func (m *CompetitionManager) cleanUpModeSettings(e *CompetitionEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	settings := e.Competition.TournamentModeSettings()
+	if settings == nil {
+		return nil
+	}
+	parents := store.ListRelationParents(settings.Record)
+	isOrphaned := len(parents) == 1
+
+	if isOrphaned {
+		return e.App.Delete(settings)
+	}
+	return nil
 }
