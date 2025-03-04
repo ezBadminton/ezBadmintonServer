@@ -28,12 +28,11 @@ func (e *CompetitionEvent) saveCompetition() error {
 	return saveEventData(e.App, e, e.Competition)
 }
 
-func (e *CompetitionEvent) syncParent(parent *core.RecordEvent) {
-	parent.App = e.App
-}
-
-func (e *CompetitionEvent) syncToParent(parent *core.RecordEvent) {
-	e.App = parent.App
+func (e *CompetitionEvent) saveDeletedCompetition() error {
+	if err := e.App.Delete(e.Competition); err != nil {
+		return err
+	}
+	return e.Next()
 }
 
 func (e *CompetitionEvent) syncRegistrationParent(parent *RegistrationEvent) {

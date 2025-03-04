@@ -140,7 +140,7 @@ func newTournamentStore(
 	tournamentModeSettingsManager.onSet.Bind(priorityHandler(s.verifyModeSettingsUpdate, -1))
 
 	// Priority for verifying before the delete deletes registrations
-	competitionManager.onDelete.Bind(priorityHandler(s.verifyCompetitonDelete, -1))
+	competitionManager.onDelete.Bind(priorityHandler(s.handleCompetitionDelete, -1))
 
 	return s
 }
@@ -622,12 +622,18 @@ func (s *TournamentStore) verifyModeSettingsUpdate(e *TournamentModeSettingsEven
 	return e.Next()
 }
 
-func (s *TournamentStore) verifyCompetitonDelete(e *CompetitionEvent) error {
+func (s *TournamentStore) handleCompetitionDelete(e *CompetitionEvent) error {
 	tournament, ok := s.tournaments[e.Competition.Id]
 	if ok && tournament.Started {
 		return errors.New("can not delete a competition that has a started tournament")
 	}
-	return e.Next()
+
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	delete(s.tournaments, e.Competition.Id)
+	return nil
 }
 
 func createMatchData(app core.App, tournament got.MatchLister) ([]*MatchData, error) {
