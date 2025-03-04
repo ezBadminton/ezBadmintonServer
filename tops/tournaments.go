@@ -209,7 +209,7 @@ func (s *TournamentStore) removeTournament(competition *Competition) {
 func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
 	for _, comp := range competitions {
 		tournament, err := s.createTournament(comp)
-		if tournament == nil && err == nil {
+		if errors.Is(err, ErrNoDraw) {
 			continue
 		}
 		if err != nil {
@@ -232,9 +232,7 @@ func (s *TournamentStore) createTournament(comp *Competition) (*CompetitionTourn
 	}
 
 	entries, err := newEntries(comp)
-	if errors.Is(err, ErrNoDraw) {
-		return nil, nil
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -366,14 +364,14 @@ func (s *TournamentStore) verifyDrawChange(e *CompetitionEvent) error {
 }
 
 func (s *TournamentStore) handleDraw(e *CompetitionEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
 	tournament, err := s.createTournament(e.Competition)
 	if err != nil {
 		return err
 	}
 
-	if err := e.Next(); err != nil {
-		return err
-	}
 	s.setTournament(e.Competition, tournament)
 	return nil
 }
