@@ -27,6 +27,8 @@ func (m *TournamentModeSettingsManager) setSettings(re *core.RecordRequestEvent)
 	}
 	settings, _ := WrapRecord[TournamentModeSettings](re.Record)
 
+	oldSettings := make([]*TournamentModeSettings, 0)
+	oldSettingsCount := make(map[string]int)
 	app := re.App
 	err := re.App.RunInTransaction(func(txApp core.App) error {
 		re.App = txApp
@@ -34,12 +36,21 @@ func (m *TournamentModeSettingsManager) setSettings(re *core.RecordRequestEvent)
 			return err
 		}
 		for _, c := range competitions {
+			old := c.TournamentModeSettings()
 			se := newTournamentModeSettingsEvent(re.App, settings, c)
 			err := m.onSet.Trigger(se, m.settingsSetHandler)
 			if err != nil {
 				return err
 			}
+			if old != nil {
+				oldSettings = append(oldSettings, old)
+				oldSettingsCount[old.Id] = oldSettingsCount[old.Id] + 1
+			}
 		}
+		if err := m.cleanUpOrphanedSettings(txApp, oldSettings, oldSettingsCount); err != nil {
+			return err
+		}
+
 		return nil
 	})
 	re.App = app
@@ -47,23 +58,31 @@ func (m *TournamentModeSettingsManager) setSettings(re *core.RecordRequestEvent)
 }
 
 func (m *TournamentModeSettingsManager) settingsSetHandler(e *TournamentModeSettingsEvent) error {
-	oldSettings := e.Competition.TournamentModeSettings()
-	var becomesUnused bool
-	if oldSettings != nil {
-		becomesUnused = len(store.ListRelationParents(oldSettings.Record)) == 1
-	}
-
 	e.Competition.SetTournamentModeSettings(e.Settings)
 
 	if err := e.App.Save(e.Competition); err != nil {
 		return err
 	}
+	return e.Next()
+}
 
-	if becomesUnused {
-		if err := e.App.Delete(oldSettings); err != nil {
-			return err
+func (m *TournamentModeSettingsManager) cleanUpOrphanedSettings(
+	app core.App,
+	settings []*TournamentModeSettings,
+	removeCounts map[string]int,
+) error {
+	for _, s := range settings {
+		count, ok := removeCounts[s.Id]
+		if !ok {
+			continue
+		}
+		delete(removeCounts, s.Id)
+		parents := store.ListRelationParents(s.Record)
+		if len(parents)-count == 0 {
+			if err := app.Delete(s); err != nil {
+				return err
+			}
 		}
 	}
-
-	return e.Next()
+	return nil
 }
