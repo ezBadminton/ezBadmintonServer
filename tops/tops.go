@@ -298,6 +298,18 @@ func DeleteCategory(e *core.RecordRequestEvent) error {
 	return tops.categorizationManager.deleteCategory(e)
 }
 
+func AddPlayingLevel(e *core.RecordRequestEvent) error {
+	return tops.categorizationManager.addPlayingLevel(e)
+}
+
+func DeletePlayingLevel(e *core.RecordRequestEvent) error {
+	return tops.categorizationManager.deletePlayingLevel(e)
+}
+
+func ReorderPlayingLevel(app core.App, from, to int) error {
+	return tops.categorizationManager.reorderPlayingLevel(app, from, to)
+}
+
 func SetTournamentModeSettings(e *core.RecordRequestEvent) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()
@@ -305,9 +317,9 @@ func SetTournamentModeSettings(e *core.RecordRequestEvent) error {
 	return tops.tournamentModeSettingsManager.setSettings(e)
 }
 
-func DeleteCompetition(e *core.RecordRequestEvent) error {
+func DeleteCompetitions(app core.App, competitions []*Competition) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()
 
-	return tops.competitionManager.deleteCompetition(e)
+	return tops.competitionManager.deleteCompetitions(app, competitions)
 }

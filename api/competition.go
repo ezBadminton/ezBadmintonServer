@@ -7,6 +7,19 @@ import (
 )
 
 func BindCompetitionHooks(app core.App) {
-	cName := CName[Competition]()
-	app.OnRecordDeleteRequest(cName).BindFunc(tops.DeleteCompetition)
+	url := "/competitions"
+
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		group := rootGroup.Group(url)
+
+		group.DELETE("", deleteCompetitions).
+			Bind(bodyIdList[Competition]("competitions"))
+		return e.Next()
+	})
+}
+
+func deleteCompetitions(e *core.RequestEvent) error {
+	competitions := e.Get("competitions").([]*Competition)
+
+	return tops.DeleteCompetitions(e.App, competitions)
 }

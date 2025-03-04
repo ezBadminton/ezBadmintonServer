@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"net/http"
 
 	"github.com/pocketbase/pocketbase/core"
 
@@ -11,9 +12,20 @@ import (
 )
 
 func BindCategoryHooks(app core.App) {
+	url := "/playinglevels/reorder"
+
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		group := rootGroup.Group(url)
+
+		group.POST("", reorderPlayingLevel)
+		return e.Next()
+	})
+
 	ageGroupCName := CName[AgeGroup]()
 	playingLevelCName := CName[PlayingLevel]()
 	app.OnRecordDeleteRequest(ageGroupCName, playingLevelCName).BindFunc(onCategoryDelete)
+	app.OnRecordCreateRequest(playingLevelCName).BindFunc(tops.AddPlayingLevel)
+	app.OnRecordDeleteRequest(playingLevelCName).BindFunc(tops.DeletePlayingLevel)
 }
 
 func onCategoryDelete(e *core.RecordRequestEvent) error {
@@ -39,4 +51,21 @@ func readReplacementFromQuery(e *core.RecordRequestEvent) error {
 	}
 	e.RequestEvent.Set("replacement", replacement)
 	return nil
+}
+
+func reorderPlayingLevel(e *core.RequestEvent) error {
+	data := struct {
+		From int `json:"from"`
+		To   int `json:"to"`
+	}{-1, -1}
+	if err := e.BindBody(&data); err != nil {
+		return e.InternalServerError("could not parse body", err)
+	}
+	if data.From == -1 || data.To == -1 {
+		return e.BadRequestError("", errors.New("the JSON body does not contain the 'from' and 'to' integer fields"))
+	}
+	if err := tops.ReorderPlayingLevel(e.App, data.From, data.To); err != nil {
+		return e.BadRequestError("could not reorder PlayingLevel", err)
+	}
+	return e.NoContent(http.StatusOK)
 }

@@ -18,24 +18,29 @@ func newCompetitionManager() *CompetitionManager {
 	}
 }
 
-func (m *CompetitionManager) deleteCompetition(re *core.RecordRequestEvent) error {
-	competition, _ := store.FindProxy[Competition](re.Record.Id)
-	app := re.App
-	err := re.App.RunInTransaction(func(txApp core.App) error {
-		re.App = txApp
-		ce := newCompetitionEvent(re.App, competition)
-		err := m.onDelete.Trigger(ce,
-			m.cleanUpModeSettings,
-			func(ce *CompetitionEvent) error {
-				ce.syncParent(re)
-				defer ce.syncToParent(re)
-				return re.Next()
-			},
-		)
-		ce.syncParent(re)
-		return err
+func (m *CompetitionManager) deleteCompetitions(app core.App, competitions []*Competition) error {
+	return app.RunInTransaction(func(txApp core.App) error {
+		for _, c := range competitions {
+			if err := txApp.Delete(c); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
-	re.App = app
+}
+
+func (m *CompetitionManager) deleteCompetition(re *core.RecordEvent) error {
+	competition, _ := store.FindProxy[Competition](re.Record.Id)
+	ce := newCompetitionEvent(re.App, competition)
+	err := m.onDelete.Trigger(ce,
+		m.cleanUpModeSettings,
+		func(ce *CompetitionEvent) error {
+			ce.syncParent(re)
+			defer ce.syncToParent(re)
+			return re.Next()
+		},
+	)
+	ce.syncParent(re)
 	return err
 }
 

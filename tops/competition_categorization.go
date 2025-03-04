@@ -39,6 +39,79 @@ func newCategorizationManager(settingsManager *EventSettingsManager) *Categoriza
 	return m
 }
 
+func (m *CategorizationManager) addPlayingLevel(e *core.RecordRequestEvent) error {
+	playingLevel, _ := WrapRecord[PlayingLevel](e.Record)
+	store, _ := store.FindRecordStore[PlayingLevel]()
+	playingLevel.SetIndex(store.Length())
+	return e.Next()
+}
+
+func (m *CategorizationManager) deletePlayingLevel(e *core.RecordRequestEvent) error {
+	store, _ := store.FindRecordStore[PlayingLevel]()
+	removed, _ := store.FindProxy(e.Record.Id)
+	removedIndex := removed.Index()
+	playingLevels := store.ListRecords()
+	modified := make([]*PlayingLevel, 0)
+	for _, p := range playingLevels {
+		i := p.Index()
+		if i > removedIndex {
+			p.SetIndex(i - 1)
+			modified = append(modified, p)
+		}
+	}
+
+	app := e.App
+	err := e.App.RunInTransaction(func(txApp core.App) error {
+		e.App = txApp
+		for _, p := range modified {
+			if err := e.App.Save(p); err != nil {
+				return err
+			}
+		}
+		return e.Next()
+	})
+	e.App = app
+	return err
+}
+
+func (m *CategorizationManager) reorderPlayingLevel(app core.App, from, to int) error {
+	if from == to {
+		return nil
+	}
+	store, _ := store.FindRecordStore[PlayingLevel]()
+	playingLevels := store.ListRecords()
+	if from > len(playingLevels)-1 || to > len(playingLevels)-1 {
+		return errors.New("invalid reordering indices")
+	}
+
+	lower, upper := min(from, to), max(from, to)
+	move := 1
+	if from < to {
+		move = -1
+	}
+	modified := make([]*PlayingLevel, 0, upper-lower)
+	for _, p := range playingLevels {
+		i := p.Index()
+		if i >= lower && i <= upper {
+			if i == from {
+				p.SetIndex(to)
+			} else {
+				p.SetIndex(i + move)
+			}
+			modified = append(modified, p)
+		}
+	}
+
+	return app.RunInTransaction(func(txApp core.App) error {
+		for _, p := range modified {
+			if err := txApp.Save(p); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (m *CategorizationManager) handleSettingsChange(se *SettingsEvent) error {
 	ageGroupsOld := se.OldSettings.UseAgeGroups()
 	ageGroupsNew := se.NewSettings.UseAgeGroups()
