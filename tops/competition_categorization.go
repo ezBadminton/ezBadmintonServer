@@ -179,8 +179,12 @@ func (m *CategorizationManager) handleCategorizationEnable(e *CategorizationEven
 	}
 
 	for _, c := range e.Competitions {
-		c.SetAgeGroup(ageGroup)
-		c.SetPlayingLevel(playingLevel)
+		if ageGroup != nil {
+			c.SetAgeGroup(ageGroup)
+		}
+		if playingLevel != nil {
+			c.SetPlayingLevel(playingLevel)
+		}
 		if err := e.App.Save(c); err != nil {
 			return err
 		}
