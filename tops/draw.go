@@ -12,25 +12,14 @@ import (
 )
 
 type DrawManager struct {
-	// Before a draw is being made
+	// Beofre draw being made. After e.Next() the draw has been persisted.
 	onDraw *hook.Hook[*CompetitionEvent]
-	// After draw has been made. After e.Next() the draw has been persisted.
-	onAfterDraw *hook.Hook[*CompetitionEvent]
-
-	// Before draw is being deleted
+	// Before draw being deleted. After e.Next() the deletion has been persisted.
 	onDrawDelete *hook.Hook[*CompetitionEvent]
-	// After draw has been deleted. After e.Next() the deletion has been persisted.
-	onAfterDrawDelete *hook.Hook[*CompetitionEvent]
-
-	// Before the draw positions are swapped
+	// Before draw positions being swapped. After e.Next() the swap has been persisted.
 	onDrawSwap *hook.Hook[*CompetitionEvent]
-	// After the swap has been made. After e.Next() the swap has been persisted.
-	onAfterDrawSwap *hook.Hook[*CompetitionEvent]
-
-	// Before seeds are set
+	// Before seeds are being set. Adter e.Next() the seeds have been persisted.
 	onSetSeeds *hook.Hook[*CompetitionEvent]
-	// After seeds are set. Adter e.Next() the seeds have been persisted.
-	onAfterSetSeeds *hook.Hook[*CompetitionEvent]
 }
 
 func newDrawManager(
@@ -38,17 +27,13 @@ func newDrawManager(
 	tournamentModeSettingsManager *TournamentModeSettingsManager,
 ) *DrawManager {
 	m := &DrawManager{
-		onDraw:            &hook.Hook[*CompetitionEvent]{},
-		onAfterDraw:       &hook.Hook[*CompetitionEvent]{},
-		onDrawDelete:      &hook.Hook[*CompetitionEvent]{},
-		onAfterDrawDelete: &hook.Hook[*CompetitionEvent]{},
-		onDrawSwap:        &hook.Hook[*CompetitionEvent]{},
-		onAfterDrawSwap:   &hook.Hook[*CompetitionEvent]{},
-		onSetSeeds:        &hook.Hook[*CompetitionEvent]{},
-		onAfterSetSeeds:   &hook.Hook[*CompetitionEvent]{},
+		onDraw:       &hook.Hook[*CompetitionEvent]{},
+		onDrawDelete: &hook.Hook[*CompetitionEvent]{},
+		onDrawSwap:   &hook.Hook[*CompetitionEvent]{},
+		onSetSeeds:   &hook.Hook[*CompetitionEvent]{},
 	}
 
-	registrationStore.onAfterDelete.BindFunc(m.handleUnregistration)
+	registrationStore.onDelete.BindFunc(m.handleUnregistration)
 
 	tournamentModeSettingsManager.onSet.BindFunc(m.handleModeSettingsUpdate)
 
@@ -57,26 +42,38 @@ func newDrawManager(
 
 func (d *DrawManager) makeDraw(app core.App, comp *Competition) error {
 	event := newCompetitionEvent(app, comp)
-	return d.onDraw.Trigger(event, d.makeDrawHandler)
+	return d.onDraw.Trigger(event,
+		d.makeDrawHandler,
+		(*CompetitionEvent).saveCompetition,
+	)
 }
 
 func (d *DrawManager) deleteDraw(app core.App, comp *Competition) error {
 	event := newCompetitionEvent(app, comp)
-	return d.onDrawDelete.Trigger(event, d.deleteDrawHandler)
+	return d.onDrawDelete.Trigger(event,
+		d.deleteDrawHandler,
+		(*CompetitionEvent).saveCompetition,
+	)
 }
 
 func (d *DrawManager) drawSwap(app core.App, competition *Competition, a, b string) error {
 	event := newCompetitionEvent(app, competition)
-	return d.onDrawSwap.Trigger(event, func(e *CompetitionEvent) error {
-		return d.drawSwapHandler(e, a, b)
-	})
+	return d.onDrawSwap.Trigger(event,
+		func(e *CompetitionEvent) error {
+			return d.drawSwapHandler(e, a, b)
+		},
+		(*CompetitionEvent).saveCompetition,
+	)
 }
 
 func (d *DrawManager) setSeeds(app core.App, competition *Competition, teams []*Team) error {
 	event := newCompetitionEvent(app, competition)
-	return d.onSetSeeds.Trigger(event, func(e *CompetitionEvent) error {
-		return d.setSeedsHandler(e, teams)
-	})
+	return d.onSetSeeds.Trigger(event,
+		func(e *CompetitionEvent) error {
+			return d.setSeedsHandler(e, teams)
+		},
+		(*CompetitionEvent).saveCompetition,
+	)
 }
 
 func (d *DrawManager) makeDrawHandler(e *CompetitionEvent) error {
@@ -114,18 +111,11 @@ func (d *DrawManager) makeDrawHandler(e *CompetitionEvent) error {
 
 	comp.SetDraw(newDraw)
 
-	if err := d.onAfterDraw.Trigger(e, (*CompetitionEvent).saveCompetition); err != nil {
-		return err
-	}
 	return e.Next()
 }
 
 func (d *DrawManager) deleteDrawHandler(e *CompetitionEvent) error {
 	e.Competition.SetDraw(nil)
-
-	if err := d.onAfterDrawDelete.Trigger(e, (*CompetitionEvent).saveCompetition); err != nil {
-		return err
-	}
 	return e.Next()
 }
 
@@ -146,21 +136,21 @@ func (d *DrawManager) drawSwapHandler(e *CompetitionEvent, a, b string) error {
 
 	e.Competition.SetDraw(draw)
 
-	if err := d.onAfterDrawSwap.Trigger(e, (*CompetitionEvent).saveCompetition); err != nil {
-		return err
-	}
-
 	return e.Next()
 }
 
 func (d *DrawManager) redraw(app core.App, comp *Competition) error {
 	event := newCompetitionEvent(app, comp)
-	return d.onDraw.Trigger(event, d.redrawHandler)
+	return d.onDraw.Trigger(event,
+		d.reseedHandler,
+		d.makeDrawHandler,
+		(*CompetitionEvent).saveCompetition,
+	)
 }
 
-func (d *DrawManager) redrawHandler(e *CompetitionEvent) error {
+func (d *DrawManager) reseedHandler(e *CompetitionEvent) error {
 	e.Competition.SetRngSeed(rand.Int())
-	return d.makeDrawHandler(e)
+	return e.Next()
 }
 
 func (d *DrawManager) setSeedsHandler(e *CompetitionEvent, seeds []*Team) error {
@@ -171,20 +161,25 @@ func (d *DrawManager) setSeedsHandler(e *CompetitionEvent, seeds []*Team) error 
 
 	e.Competition.SetSeeds(seeds)
 
-	if err := d.onAfterSetSeeds.Trigger(e, (*CompetitionEvent).saveCompetition); err != nil {
-		return err
-	}
-
 	return e.Next()
 }
 
-func (d *DrawManager) handleUnregistration(e *RegistrationEvent) error {
-	if isInDraw(e.Registration) {
-		if err := d.deleteDraw(e.App, e.Competition); err != nil {
-			return err
-		}
+func (d *DrawManager) handleUnregistration(re *RegistrationEvent) error {
+	if isInDraw(re.Competition, re.Registration) {
+		ce := newCompetitionEvent(re.App, re.Competition)
+		err := d.onDrawDelete.Trigger(ce,
+			d.deleteDrawHandler,
+			(*CompetitionEvent).saveCompetition,
+			func(ce *CompetitionEvent) error {
+				ce.syncRegistrationParent(re)
+				defer ce.syncToRegistrationParent(re)
+				return re.Next()
+			},
+		)
+		ce.syncRegistrationParent(re)
+		return err
 	}
-	return e.Next()
+	return re.Next()
 }
 
 func (d *DrawManager) handleModeSettingsUpdate(e *TournamentModeSettingsEvent) error {
@@ -216,11 +211,10 @@ func allPlayersAttending(players []*Player) bool {
 	return true
 }
 
-func isInDraw(reg *Registration) bool {
+func isInDraw(competition *Competition, reg *Registration) bool {
 	team := reg.Team
-	comp := reg.Competition
 	isInDraw := slices.ContainsFunc(
-		comp.Draw(),
+		competition.Draw(),
 		func(t *Team) bool { return t.Id == team.Id },
 	)
 	return isInDraw

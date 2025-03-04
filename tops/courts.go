@@ -15,23 +15,16 @@ type CourtStore struct {
 	// court id -> match data id
 	occupied map[string]string
 
-	// Before court is assigned
+	// Before court assignment. After e.Next() the court assignment has been persisted.
 	onCourtAssign *hook.Hook[*CourtEvent]
-	// After court assignment. After e.Next() the court assignment has been persisted.
-	onAfterCourtAssign *hook.Hook[*CourtEvent]
-
-	// Before court is unassigned
+	// Before court unassignment. After e.Next() the unassignment has been persisted.
 	onCourtUnassign *hook.Hook[*CourtEvent]
-	// After court unassignment. After e.Next() the unassignment has been persisted.
-	onAfterCourtUnassign *hook.Hook[*CourtEvent]
 }
 
 func newCourtStore() *CourtStore {
 	return &CourtStore{
-		onCourtAssign:        &hook.Hook[*CourtEvent]{},
-		onAfterCourtAssign:   &hook.Hook[*CourtEvent]{},
-		onCourtUnassign:      &hook.Hook[*CourtEvent]{},
-		onAfterCourtUnassign: &hook.Hook[*CourtEvent]{},
+		onCourtAssign:   &hook.Hook[*CourtEvent]{},
+		onCourtUnassign: &hook.Hook[*CourtEvent]{},
 	}
 }
 
@@ -54,10 +47,10 @@ func (s *CourtStore) init(
 	courtProxyStore.RegisterCreateHander(s.created)
 	courtProxyStore.RegisterUpdateHandler(s.updated)
 
-	matchManager.onAfterScoreSet.BindFunc(s.handleScoreSet)
-	matchManager.onAfterReset.BindFunc(s.handleMatchReset)
+	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
+	matchManager.onReset.BindFunc(s.handleMatchReset)
 
-	tournamentStore.onAfterStop.BindFunc(s.handleTournamentStop)
+	tournamentStore.onStop.BindFunc(s.handleTournamentStop)
 }
 
 func (s *CourtStore) deleteCourt(e *core.RecordRequestEvent) error {
@@ -134,7 +127,11 @@ func (s *CourtStore) nextCourt() *Court {
 
 func (s *CourtStore) assignCourtToMatch(app core.App, matchData *MatchData, optCourt *Court) error {
 	event := newCourtEvent(app, matchData, optCourt)
-	return s.onCourtAssign.Trigger(event, s.courtAssignmentHandler)
+	return s.onCourtAssign.Trigger(event,
+		s.courtAssignmentHandler,
+		(*CourtEvent).saveMatchData,
+		s.storeAssignment,
+	)
 }
 
 func (s *CourtStore) courtAssignmentHandler(e *CourtEvent) error {
@@ -153,13 +150,6 @@ func (s *CourtStore) courtAssignmentHandler(e *CourtEvent) error {
 	e.MatchData.SetCourt(court)
 	e.Court = court
 
-	err := s.onAfterCourtAssign.Trigger(e,
-		(*CourtEvent).saveMatchData,
-		s.storeAssignment,
-	)
-	if err != nil {
-		return err
-	}
 	return e.Next()
 }
 
@@ -170,7 +160,11 @@ func (s *CourtStore) storeAssignment(e *CourtEvent) error {
 
 func (s *CourtStore) unassignCourt(app core.App, matchData *MatchData) error {
 	event := newCourtEvent(app, matchData, nil)
-	return s.onCourtUnassign.Trigger(event, s.courtUnassignmentHandler)
+	return s.onCourtUnassign.Trigger(event,
+		s.courtUnassignmentHandler,
+		(*CourtEvent).saveMatchData,
+		s.storeUnassignment,
+	)
 }
 
 func (s *CourtStore) courtUnassignmentHandler(e *CourtEvent) error {
@@ -178,13 +172,6 @@ func (s *CourtStore) courtUnassignmentHandler(e *CourtEvent) error {
 	e.MatchData.SetCourt(nil)
 	e.Court = court
 
-	err := s.onAfterCourtUnassign.Trigger(e,
-		(*CourtEvent).saveMatchData,
-		s.storeUnassignment,
-	)
-	if err != nil {
-		return err
-	}
 	return e.Next()
 }
 
@@ -217,7 +204,7 @@ func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
 	} else {
 		// Re-assign the court (skip onCourtAssign)
 		courtEvent := newCourtEvent(e.App, e.MatchData, currentCourt)
-		err = s.onAfterCourtAssign.Trigger(courtEvent,
+		err = s.onCourtAssign.Trigger(courtEvent,
 			func(ce *CourtEvent) error {
 				if err := e.Next(); err != nil {
 					return err

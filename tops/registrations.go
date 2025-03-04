@@ -38,21 +38,13 @@ type RegistrationStore struct {
 	byCompetitionPlayer map[string]map[string]*Registration
 	byId                map[string]*Registration
 
-	// Before registration
+	// Before registration. After e.Next() the registration has been persisted.
 	onRegistration *hook.Hook[*RegistrationEvent]
-	// After registration verification. After e.Next() the registration has been persisted.
-	onAfterRegistration *hook.Hook[*RegistrationEvent]
-
-	// Before registered team is updated
+	// Before registration update. After e.Next() the registration update has been persisted.
 	onUpdate *hook.Hook[*RegistrationEvent]
-	// After updated registration verification. After e.Next() the registration update has been persisted.
-	onAfterUpdate *hook.Hook[*RegistrationEvent]
-
-	// Before registered team is deleted
-	onDelete *hook.Hook[*RegistrationEvent]
-	// After deleted registration verification. After e.Next() the registration deletion has been persisted.
+	// Before registration delete. After e.Next() the registration deletion has been persisted.
 	// Is wrapped in a transaction.
-	onAfterDelete *hook.Hook[*RegistrationEvent]
+	onDelete *hook.Hook[*RegistrationEvent]
 }
 
 func newRegistrationStore(
@@ -73,16 +65,14 @@ func newRegistrationStore(
 		byCompetitionPlayer: make(map[string]map[string]*Registration),
 		byId:                make(map[string]*Registration),
 		onRegistration:      &hook.Hook[*RegistrationEvent]{},
-		onAfterRegistration: &hook.Hook[*RegistrationEvent]{},
 		onUpdate:            &hook.Hook[*RegistrationEvent]{},
-		onAfterUpdate:       &hook.Hook[*RegistrationEvent]{},
 		onDelete:            &hook.Hook[*RegistrationEvent]{},
-		onAfterDelete:       &hook.Hook[*RegistrationEvent]{},
 	}
 
 	s.addTeams(teams...)
 
-	withdrawalManager.onWithdraw.BindFunc(s.verifyWithdrawal)
+	// Priority for setting e.Registration
+	withdrawalManager.onWithdraw.Bind(priorityHandler(s.verifyWithdrawal, -1))
 
 	competitionManager.onDelete.BindFunc(s.handleCompetitonDeletion)
 
@@ -99,7 +89,11 @@ func (s *RegistrationStore) addTeams(teams ...*Team) {
 func (s *RegistrationStore) registerTeam(app core.App, team *Team, competition *Competition) error {
 	event := newRegistrationEvent(app, competition, team)
 	event.AddedPlayers = team.Players()
-	return s.onRegistration.Trigger(event, s.registerHandler)
+	return s.onRegistration.Trigger(event,
+		s.registerHandler,
+		(*RegistrationEvent).saveNewRegistration,
+		s.registerStoreHandler,
+	)
 }
 
 func (s *RegistrationStore) registerHandler(e *RegistrationEvent) error {
@@ -110,11 +104,7 @@ func (s *RegistrationStore) registerHandler(e *RegistrationEvent) error {
 	reg := newRegistration(e.Team, e.Competition, false)
 	e.Registration = reg
 
-	err := s.onAfterRegistration.Trigger(e,
-		(*RegistrationEvent).saveNewRegistration,
-		s.registerStoreHandler,
-	)
-	if err != nil {
+	if err := e.Next(); err != nil {
 		return err
 	}
 
@@ -122,8 +112,7 @@ func (s *RegistrationStore) registerHandler(e *RegistrationEvent) error {
 	e.Registration.BaseTopsRecord.Updated = e.Team.Updated()
 
 	go realtimeNotify(e.App, "registrations", core.ModelEventTypeCreate, reg)
-
-	return e.Next()
+	return nil
 }
 
 // Stores the registration after it has been persisted
@@ -139,7 +128,11 @@ func (s *RegistrationStore) updateTeam(app core.App, team *Team) error {
 		event.Competition = event.Registration.Competition
 	}
 
-	return s.onUpdate.Trigger(event, s.updateHandler)
+	return s.onUpdate.Trigger(event,
+		s.updateHandler,
+		(*RegistrationEvent).saveUpdatedRegistration,
+		s.updateStoreHandler,
+	)
 }
 
 func (s *RegistrationStore) updateHandler(e *RegistrationEvent) error {
@@ -180,17 +173,12 @@ func (s *RegistrationStore) updateHandler(e *RegistrationEvent) error {
 		return err
 	}
 
-	err := s.onAfterUpdate.Trigger(e,
-		(*RegistrationEvent).saveUpdatedRegistration,
-		s.updateStoreHandler,
-	)
-	if err != nil {
+	if err := e.Next(); err != nil {
 		return err
 	}
 
 	go realtimeNotify(e.App, "registrations", core.ModelEventTypeUpdate, e.Registration)
-
-	return e.Next()
+	return nil
 }
 
 // Stores the updated registration after it has been persisted
@@ -206,12 +194,18 @@ func (s *RegistrationStore) updateStoreHandler(e *RegistrationEvent) error {
 }
 
 func (s *RegistrationStore) deleteTeam(app core.App, team *Team) error {
-	event := newRegistrationEvent(app, nil, team)
-	event.Registration = s.byTeam[team.Id]
-	if event.Registration != nil {
-		event.Competition = event.Registration.Competition
-	}
-	return s.onDelete.Trigger(event, s.deleteHandler)
+	return app.RunInTransaction(func(txApp core.App) error {
+		event := newRegistrationEvent(txApp, nil, team)
+		event.Registration = s.byTeam[team.Id]
+		if event.Registration != nil {
+			event.Competition = event.Registration.Competition
+		}
+		return s.onDelete.Trigger(event,
+			s.deleteHandler,
+			(*RegistrationEvent).saveDeletedRegistration,
+			s.deleteStoreHandler,
+		)
+	})
 }
 
 func (s *RegistrationStore) deleteHandler(e *RegistrationEvent) error {
@@ -219,20 +213,6 @@ func (s *RegistrationStore) deleteHandler(e *RegistrationEvent) error {
 	if reg == nil {
 		return errors.New("can not delete unregistered team")
 	}
-
-	app := e.App
-	err := e.App.RunInTransaction(func(txApp core.App) error {
-		e.App = txApp
-		return s.onAfterDelete.Trigger(e,
-			(*RegistrationEvent).saveDeletedRegistration,
-			s.deleteStoreHandler,
-		)
-	})
-	e.App = app
-	if err != nil {
-		return err
-	}
-
 	return e.Next()
 }
 
@@ -342,7 +322,8 @@ func (s *RegistrationStore) handleCompetitonDeletion(ce *CompetitionEvent) error
 		re := newRegistrationEvent(ce.App, ce.Competition, team)
 		re.Registration = s.byTeam[team.Id]
 
-		err := s.onAfterDelete.Trigger(re,
+		err := s.onDelete.Trigger(re,
+			s.deleteHandler,
 			(*RegistrationEvent).saveDeletedRegistration,
 			s.deleteStoreHandler,
 			func(re *RegistrationEvent) error {

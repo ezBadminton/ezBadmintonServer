@@ -72,13 +72,13 @@ func (t *PlayerTracker) init(
 	t.lastMatches = collectLastMatches(matches, tournamentStore)
 	t.inMatch = collectCurrentMatches(matches, tournamentStore)
 
-	courtStore.onAfterCourtAssign.BindFunc(t.handleCourtAssignment)
-	courtStore.onAfterCourtUnassign.BindFunc(t.handleCourtUnassignment)
+	courtStore.onCourtAssign.BindFunc(t.handleCourtAssignment)
+	courtStore.onCourtUnassign.BindFunc(t.handleCourtUnassignment)
 
-	matchManager.onAfterScoreSet.BindFunc(t.handleScoreSet)
+	matchManager.onScoreSet.BindFunc(t.handleScoreSet)
 	matchManager.onReset.BindFunc(t.handleMatchReset)
 
-	tournamentStore.onAfterStop.BindFunc(t.handleTournamentStop)
+	tournamentStore.onStop.BindFunc(t.handleTournamentStop)
 
 	eventSettingsManager.onSettingsChange.BindFunc(t.handleRestTimeChange)
 

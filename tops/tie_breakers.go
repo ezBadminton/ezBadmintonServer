@@ -11,33 +11,28 @@ import (
 )
 
 type TieBreakerManager struct {
-	// Before tie breaker add
+	// Before tie breaker create. After e.Next() the tie breaker has been persisted
 	onAdd *hook.Hook[*TieBreakerEvent]
-	// After tie breaker created. After e.Next() the tie breaker has been persisted
-	onAfterAdd *hook.Hook[*TieBreakerEvent]
-
-	// Before tie breaker update
+	// Before tie breaker update. After e.Next() the tie breaker update has been persisted
 	onUpdate *hook.Hook[*TieBreakerEvent]
-	// After tie breaker updated. After e.Next() the tie breaker update has been persisted
-	onAfterUpdate *hook.Hook[*TieBreakerEvent]
-
 	// Before tie breaker delete. After e.Next() the tie breaker deletion has been persisted
 	onDelete *hook.Hook[*TieBreakerEvent]
 }
 
 func newTieBreakerManager() *TieBreakerManager {
 	return &TieBreakerManager{
-		onAdd:         &hook.Hook[*TieBreakerEvent]{},
-		onAfterAdd:    &hook.Hook[*TieBreakerEvent]{},
-		onUpdate:      &hook.Hook[*TieBreakerEvent]{},
-		onAfterUpdate: &hook.Hook[*TieBreakerEvent]{},
-		onDelete:      &hook.Hook[*TieBreakerEvent]{},
+		onAdd:    &hook.Hook[*TieBreakerEvent]{},
+		onUpdate: &hook.Hook[*TieBreakerEvent]{},
+		onDelete: &hook.Hook[*TieBreakerEvent]{},
 	}
 }
 
 func (m *TieBreakerManager) addTieBreaker(app core.App, competition *Competition, teams []*Team) error {
 	event := newTieBreakerEvent(app, competition, teams)
-	return m.onAdd.Trigger(event, m.tieBreakerAddHandler)
+	return m.onAdd.Trigger(event,
+		m.tieBreakerAddHandler,
+		(*TieBreakerEvent).saveNewTieBreaker,
+	)
 }
 
 func (m *TieBreakerManager) tieBreakerAddHandler(e *TieBreakerEvent) error {
@@ -64,9 +59,6 @@ func (m *TieBreakerManager) tieBreakerAddHandler(e *TieBreakerEvent) error {
 	tieBreaker.SetTieBreakerRanking(teams)
 	e.TieBreaker = tieBreaker
 
-	if err := m.onAfterAdd.Trigger(e, (*TieBreakerEvent).saveNewTieBreaker); err != nil {
-		return err
-	}
 	return e.Next()
 }
 
@@ -77,7 +69,10 @@ func (m *TieBreakerManager) updateTieBreaker(app core.App, tieBreaker *TieBreake
 	}
 	event := newTieBreakerEvent(app, competition, teams)
 	event.TieBreaker = tieBreaker
-	return m.onUpdate.Trigger(event, m.tieBreakerUpdateHandler)
+	return m.onUpdate.Trigger(event,
+		m.tieBreakerUpdateHandler,
+		(*TieBreakerEvent).saveUpdatedTieBreaker,
+	)
 }
 
 func (m *TieBreakerManager) tieBreakerUpdateHandler(e *TieBreakerEvent) error {
@@ -90,9 +85,6 @@ func (m *TieBreakerManager) tieBreakerUpdateHandler(e *TieBreakerEvent) error {
 	tieBreaker.SetTieBreakerRanking(e.Teams)
 	e.TieBreaker = tieBreaker
 
-	if err := m.onAfterUpdate.Trigger(e, (*TieBreakerEvent).saveUpdatedTieBreaker); err != nil {
-		return err
-	}
 	return e.Next()
 }
 

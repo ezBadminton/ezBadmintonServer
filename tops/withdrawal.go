@@ -14,20 +14,16 @@ type WithdrawalManager struct {
 	tournamentStore   *TournamentStore
 	registrationStore *RegistrationStore
 
-	// Before status change
+	// Before withdrawals processed. After e.Next() the withdrawals and new status have been persisted
 	onStatusChange *hook.Hook[*StatusChangeEvent]
-	// After withdrawals processed. After e.Next() the withdrawals and new status have been persisted
-	onAfterStatusChange *hook.Hook[*StatusChangeEvent]
-
 	// Before registration withdraw/reenter. After e.Next() the changed matches will be set
 	onWithdraw *hook.Hook[*WithdrawEvent]
 }
 
 func newWithdrawalManager() *WithdrawalManager {
 	return &WithdrawalManager{
-		onStatusChange:      &hook.Hook[*StatusChangeEvent]{},
-		onAfterStatusChange: &hook.Hook[*StatusChangeEvent]{},
-		onWithdraw:          &hook.Hook[*WithdrawEvent]{},
+		onStatusChange: &hook.Hook[*StatusChangeEvent]{},
+		onWithdraw:     &hook.Hook[*WithdrawEvent]{},
 	}
 }
 
@@ -139,14 +135,14 @@ func (m *WithdrawalManager) setPlayerStatus(
 	}
 
 	event := newStatusChangeEvent(app, player, newStatus, withdraw, competitions)
-	return m.onStatusChange.Trigger(event, m.statusChangeHandler)
+	return m.onStatusChange.Trigger(event,
+		m.statusChangeHandler,
+		(*StatusChangeEvent).saveStatusChange,
+	)
 }
 
 func (m *WithdrawalManager) statusChangeHandler(e *StatusChangeEvent) error {
 	for _, comp := range e.Competitions {
-		/*
-			// Set tournament and reg in the event
-		*/
 		event := newWithdrawEvent(comp, e)
 		if err := m.onWithdraw.Trigger(event, m.withdrawHandler); err != nil {
 			return err
@@ -166,12 +162,6 @@ func (m *WithdrawalManager) statusChangeHandler(e *StatusChangeEvent) error {
 		e.ChangedMatchData = append(e.ChangedMatchData, updatedData...)
 	}
 
-	err := m.onAfterStatusChange.Trigger(e,
-		(*StatusChangeEvent).saveStatusChange,
-	)
-	if err != nil {
-		return err
-	}
 	return e.Next()
 }
 

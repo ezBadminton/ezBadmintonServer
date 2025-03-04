@@ -53,16 +53,10 @@ type TournamentStore struct {
 	// match data id -> tournament
 	byMatch map[string]*CompetitionTournament
 
-	// Before tournament start
+	// Before match data create. After e.Next() the match data has been persisted and the tournament hydrated
 	onStart *hook.Hook[*PlanEvent]
-	// After match data created. After e.Next() the match data has been persisted and the tournament hydrated
-	onAfterStart *hook.Hook[*PlanEvent]
-
-	// Before tournament stop
+	// Before match data delete. After e.Next() the match data deletion has been persisted.
 	onStop *hook.Hook[*PlanEvent]
-	// After match data to delete is set. After e.Next() the match data deletion has been persisted. Dehydration happens after the hook
-	onAfterStop *hook.Hook[*PlanEvent]
-
 	// Before tournament plan update. After e.Next() the tournament has been updated
 	onUpdate *hook.Hook[*PlanEvent]
 }
@@ -84,17 +78,15 @@ func newTournamentStore(
 	compStore, _ := store.FindRecordStore[Competition]()
 
 	s := &TournamentStore{
-		app:          app,
-		tournaments:  make(map[string]*CompetitionTournament),
-		list:         make([]*CompetitionTournament, 0),
-		matchData:    make(map[int]*MatchData),
-		matches:      make(map[string]*got.Match),
-		byMatch:      make(map[string]*CompetitionTournament),
-		onStart:      &hook.Hook[*PlanEvent]{},
-		onAfterStart: &hook.Hook[*PlanEvent]{},
-		onStop:       &hook.Hook[*PlanEvent]{},
-		onAfterStop:  &hook.Hook[*PlanEvent]{},
-		onUpdate:     &hook.Hook[*PlanEvent]{},
+		app:         app,
+		tournaments: make(map[string]*CompetitionTournament),
+		list:        make([]*CompetitionTournament, 0),
+		matchData:   make(map[int]*MatchData),
+		matches:     make(map[string]*got.Match),
+		byMatch:     make(map[string]*CompetitionTournament),
+		onStart:     &hook.Hook[*PlanEvent]{},
+		onStop:      &hook.Hook[*PlanEvent]{},
+		onUpdate:    &hook.Hook[*PlanEvent]{},
 	}
 
 	err := s.addTournaments(compStore.RecordList...)
@@ -103,34 +95,33 @@ func newTournamentStore(
 	}
 
 	drawManager.onDraw.BindFunc(s.verifyDrawChange)
-	drawManager.onAfterDraw.BindFunc(s.handleDraw)
-	drawManager.onDrawDelete.BindFunc(s.verifyDrawDeletion)
-	drawManager.onAfterDrawDelete.BindFunc(s.handleDrawDeletion)
+	drawManager.onDraw.BindFunc(s.handleDraw)
+	drawManager.onDrawDelete.BindFunc(s.handleDrawDeletion)
 	drawManager.onDrawSwap.BindFunc(s.verifyDrawChange)
-	drawManager.onAfterDrawSwap.BindFunc(s.handleDraw)
+	drawManager.onDrawSwap.BindFunc(s.handleDraw)
 	drawManager.onSetSeeds.BindFunc(s.verifyDrawChange)
 
-	courtStore.onAfterCourtAssign.BindFunc(s.handleCourtAssignment)
-	courtStore.onAfterCourtUnassign.BindFunc(s.handleCourtAssignment)
+	// Priority for setting the e.Match
+	courtStore.onCourtAssign.Bind(priorityHandler(s.handleCourtAssignment, -1))
+	courtStore.onCourtUnassign.Bind(priorityHandler(s.handleCourtAssignment, -1))
 
-	matchManager.onAfterStart.BindFunc(s.handleMatchStart)
-	matchManager.onAfterCancel.BindFunc(s.handleMatchCancel)
-	matchManager.onScoreSet.BindFunc(s.verifyScoreSet)
-	matchManager.onAfterScoreSet.BindFunc(s.handleScoreSet)
-	matchManager.onReset.BindFunc(s.verifyMatchReset)
-	matchManager.onAfterReset.BindFunc(s.handleMatchReset)
+	matchManager.onStart.BindFunc(s.handleMatchStart)
+	matchManager.onCancel.BindFunc(s.handleMatchCancel)
+	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
+	matchManager.onReset.BindFunc(s.handleMatchReset)
 
-	registrationStore.onAfterUpdate.BindFunc(s.verifyRegistrationUpdate)
+	registrationStore.onUpdate.BindFunc(s.verifyRegistrationUpdate)
 	registrationStore.onDelete.BindFunc(s.verifyUnregistration)
 
-	withdrawalManager.onWithdraw.BindFunc(s.verifyWithdrawal)
-	withdrawalManager.onAfterStatusChange.BindFunc(s.handleStatusChange)
+	// Priority for settings e.WithdrawalPolicy
+	withdrawalManager.onWithdraw.Bind(priorityHandler(s.verifyWithdrawal, -1))
+	withdrawalManager.onStatusChange.BindFunc(s.handleStatusChange)
 
 	tieBreakerManager.onAdd.BindFunc(s.verifyTieBreakerAdd)
 	tieBreakerManager.onAdd.BindFunc(s.verifyTieBreakerChange)
-	tieBreakerManager.onAfterAdd.BindFunc(s.handleTieBreakerChange)
+	tieBreakerManager.onAdd.BindFunc(s.handleTieBreakerChange)
 	tieBreakerManager.onUpdate.BindFunc(s.verifyTieBreakerChange)
-	tieBreakerManager.onAfterUpdate.BindFunc(s.handleTieBreakerChange)
+	tieBreakerManager.onUpdate.BindFunc(s.handleTieBreakerChange)
 	tieBreakerManager.onDelete.BindFunc(s.verifyTieBreakerChange)
 	tieBreakerManager.onDelete.BindFunc(s.handleTieBreakerDelete)
 
@@ -319,7 +310,11 @@ func (s *TournamentStore) start(app core.App, competition *Competition) error {
 	}
 
 	event := newPlanEvent(app, competition, tournament)
-	return s.onStart.Trigger(event, s.startHandler)
+	return s.onStart.Trigger(event,
+		s.startHandler,
+		(*PlanEvent).saveStartedPlan,
+		s.hydrateHandler,
+	)
 }
 
 func (s *TournamentStore) startHandler(e *PlanEvent) error {
@@ -328,11 +323,6 @@ func (s *TournamentStore) startHandler(e *PlanEvent) error {
 		return err
 	}
 	e.MatchData = matchData
-
-	err = s.onAfterStart.Trigger(e,
-		(*PlanEvent).saveStartedPlan,
-		s.hydrateHandler,
-	)
 	return e.Next()
 }
 
@@ -350,16 +340,19 @@ func (s *TournamentStore) stop(app core.App, competition *Competition) error {
 		return errors.New("competition is not running")
 	}
 	event := newPlanEvent(app, competition, tournament)
-	return s.onStop.Trigger(event, s.stopHandler)
+	return s.onStop.Trigger(event,
+		s.stopHandler,
+		(*PlanEvent).saveStoppedPlan,
+		s.dehydrateHandler,
+	)
 }
 
 func (s *TournamentStore) stopHandler(e *PlanEvent) error {
 	e.MatchData = e.Competition.Matches()
+	return e.Next()
+}
 
-	err := s.onAfterStop.Trigger(e, (*PlanEvent).saveStoppedPlan)
-	if err != nil {
-		return err
-	}
+func (s *TournamentStore) dehydrateHandler(e *PlanEvent) error {
 	s.dehydrate(e.Tournament)
 	return e.Next()
 }
@@ -377,6 +370,7 @@ func (s *TournamentStore) handleDraw(e *CompetitionEvent) error {
 	if err != nil {
 		return err
 	}
+
 	if err := e.Next(); err != nil {
 		return err
 	}
@@ -384,7 +378,7 @@ func (s *TournamentStore) handleDraw(e *CompetitionEvent) error {
 	return nil
 }
 
-func (s *TournamentStore) verifyDrawDeletion(e *CompetitionEvent) error {
+func (s *TournamentStore) handleDrawDeletion(e *CompetitionEvent) error {
 	tournament := s.tournaments[e.Competition.Id]
 	if tournament == nil {
 		return errors.New("this competition has no draw. Can not delete draw")
@@ -392,10 +386,6 @@ func (s *TournamentStore) verifyDrawDeletion(e *CompetitionEvent) error {
 	if tournament.Started {
 		return errors.New("can not delete draw of running tournament")
 	}
-	return e.Next()
-}
-
-func (s *TournamentStore) handleDrawDeletion(e *CompetitionEvent) error {
 	if err := e.Next(); err != nil {
 		return err
 	}
@@ -427,15 +417,12 @@ func (s *TournamentStore) handleMatchCancel(e *MatchEvent) error {
 	return nil
 }
 
-func (s *TournamentStore) verifyScoreSet(e *ScoreEvent) error {
+func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 	if !e.MatchData.EndTime().IsZero() && !s.isEditable(e.MatchData) {
 		return errors.New("the match is not in an editable state")
 	}
-	e.Match = s.matches[e.MatchData.Id]
-	return e.Next()
-}
 
-func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
+	e.Match = s.matches[e.MatchData.Id]
 	tournament := s.byMatch[e.MatchData.Id]
 	score, err := scoreDataToScore(e.ScoreData, tournament.ScoreSettings)
 	if err != nil {
@@ -447,24 +434,20 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 		return err
 	}
 
-	match := s.matches[e.MatchData.Id]
-	match.Score = score
+	e.Match.Score = score
 	if matchEnding {
-		match.EndTime = e.MatchData.EndTime().Time()
+		e.Match.EndTime = e.MatchData.EndTime().Time()
 		tournament.Ended = matchesFinished(tournament.MatchList().Matches)
 	}
 	s.update(tournament)
 	return nil
 }
 
-func (s *TournamentStore) verifyMatchReset(e *ScoreEvent) error {
+func (s *TournamentStore) handleMatchReset(e *ScoreEvent) error {
 	if !s.isEditable(e.MatchData) {
 		return errors.New("the match is not in an editable state")
 	}
-	return e.Next()
-}
 
-func (s *TournamentStore) handleMatchReset(e *ScoreEvent) error {
 	if err := e.Next(); err != nil {
 		return err
 	}
@@ -760,6 +743,9 @@ func (s *TournamentStore) isRegistrationActive(reg *Registration) bool {
 	team := reg.Team
 	comp := reg.Competition
 	tournament := s.tournaments[comp.Id]
+	if tournament == nil {
+		return false
+	}
 
 	isInDraw := slices.ContainsFunc(
 		comp.Draw(),
