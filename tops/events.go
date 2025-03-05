@@ -45,6 +45,16 @@ func (e *CompetitionEvent) syncToRegistrationParent(parent *RegistrationEvent) {
 	e.Competition = parent.Competition
 }
 
+func (e *CompetitionEvent) syncSettingsParent(parent *TournamentModeSettingsEvent) {
+	parent.App = e.App
+	parent.Competition = e.Competition
+}
+
+func (e *CompetitionEvent) syncToSettingsParent(parent *TournamentModeSettingsEvent) {
+	e.App = parent.App
+	e.Competition = parent.Competition
+}
+
 type MatchEvent struct {
 	hook.Event
 

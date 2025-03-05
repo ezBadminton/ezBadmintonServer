@@ -29,6 +29,8 @@ type CompetitionTournament struct {
 	Tournament
 	badminton.ScoreSettings
 	Started, Ended bool
+	// Match ID -> MatchData ID
+	MatchData map[int]string
 }
 
 func (c *CompetitionTournament) ToMap() map[string]any {
@@ -37,6 +39,7 @@ func (c *CompetitionTournament) ToMap() map[string]any {
 		"tournament":  c.Tournament,
 		"started":     c.Started,
 		"ended":       c.Ended,
+		"matchData":   c.MatchData,
 	}
 	return c.BaseTopsRecord.ToMap(data)
 }
@@ -293,6 +296,7 @@ func (s *TournamentStore) createTournament(comp *Competition) (*CompetitionTourn
 		Competition:   comp,
 		Tournament:    tournament,
 		ScoreSettings: scoreSettings,
+		MatchData:     map[int]string{},
 	}
 
 	return compTournament, nil
@@ -653,6 +657,7 @@ func createMatchData(app core.App, tournament got.MatchLister) ([]*MatchData, er
 func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 	comp := tournament.Competition
 	matchData := comp.Matches()
+	tournament.MatchData = make(map[int]string)
 
 	if len(matchData) == 0 {
 		tournament.Started = false
@@ -691,6 +696,7 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 		withdrawn := data.WithdrawnTeams()
 		hydrateWithdrawnTeams(match, withdrawn)
 
+		tournament.MatchData[match.Id()] = data.Id
 		s.matchData[match.Id()] = data
 		s.matches[data.Id] = match
 		s.byMatch[data.Id] = tournament

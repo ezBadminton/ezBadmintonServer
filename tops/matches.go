@@ -57,33 +57,26 @@ func (m *MatchManager) cancelMatchHandler(e *MatchEvent) error {
 }
 
 func (m *MatchManager) setMatchScore(app core.App, matchData *MatchData, points [][]int) error {
-	event := NewScoreEvent(app, matchData)
-	return m.onScoreSet.Trigger(event,
-		func(e *ScoreEvent) error {
-			return m.scoreSetHandler(e, points)
-		},
-		m.handleEndTimeSet,
-		(*ScoreEvent).saveScoreData,
-	)
-}
-
-func (m *MatchManager) scoreSetHandler(e *ScoreEvent, points [][]int) error {
 	if len(points) != 2 || len(points[0]) != len(points[1]) {
 		return errors.New("invalid points format")
 	}
-	scoreData := make([]*MatchSet, 0, 3)
+	event := NewScoreEvent(app, matchData)
+
+	event.ScoreData = make([]*MatchSet, 0, 3)
 	for i := range len(points[0]) {
-		set, err := NewProxy[MatchSet](e.App)
+		set, err := NewProxy[MatchSet](app)
 		if err != nil {
 			return err
 		}
 		set.SetTeam1Points(points[0][i])
 		set.SetTeam2Points(points[1][i])
-		scoreData = append(scoreData, set)
+		event.ScoreData = append(event.ScoreData, set)
 	}
-	e.ScoreData = scoreData
 
-	return e.Next()
+	return m.onScoreSet.Trigger(event,
+		m.handleEndTimeSet,
+		(*ScoreEvent).saveScoreData,
+	)
 }
 
 func (m *MatchManager) handleEndTimeSet(e *ScoreEvent) error {

@@ -182,11 +182,21 @@ func (d *DrawManager) handleUnregistration(re *RegistrationEvent) error {
 	return re.Next()
 }
 
-func (d *DrawManager) handleModeSettingsUpdate(e *TournamentModeSettingsEvent) error {
-	if len(e.Competition.Draw()) == 0 {
-		return e.Next()
+func (d *DrawManager) handleModeSettingsUpdate(se *TournamentModeSettingsEvent) error {
+	if len(se.Competition.Draw()) == 0 {
+		return se.Next()
 	}
-	return d.deleteDraw(e.App, e.Competition)
+	ce := newCompetitionEvent(se.App, se.Competition)
+	err := d.onDrawDelete.Trigger(ce,
+		d.deleteDrawHandler,
+		func(ce *CompetitionEvent) error {
+			ce.syncSettingsParent(se)
+			defer ce.syncToSettingsParent(se)
+			return se.Next()
+		},
+	)
+	ce.syncSettingsParent(se)
+	return err
 }
 
 func filterEligibleTeams(competition *Competition, teams []*Team) []*Team {
