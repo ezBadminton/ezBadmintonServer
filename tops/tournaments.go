@@ -404,6 +404,7 @@ func (s *TournamentStore) handleMatchStart(e *MatchEvent) error {
 
 	tournament := s.byMatch[e.MatchData.Id]
 	tournament.UpdateEditableMatches()
+	go realtimeNotify(s.app, "tournamentplans", core.ModelEventTypeUpdate, tournament)
 	return nil
 }
 
@@ -416,6 +417,7 @@ func (s *TournamentStore) handleMatchCancel(e *MatchEvent) error {
 
 	tournament := s.byMatch[e.MatchData.Id]
 	tournament.UpdateEditableMatches()
+	go realtimeNotify(s.app, "tournamentplans", core.ModelEventTypeUpdate, tournament)
 	return nil
 }
 
