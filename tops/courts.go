@@ -127,11 +127,15 @@ func (s *CourtStore) nextCourt() *Court {
 
 func (s *CourtStore) assignCourtToMatch(app core.App, matchData *MatchData, optCourt *Court) error {
 	event := newCourtEvent(app, matchData, optCourt)
-	return s.onCourtAssign.Trigger(event,
+	err := s.onCourtAssign.Trigger(event,
 		s.courtAssignmentHandler,
 		(*CourtEvent).saveMatchData,
 		s.storeAssignment,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (s *CourtStore) courtAssignmentHandler(e *CourtEvent) error {
@@ -160,11 +164,15 @@ func (s *CourtStore) storeAssignment(e *CourtEvent) error {
 
 func (s *CourtStore) unassignCourt(app core.App, matchData *MatchData) error {
 	event := newCourtEvent(app, matchData, nil)
-	return s.onCourtUnassign.Trigger(event,
+	err := s.onCourtUnassign.Trigger(event,
 		s.courtUnassignmentHandler,
 		(*CourtEvent).saveMatchData,
 		s.storeUnassignment,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (s *CourtStore) courtUnassignmentHandler(e *CourtEvent) error {
@@ -213,6 +221,9 @@ func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
 			},
 			s.storeAssignment,
 		)
+		if err == nil {
+			courtEvent.TriggerRealtimeNotifications()
+		}
 	}
 	return err
 }

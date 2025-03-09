@@ -90,6 +90,13 @@ func ListTournaments() []*CompetitionTournament {
 	return tops.tournamentStore.list
 }
 
+func ListMatches() []*TournamentMatch {
+	defer tops.mu.RUnlock()
+	tops.mu.RLock()
+
+	return tops.tournamentStore.listMatches()
+}
+
 func StartTournament(app core.App, competition *Competition) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()

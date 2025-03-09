@@ -32,10 +32,14 @@ func newMatchManager() *MatchManager {
 
 func (m *MatchManager) startMatch(app core.App, matchData *MatchData) error {
 	event := newMatchEvent(app, matchData)
-	return m.onStart.Trigger(event,
+	err := m.onStart.Trigger(event,
 		m.startMatchHandler,
 		(*MatchEvent).saveMatchData,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (m *MatchManager) startMatchHandler(e *MatchEvent) error {
@@ -45,10 +49,14 @@ func (m *MatchManager) startMatchHandler(e *MatchEvent) error {
 
 func (m *MatchManager) cancelMatch(app core.App, matchData *MatchData) error {
 	event := newMatchEvent(app, matchData)
-	return m.onCancel.Trigger(event,
+	err := m.onCancel.Trigger(event,
 		m.cancelMatchHandler,
 		(*MatchEvent).saveMatchData,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (m *MatchManager) cancelMatchHandler(e *MatchEvent) error {
@@ -60,7 +68,7 @@ func (m *MatchManager) setMatchScore(app core.App, matchData *MatchData, points 
 	if len(points) != 2 || len(points[0]) != len(points[1]) {
 		return errors.New("invalid points format")
 	}
-	event := NewScoreEvent(app, matchData)
+	event := newScoreEvent(app, matchData)
 
 	event.ScoreData = make([]*MatchSet, 0, 3)
 	for i := range len(points[0]) {
@@ -73,10 +81,14 @@ func (m *MatchManager) setMatchScore(app core.App, matchData *MatchData, points 
 		event.ScoreData = append(event.ScoreData, set)
 	}
 
-	return m.onScoreSet.Trigger(event,
+	err := m.onScoreSet.Trigger(event,
 		m.handleEndTimeSet,
 		(*ScoreEvent).saveScoreData,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (m *MatchManager) handleEndTimeSet(e *ScoreEvent) error {
@@ -88,11 +100,15 @@ func (m *MatchManager) handleEndTimeSet(e *ScoreEvent) error {
 }
 
 func (m *MatchManager) resetMatch(app core.App, matchData *MatchData) error {
-	event := NewScoreEvent(app, matchData)
-	return m.onReset.Trigger(event,
+	event := newScoreEvent(app, matchData)
+	err := m.onReset.Trigger(event,
 		m.resetMatchHandler,
 		(*ScoreEvent).saveScoreData,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (m *MatchManager) resetMatchHandler(e *ScoreEvent) error {

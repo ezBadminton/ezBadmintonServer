@@ -89,11 +89,15 @@ func (s *RegistrationStore) addTeams(teams ...*Team) {
 func (s *RegistrationStore) registerTeam(app core.App, team *Team, competition *Competition) error {
 	event := newRegistrationEvent(app, competition, team)
 	event.AddedPlayers = team.Players()
-	return s.onRegistration.Trigger(event,
+	err := s.onRegistration.Trigger(event,
 		s.registerHandler,
 		(*RegistrationEvent).saveNewRegistration,
 		s.registerStoreHandler,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (s *RegistrationStore) registerHandler(e *RegistrationEvent) error {
@@ -111,7 +115,7 @@ func (s *RegistrationStore) registerHandler(e *RegistrationEvent) error {
 	e.Registration.BaseTopsRecord.Created = e.Team.Created()
 	e.Registration.BaseTopsRecord.Updated = e.Team.Updated()
 
-	go realtimeNotify(e.App, "registrations", core.ModelEventTypeCreate, reg)
+	e.AddRealtimeNotification(e.App, "registrations", core.ModelEventTypeCreate, reg, 0)
 	return nil
 }
 
@@ -128,11 +132,15 @@ func (s *RegistrationStore) updateTeam(app core.App, team *Team) error {
 		event.Competition = event.Registration.Competition
 	}
 
-	return s.onUpdate.Trigger(event,
+	err := s.onUpdate.Trigger(event,
 		s.updateHandler,
 		(*RegistrationEvent).saveUpdatedRegistration,
 		s.updateStoreHandler,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (s *RegistrationStore) updateHandler(e *RegistrationEvent) error {
@@ -177,7 +185,7 @@ func (s *RegistrationStore) updateHandler(e *RegistrationEvent) error {
 		return err
 	}
 
-	go realtimeNotify(e.App, "registrations", core.ModelEventTypeUpdate, e.Registration)
+	e.AddRealtimeNotification(e.App, "registrations", core.ModelEventTypeUpdate, e.Registration, 0)
 	return nil
 }
 
@@ -200,11 +208,15 @@ func (s *RegistrationStore) deleteTeam(app core.App, team *Team) error {
 		if event.Registration != nil {
 			event.Competition = event.Registration.Competition
 		}
-		return s.onDelete.Trigger(event,
+		err := s.onDelete.Trigger(event,
 			s.deleteHandler,
 			(*RegistrationEvent).saveDeletedRegistration,
 			s.deleteStoreHandler,
 		)
+		if err == nil {
+			event.TriggerRealtimeNotifications()
+		}
+		return err
 	})
 }
 
@@ -232,7 +244,7 @@ func (s *RegistrationStore) deleteStoreHandler(e *RegistrationEvent) error {
 		delete(s.byCompetitionPlayer[comp.Id], p.Id)
 	}
 
-	go realtimeNotify(e.App, "registrations", core.ModelEventTypeDelete, e.Registration)
+	e.AddRealtimeNotification(e.App, "registrations", core.ModelEventTypeDelete, e.Registration, 0)
 
 	return e.Next()
 }
@@ -331,6 +343,9 @@ func (s *RegistrationStore) handleCompetitonDeletion(ce *CompetitionEvent) error
 				return nil
 			},
 		)
+		if err == nil {
+			re.TriggerRealtimeNotifications()
+		}
 		re.syncParent(ce)
 		if err != nil {
 			return err

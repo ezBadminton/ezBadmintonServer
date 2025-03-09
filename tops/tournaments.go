@@ -1,8 +1,9 @@
 package tops
 
 import (
-	"encoding/json"
 	"errors"
+	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -20,7 +21,22 @@ type Tournament interface {
 	got.WithdrawalPolicy
 	got.EditingPolicy
 
-	json.Marshaler
+	ToMap(getMatchId func(int) string) map[string]any
+}
+
+type TournamentMatch struct {
+	BaseTopsRecord
+	match     *got.Match
+	matchData *MatchData
+}
+
+func (m *TournamentMatch) ToMap() map[string]any {
+	result := m.match.ToMap()
+	if m.matchData != nil {
+		matchData := m.matchData.Record.FieldsData()
+		maps.Copy(result, matchData)
+	}
+	return m.BaseTopsRecord.ToMap(result)
 }
 
 type CompetitionTournament struct {
@@ -29,31 +45,34 @@ type CompetitionTournament struct {
 	Tournament
 	badminton.ScoreSettings
 	Started, Ended bool
-	// Match ID -> MatchData ID
-	MatchData map[int]string
 }
 
 func (c *CompetitionTournament) ToMap() map[string]any {
+	comp := c.Competition
+	matchIdGetter := createMatchIdGetter(comp.Id)
+	tournament := c.Tournament.ToMap(matchIdGetter)
 	data := map[string]any{
 		"competition": c.Competition.Id,
-		"tournament":  c.Tournament,
+		"tournament":  tournament,
 		"started":     c.Started,
 		"ended":       c.Ended,
-		"matchData":   c.MatchData,
 	}
 	return c.BaseTopsRecord.ToMap(data)
 }
 
 type TournamentStore struct {
-	app  core.App
+	app core.App
+
 	list []*CompetitionTournament
-	// Competition id -> tournament
+	// match id -> tournament match
+	matches map[string]*TournamentMatch
+	// competition id -> match list
+	competitionMatches map[string][]*TournamentMatch
+	// competition id -> tournament
 	tournaments map[string]*CompetitionTournament
-	// Tournament match id -> match data
-	matchData map[int]*MatchData
-	// match data id -> tournament match
-	matches map[string]*got.Match
-	// match data id -> tournament
+	// got match id -> match
+	hydratedMatches map[int]*TournamentMatch
+	// match id -> tournament
 	byMatch map[string]*CompetitionTournament
 
 	// Before match data create. After e.Next() the match data has been persisted and the tournament hydrated
@@ -81,15 +100,16 @@ func newTournamentStore(
 	compStore, _ := store.FindRecordStore[Competition]()
 
 	s := &TournamentStore{
-		app:         app,
-		tournaments: make(map[string]*CompetitionTournament),
-		list:        make([]*CompetitionTournament, 0),
-		matchData:   make(map[int]*MatchData),
-		matches:     make(map[string]*got.Match),
-		byMatch:     make(map[string]*CompetitionTournament),
-		onStart:     &hook.Hook[*PlanEvent]{},
-		onStop:      &hook.Hook[*PlanEvent]{},
-		onUpdate:    &hook.Hook[*PlanEvent]{},
+		app:                app,
+		tournaments:        make(map[string]*CompetitionTournament),
+		matches:            make(map[string]*TournamentMatch),
+		competitionMatches: make(map[string][]*TournamentMatch),
+		list:               make([]*CompetitionTournament, 0),
+		hydratedMatches:    make(map[int]*TournamentMatch),
+		byMatch:            make(map[string]*CompetitionTournament),
+		onStart:            &hook.Hook[*PlanEvent]{},
+		onStop:             &hook.Hook[*PlanEvent]{},
+		onUpdate:           &hook.Hook[*PlanEvent]{},
 	}
 
 	err := s.addTournaments(compStore.RecordList...)
@@ -159,7 +179,30 @@ func (s *TournamentStore) listStarted() []*CompetitionTournament {
 	return tournaments
 }
 
-func (s *TournamentStore) setTournament(competition *Competition, tournament *CompetitionTournament) {
+func (s *TournamentStore) listMatches() []*TournamentMatch {
+	matches := make([]*TournamentMatch, 0)
+	matchDataStore, _ := store.FindRecordStore[MatchData]()
+	for _, t := range s.list {
+		comp := t.Competition
+		matchIdGetter := createMatchIdGetter(comp.Id)
+		for i, m := range t.Tournament.MatchList().Matches {
+			id := matchIdGetter(i)
+			var matchData *MatchData
+			if t.Started {
+				matchData, _ = matchDataStore.FindProxy(id)
+			}
+			tMatch := &TournamentMatch{
+				BaseTopsRecord: BaseTopsRecord{Id: id},
+				match:          m,
+				matchData:      matchData,
+			}
+			matches = append(matches, tMatch)
+		}
+	}
+	return matches
+}
+
+func (s *TournamentStore) setTournament(realtimeNotifier realtimeNotifier, competition *Competition, tournament *CompetitionTournament) {
 	_, isUpdate := s.tournaments[competition.Id]
 
 	s.tournaments[competition.Id] = tournament
@@ -170,6 +213,10 @@ func (s *TournamentStore) setTournament(competition *Competition, tournament *Co
 	s.list = append(s.list, tournament)
 	slices.SortFunc(s.list, compareTournaments)
 
+	if !isUpdate {
+		s.initTournamentMatches(tournament)
+	}
+
 	var realtimeEventType string
 	if isUpdate {
 		realtimeEventType = core.ModelEventTypeUpdate
@@ -177,36 +224,78 @@ func (s *TournamentStore) setTournament(competition *Competition, tournament *Co
 		realtimeEventType = core.ModelEventTypeCreate
 	}
 
-	go realtimeNotify(s.app, "tournamentplans", realtimeEventType, tournament)
+	matches := s.competitionMatches[competition.Id]
+	for _, m := range matches {
+		realtimeNotifier.AddRealtimeNotification(s.app, "tournament_matches", realtimeEventType, m, 0)
+	}
+	realtimeNotifier.AddRealtimeNotification(s.app, "tournament_plans", realtimeEventType, tournament, 0)
 }
 
-func (s *TournamentStore) update(tournament *CompetitionTournament) {
+func (s *TournamentStore) update(realtimeNotifier realtimeNotifier, tournament *CompetitionTournament) {
 	event := newPlanEvent(s.app, tournament.Competition, tournament)
-	s.onUpdate.Trigger(event, func(e *PlanEvent) error {
-		e.Tournament.Update(nil)
-		go realtimeNotify(s.app, "tournamentplans", core.ModelEventTypeUpdate, tournament)
-		return e.Next()
-	})
+	s.onUpdate.Trigger(event,
+		func(e *PlanEvent) error {
+			e.Tournament.Update(nil)
+			matches := s.competitionMatches[e.Tournament.Competition.Id]
+			s.realtimeUpdateNotification(realtimeNotifier, e.Tournament, matches)
+			return e.Next()
+		},
+	)
+	event.TriggerRealtimeNotifications()
 }
 
-func (s *TournamentStore) removeTournament(competition *Competition) {
+func (s *TournamentStore) realtimeUpdateNotification(realtimeNotifier realtimeNotifier, tournament *CompetitionTournament, matches []*TournamentMatch) {
+	for _, m := range matches {
+		realtimeNotifier.AddRealtimeNotification(s.app, "tournament_matches", core.ModelEventTypeUpdate, m, 0)
+	}
+	realtimeNotifier.AddRealtimeNotification(s.app, "tournament_plans", core.ModelEventTypeUpdate, tournament, 0)
+}
+
+func (s *TournamentStore) removeTournament(realtimeNotifier realtimeNotifier, competition *Competition) {
 	tournament := s.tournaments[competition.Id]
 	matches := tournament.MatchList().Matches
-	for _, m := range matches {
-		delete(s.matchData, m.Id())
-		matchData := s.matchData[m.Id()]
-		if matchData != nil {
-			delete(s.matches, matchData.Id)
-			delete(s.byMatch, matchData.Id)
-		}
+	matchIdGetter := createMatchIdGetter(competition.Id)
+	for i, m := range matches {
+		delete(s.hydratedMatches, m.Id())
+		matchId := matchIdGetter(i)
+		delete(s.byMatch, matchId)
+		delete(s.matches, matchId)
 	}
+	tMatches := s.competitionMatches[competition.Id]
+	delete(s.competitionMatches, competition.Id)
 
 	delete(s.tournaments, competition.Id)
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
 		return t.Competition.Id == competition.Id
 	})
 
-	go realtimeNotify(s.app, "tournamentplans", core.ModelEventTypeDelete, tournament)
+	realtimeNotifier.AddRealtimeNotification(s.app, "tournament_plans", core.ModelEventTypeDelete, tournament, 0)
+	for _, m := range tMatches {
+		realtimeNotifier.AddRealtimeNotification(s.app, "tournament_matches", core.ModelEventTypeDelete, m, 0)
+	}
+}
+
+func (s *TournamentStore) initTournamentMatches(tournament *CompetitionTournament) {
+	matchDataList := tournament.Competition.Matches()
+	matches := tournament.MatchList().Matches
+	matchIdGetter := createMatchIdGetter(tournament.Competition.Id)
+	tMatches := make([]*TournamentMatch, len(matches))
+	for i, m := range matches {
+		var matchData *MatchData
+		if len(matchDataList) > 0 {
+			matchData = matchDataList[i]
+		}
+		id := matchIdGetter(i)
+		tMatch := &TournamentMatch{
+			BaseTopsRecord: BaseTopsRecord{Id: id},
+			match:          m,
+			matchData:      matchData,
+		}
+		s.matches[id] = tMatch
+		s.hydratedMatches[m.Id()] = tMatch
+		tMatches[i] = tMatch
+	}
+	s.competitionMatches[tournament.Competition.Id] = tMatches
 }
 
 func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
@@ -218,6 +307,7 @@ func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
 		if err != nil {
 			return err
 		}
+		s.initTournamentMatches(tournament)
 		if err := s.hydrate(tournament); err != nil {
 			return err
 		}
@@ -296,7 +386,6 @@ func (s *TournamentStore) createTournament(comp *Competition) (*CompetitionTourn
 		Competition:   comp,
 		Tournament:    tournament,
 		ScoreSettings: scoreSettings,
-		MatchData:     map[int]string{},
 	}
 
 	return compTournament, nil
@@ -312,11 +401,15 @@ func (s *TournamentStore) start(app core.App, competition *Competition) error {
 	}
 
 	event := newPlanEvent(app, competition, tournament)
-	return s.onStart.Trigger(event,
+	err := s.onStart.Trigger(event,
 		s.startHandler,
 		(*PlanEvent).saveStartedPlan,
 		s.hydrateHandler,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (s *TournamentStore) startHandler(e *PlanEvent) error {
@@ -342,11 +435,15 @@ func (s *TournamentStore) stop(app core.App, competition *Competition) error {
 		return errors.New("competition is not running")
 	}
 	event := newPlanEvent(app, competition, tournament)
-	return s.onStop.Trigger(event,
+	err := s.onStop.Trigger(event,
 		s.stopHandler,
 		(*PlanEvent).saveStoppedPlan,
 		s.dehydrateHandler,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (s *TournamentStore) stopHandler(e *PlanEvent) error {
@@ -376,7 +473,7 @@ func (s *TournamentStore) handleDraw(e *CompetitionEvent) error {
 		return err
 	}
 
-	s.setTournament(e.Competition, tournament)
+	s.setTournament(e, e.Competition, tournament)
 	return nil
 }
 
@@ -391,7 +488,7 @@ func (s *TournamentStore) handleDrawDeletion(e *CompetitionEvent) error {
 	if err := e.Next(); err != nil {
 		return err
 	}
-	s.removeTournament(e.Competition)
+	s.removeTournament(e, e.Competition)
 	return nil
 }
 
@@ -400,11 +497,13 @@ func (s *TournamentStore) handleMatchStart(e *MatchEvent) error {
 		return err
 	}
 	match := s.matches[e.MatchData.Id]
-	match.StartTime = e.MatchData.StartTime().Time()
+	match.matchData = e.MatchData
+	match.match.StartTime = e.MatchData.StartTime().Time()
 
 	tournament := s.byMatch[e.MatchData.Id]
 	tournament.UpdateEditableMatches()
-	go realtimeNotify(s.app, "tournamentplans", core.ModelEventTypeUpdate, tournament)
+	e.AddRealtimeNotification(s.app, "tournament_matches", core.ModelEventTypeUpdate, match, 0)
+	e.AddRealtimeNotification(s.app, "tournament_plans", core.ModelEventTypeUpdate, tournament, 0)
 	return nil
 }
 
@@ -413,11 +512,13 @@ func (s *TournamentStore) handleMatchCancel(e *MatchEvent) error {
 		return err
 	}
 	match := s.matches[e.MatchData.Id]
-	match.StartTime = time.Time{}
+	match.matchData = e.MatchData
+	match.match.StartTime = time.Time{}
 
 	tournament := s.byMatch[e.MatchData.Id]
 	tournament.UpdateEditableMatches()
-	go realtimeNotify(s.app, "tournamentplans", core.ModelEventTypeUpdate, tournament)
+	e.AddRealtimeNotification(s.app, "tournament_matches", core.ModelEventTypeUpdate, match, 0)
+	e.AddRealtimeNotification(s.app, "tournament_plans", core.ModelEventTypeUpdate, tournament, 0)
 	return nil
 }
 
@@ -438,12 +539,13 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 		return err
 	}
 
-	e.Match.Score = score
+	e.Match.matchData = e.MatchData
+	e.Match.match.Score = score
 	if matchEnding {
-		e.Match.EndTime = e.MatchData.EndTime().Time()
+		e.Match.match.EndTime = e.MatchData.EndTime().Time()
 		tournament.Ended = matchesFinished(tournament.MatchList().Matches)
 	}
-	s.update(tournament)
+	s.update(e, tournament)
 	return nil
 }
 
@@ -457,16 +559,17 @@ func (s *TournamentStore) handleMatchReset(e *ScoreEvent) error {
 	}
 
 	match := s.matches[e.MatchData.Id]
-	match.Score = nil
-	match.StartTime = time.Time{}
-	match.EndTime = time.Time{}
+	match.matchData = e.MatchData
+	match.match.Score = nil
+	match.match.StartTime = time.Time{}
+	match.match.EndTime = time.Time{}
 	if e.MatchData.Court() == nil {
-		match.Location = nil
+		match.match.Location = nil
 	}
 
 	tournament := s.byMatch[e.MatchData.Id]
 	tournament.Ended = false
-	s.update(tournament)
+	s.update(e, tournament)
 	return nil
 }
 
@@ -477,7 +580,9 @@ func (s *TournamentStore) handleCourtAssignment(e *CourtEvent) error {
 		return err
 	}
 
-	hydrateCourt(e.Match, e.MatchData.Court())
+	e.Match.matchData = e.MatchData
+	hydrateCourt(e.Match.match, e.MatchData.Court())
+	e.AddRealtimeNotification(e.App, "tournament_matches", core.ModelEventTypeUpdate, e.Match, 0)
 	return nil
 }
 
@@ -511,6 +616,10 @@ func (s *TournamentStore) handleStatusChange(e *StatusChangeEvent) error {
 		return err
 	}
 
+	for _, matchData := range e.ChangedMatchData {
+		match := s.matches[matchData.Id]
+		match.matchData = matchData
+	}
 	for _, withdrawal := range e.Withdrawals {
 		tPlayer := TournamentPlayer{withdrawal.Registration.Team}
 		if e.Withdraw {
@@ -519,7 +628,7 @@ func (s *TournamentStore) handleStatusChange(e *StatusChangeEvent) error {
 			removeWithdrawnFromMatches(tPlayer, withdrawal.ChangedMatches)
 		}
 		tournament := s.tournaments[withdrawal.Competition.Id]
-		s.update(tournament)
+		s.update(e, tournament)
 	}
 	return nil
 }
@@ -554,7 +663,7 @@ func (s *TournamentStore) handleTieBreakerChange(e *TieBreakerEvent) error {
 
 	insertTieBreaker(e.Teams, e.GroupPhase)
 	tournament := s.tournaments[e.Competition.Id]
-	s.update(tournament)
+	s.update(e, tournament)
 	return nil
 }
 
@@ -565,7 +674,7 @@ func (s *TournamentStore) handleTieBreakerDelete(e *TieBreakerEvent) error {
 
 	revokeTieBreaker(e.Teams, e.GroupPhase)
 	tournament := s.tournaments[e.Competition.Id]
-	s.update(tournament)
+	s.update(e, tournament)
 	return nil
 }
 
@@ -575,12 +684,12 @@ func (s *TournamentStore) handleReschedule(e *RescheduleEvent) error {
 }
 
 func (s *TournamentStore) handleScheduleStatus(e *ScheduleStatusEvent) error {
-	e.MatchData = s.matchData[e.Match.Id()]
+	e.MatchData = s.hydratedMatches[e.Match.Id()].matchData
 	return e.Next()
 }
 
 func (s *TournamentStore) handleRestEnd(e *PlayerRestEvent) error {
-	e.Tournament = s.byMatch[e.MatchData.Id]
+	e.Tournament = s.byMatch[e.Match.Id]
 	return e.Next()
 }
 
@@ -642,14 +751,17 @@ func (s *TournamentStore) handleCompetitionDelete(e *CompetitionEvent) error {
 	return nil
 }
 
-func createMatchData(app core.App, tournament got.MatchLister) ([]*MatchData, error) {
+func createMatchData(app core.App, tournament *CompetitionTournament) ([]*MatchData, error) {
 	matches := tournament.MatchList().Matches
 	matchData := make([]*MatchData, len(matches))
+	compId := tournament.Competition.Id
+	matchIdGetter := createMatchIdGetter(compId)
 	for i := range matches {
 		data, err := NewProxy[MatchData](app)
 		if err != nil {
 			return nil, errors.New("could not create match data proxy")
 		}
+		data.Id = matchIdGetter(i)
 		matchData[i] = data
 	}
 
@@ -659,7 +771,6 @@ func createMatchData(app core.App, tournament got.MatchLister) ([]*MatchData, er
 func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 	comp := tournament.Competition
 	matchData := comp.Matches()
-	tournament.MatchData = make(map[int]string)
 
 	if len(matchData) == 0 {
 		tournament.Started = false
@@ -698,9 +809,8 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 		withdrawn := data.WithdrawnTeams()
 		hydrateWithdrawnTeams(match, withdrawn)
 
-		tournament.MatchData[match.Id()] = data.Id
-		s.matchData[match.Id()] = data
-		s.matches[data.Id] = match
+		s.hydratedMatches[match.Id()] = s.matches[data.Id]
+		s.matches[data.Id].matchData = data
 		s.byMatch[data.Id] = tournament
 	}
 
@@ -720,10 +830,10 @@ func (s *TournamentStore) dehydrate(tournament *CompetitionTournament) {
 		m.EndTime = time.Time{}
 		m.WithdrawnPlayers = nil
 
-		delete(s.matchData, m.Id())
-		matchData := s.matchData[m.Id()]
+		delete(s.hydratedMatches, m.Id())
+		matchData := s.hydratedMatches[m.Id()]
 		if matchData != nil {
-			delete(s.matches, matchData.Id)
+			s.matches[matchData.Id].matchData = nil
 			delete(s.byMatch, matchData.Id)
 		}
 	}
@@ -734,7 +844,7 @@ func (s *TournamentStore) dehydrate(tournament *CompetitionTournament) {
 func (s *TournamentStore) matchesToMatchData(matches []*got.Match) []*MatchData {
 	matchData := make([]*MatchData, len(matches))
 	for i, m := range matches {
-		matchData[i] = s.matchData[m.Id()]
+		matchData[i] = s.hydratedMatches[m.Id()].matchData
 	}
 	return matchData
 }
@@ -743,7 +853,7 @@ func (s *TournamentStore) isEditable(matchData *MatchData) bool {
 	tournament := s.byMatch[matchData.Id]
 	editable := tournament.EditableMatches()
 	for _, m := range editable {
-		editableMatchData := s.matchData[m.Id()]
+		editableMatchData := s.hydratedMatches[m.Id()]
 		if editableMatchData.Id == matchData.Id {
 			return true
 		}
@@ -904,4 +1014,10 @@ func newScoreSettings(settings *TournamentModeSettings) (badminton.ScoreSettings
 		settings.TwoPointMargin(),
 	)
 	return scoreSettings, err
+}
+
+func createMatchIdGetter(competitionId string) func(int) string {
+	return func(i int) string {
+		return fmt.Sprintf("m-%v-%v", competitionId, i)
+	}
 }

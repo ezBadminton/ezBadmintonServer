@@ -9,8 +9,27 @@ import (
 	"github.com/pocketbase/pocketbase/tools/hook"
 )
 
-type CompetitionEvent struct {
+type BaseEvent struct {
 	hook.Event
+	*realtimeNotificationList
+}
+
+func newBaseEvent() BaseEvent {
+	return BaseEvent{
+		Event: hook.Event{},
+		realtimeNotificationList: &realtimeNotificationList{
+			notifications: make([]realtimeNotification, 0),
+		},
+	}
+}
+
+func (e BaseEvent) TriggerRealtimeNotifications() error {
+	go e.realtimeNotificationList.TriggerRealtimeNotifications()
+	return nil
+}
+
+type CompetitionEvent struct {
+	BaseEvent
 
 	App         core.App
 	Competition *Competition
@@ -18,7 +37,7 @@ type CompetitionEvent struct {
 
 func newCompetitionEvent(app core.App, competition *Competition) *CompetitionEvent {
 	return &CompetitionEvent{
-		Event:       hook.Event{},
+		BaseEvent:   newBaseEvent(),
 		App:         app,
 		Competition: Clone(competition),
 	}
@@ -56,16 +75,16 @@ func (e *CompetitionEvent) syncToSettingsParent(parent *TournamentModeSettingsEv
 }
 
 type MatchEvent struct {
-	hook.Event
+	BaseEvent
 
 	App       core.App
 	MatchData *MatchData
-	Match     *got.Match
+	Match     *TournamentMatch
 }
 
 func newMatchEvent(app core.App, matchData *MatchData) *MatchEvent {
 	return &MatchEvent{
-		Event:     hook.Event{},
+		BaseEvent: newBaseEvent(),
 		App:       app,
 		MatchData: Clone(matchData),
 	}
@@ -94,7 +113,7 @@ type ScoreEvent struct {
 	ScoreData []*MatchSet
 }
 
-func NewScoreEvent(app core.App, matchData *MatchData) *ScoreEvent {
+func newScoreEvent(app core.App, matchData *MatchData) *ScoreEvent {
 	return &ScoreEvent{MatchEvent: newMatchEvent(app, matchData)}
 }
 
@@ -124,7 +143,7 @@ func (e *ScoreEvent) saveScoreData() error {
 }
 
 type RegistrationEvent struct {
-	hook.Event
+	BaseEvent
 
 	App          core.App
 	Competition  *Competition
@@ -136,7 +155,7 @@ type RegistrationEvent struct {
 
 func newRegistrationEvent(app core.App, competition *Competition, team *Team) *RegistrationEvent {
 	return &RegistrationEvent{
-		Event:       hook.Event{},
+		BaseEvent:   newBaseEvent(),
 		App:         app,
 		Competition: competition,
 		Team:        team,
@@ -277,7 +296,7 @@ func (e *PlanEvent) saveStoppedPlan() error {
 }
 
 type StatusChangeEvent struct {
-	hook.Event
+	BaseEvent
 
 	App    core.App
 	Player *Player
@@ -298,7 +317,7 @@ func newStatusChangeEvent(
 	competitions []*Competition,
 ) *StatusChangeEvent {
 	return &StatusChangeEvent{
-		Event:            hook.Event{},
+		BaseEvent:        newBaseEvent(),
 		App:              app,
 		Player:           Clone(player),
 		Status:           status,
@@ -371,18 +390,18 @@ func (e *SettingsEvent) syncToRequest(re *core.RecordRequestEvent) {
 }
 
 type PlayerRestEvent struct {
-	hook.Event
+	BaseEvent
 
 	Players    []*Player
-	MatchData  *MatchData
+	Match      *TournamentMatch
 	Tournament *CompetitionTournament
 }
 
-func newPlayerRestEvent(players []*Player, matchData *MatchData) *PlayerRestEvent {
+func newPlayerRestEvent(players []*Player, match *TournamentMatch) *PlayerRestEvent {
 	return &PlayerRestEvent{
-		Event:     hook.Event{},
+		BaseEvent: newBaseEvent(),
 		Players:   players,
-		MatchData: matchData,
+		Match:     match,
 	}
 }
 
@@ -391,16 +410,16 @@ func newPlayerRestEvent(players []*Player, matchData *MatchData) *PlayerRestEven
 // in their rest period before and after the change are
 // not listed.
 type MatchRestEvent struct {
-	hook.Event
+	BaseEvent
 
-	MatchData   []*MatchData
+	MatchData   []*TournamentMatch
 	Tournaments []*CompetitionTournament
 }
 
-func newMatchRestEvent(matchData []*MatchData) *MatchRestEvent {
+func newMatchRestEvent(matches []*TournamentMatch) *MatchRestEvent {
 	return &MatchRestEvent{
-		Event:     hook.Event{},
-		MatchData: matchData,
+		BaseEvent: newBaseEvent(),
+		MatchData: matches,
 	}
 }
 

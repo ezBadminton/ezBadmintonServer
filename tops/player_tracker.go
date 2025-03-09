@@ -20,11 +20,11 @@ type restGroup struct {
 
 type PlayerTracker struct {
 	// player id -> currently played match
-	inMatch map[string]*MatchData
+	inMatch map[string]*TournamentMatch
 	// player ids of resting players
 	inRest map[string]any
 	// player id -> last ended match
-	lastMatches  map[string]*MatchData
+	lastMatches  map[string]*TournamentMatch
 	restDuration time.Duration
 
 	// match data id of recently ended match -> rest group
@@ -88,14 +88,14 @@ func (t *PlayerTracker) init(
 	t.initRestTimers()
 }
 
-func collectCurrentMatches(matches []*got.Match, tournamentStore *TournamentStore) map[string]*MatchData {
-	inMatch := make(map[string]*MatchData)
+func collectCurrentMatches(matches []*got.Match, tournamentStore *TournamentStore) map[string]*TournamentMatch {
+	inMatch := make(map[string]*TournamentMatch)
 	for _, m := range matches {
 		if !matchRunning(m) {
 			continue
 		}
 
-		matchData := tournamentStore.matchData[m.Id()]
+		matchData := tournamentStore.hydratedMatches[m.Id()]
 		players := playersInMatch(m)
 
 		for _, p := range players {
@@ -107,27 +107,27 @@ func collectCurrentMatches(matches []*got.Match, tournamentStore *TournamentStor
 
 // Goes through the sortedMatches (sorted by end time) and
 // maps each player ID to their last ended match
-func collectLastMatches(sortedMatches []*got.Match, tournamentStore *TournamentStore) map[string]*MatchData {
-	lastMatches := make(map[string]*MatchData)
+func collectLastMatches(sortedMatches []*got.Match, tournamentStore *TournamentStore) map[string]*TournamentMatch {
+	lastMatches := make(map[string]*TournamentMatch)
 	for _, m := range sortedMatches {
 		if m.EndTime.IsZero() {
 			break
 		}
 
-		matchData := tournamentStore.matchData[m.Id()]
+		match := tournamentStore.hydratedMatches[m.Id()]
 		players := playersInMatch(m)
 
 		for _, p := range players {
 			_, ok := lastMatches[p.Id]
 			if !ok {
-				lastMatches[p.Id] = matchData
+				lastMatches[p.Id] = match
 			}
 		}
 	}
 	return lastMatches
 }
 
-func (t *PlayerTracker) isPlaying(player *Player) (bool, *MatchData) {
+func (t *PlayerTracker) isPlaying(player *Player) (bool, *TournamentMatch) {
 	match, ok := t.inMatch[player.Id]
 	if !ok {
 		return false, nil
@@ -142,12 +142,12 @@ func (t *PlayerTracker) isResting(player *Player) (bool, time.Time) {
 	}
 
 	lastMatch := t.lastMatches[player.Id]
-	restUntil := lastMatch.EndTime().Add(t.restDuration)
+	restUntil := lastMatch.matchData.EndTime().Add(t.restDuration)
 
 	return true, restUntil.Time()
 }
 
-func (t *PlayerTracker) startPlayerRest(players []*Player, match *MatchData, duration time.Duration) {
+func (t *PlayerTracker) startPlayerRest(players []*Player, match *TournamentMatch, duration time.Duration) {
 	for _, p := range players {
 		t.lastMatches[p.Id] = match
 	}
@@ -165,7 +165,7 @@ func (t *PlayerTracker) startPlayerRest(players []*Player, match *MatchData, dur
 	go t.restTimer(match, players, duration, cancel)
 }
 
-func (t *PlayerTracker) restTimer(match *MatchData, players []*Player, duration time.Duration, cancel chan any) {
+func (t *PlayerTracker) restTimer(match *TournamentMatch, players []*Player, duration time.Duration, cancel chan any) {
 	timer := time.NewTimer(duration)
 	select {
 	case <-timer.C:
@@ -177,7 +177,7 @@ func (t *PlayerTracker) restTimer(match *MatchData, players []*Player, duration 
 	}
 }
 
-func (t *PlayerTracker) handleRestEnd(match *MatchData, players ...*Player) {
+func (t *PlayerTracker) handleRestEnd(match *TournamentMatch, players ...*Player) {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()
 
@@ -191,6 +191,7 @@ func (t *PlayerTracker) handleRestEnd(match *MatchData, players ...*Player) {
 		delete(t.restGroups, match.Id)
 		event := newPlayerRestEvent(players, match)
 		t.onRestEnd.Trigger(event)
+		event.TriggerRealtimeNotifications()
 	}
 }
 
@@ -205,7 +206,7 @@ func (t *PlayerTracker) handleRestTimeChange(e *SettingsEvent) error {
 	}
 	t.restDuration = time.Duration(newRestTime) * time.Minute
 
-	oldRestingMatches := make(map[*MatchData]any)
+	oldRestingMatches := make(map[*TournamentMatch]any)
 	for playerId := range t.inRest {
 		oldRestingMatches[t.lastMatches[playerId]] = struct{}{}
 	}
@@ -216,7 +217,7 @@ func (t *PlayerTracker) handleRestTimeChange(e *SettingsEvent) error {
 
 	newRestingMatches := t.initRestTimers()
 
-	changedRestingMatches := make([]*MatchData, 0)
+	changedRestingMatches := make([]*TournamentMatch, 0)
 	for _, m := range newRestingMatches {
 		_, ok := oldRestingMatches[m]
 		if !ok {
@@ -231,6 +232,7 @@ func (t *PlayerTracker) handleRestTimeChange(e *SettingsEvent) error {
 	if len(changedRestingMatches) > 0 {
 		event := newMatchRestEvent(changedRestingMatches)
 		t.onRestChanged.Trigger(event)
+		event.TriggerRealtimeNotifications()
 	}
 
 	return nil
@@ -238,8 +240,8 @@ func (t *PlayerTracker) handleRestTimeChange(e *SettingsEvent) error {
 
 // Starts all rest timers based on the current t.lastMatches
 // Returns the last matches which had timers started for them.
-func (t *PlayerTracker) initRestTimers() []*MatchData {
-	matchMap := make(map[*MatchData][]*Player)
+func (t *PlayerTracker) initRestTimers() []*TournamentMatch {
+	matchMap := make(map[*TournamentMatch][]*Player)
 	for playerId, lastMatch := range t.lastMatches {
 		_, ok := t.inMatch[playerId]
 		if ok {
@@ -253,7 +255,7 @@ func (t *PlayerTracker) initRestTimers() []*MatchData {
 		matchMap[lastMatch] = append(matchMap[lastMatch], player)
 	}
 
-	matchesInRest := make([]*MatchData, 0)
+	matchesInRest := make([]*TournamentMatch, 0)
 	for lastMatch, players := range matchMap {
 		restDuration := t.calculateRestDuration(lastMatch)
 		if restDuration > 10*time.Second {
@@ -265,8 +267,8 @@ func (t *PlayerTracker) initRestTimers() []*MatchData {
 	return matchesInRest
 }
 
-func (t *PlayerTracker) calculateRestDuration(match *MatchData) time.Duration {
-	restUntil := match.EndTime().Add(t.restDuration)
+func (t *PlayerTracker) calculateRestDuration(match *TournamentMatch) time.Duration {
+	restUntil := match.matchData.EndTime().Add(t.restDuration)
 	restDuration := restUntil.Time().Sub(time.Now())
 	return restDuration
 }
@@ -278,7 +280,7 @@ func (t *PlayerTracker) handleScheduleStatus(e *ScheduleStatusEvent) error {
 	for _, p := range players {
 		isPlaying, blockingMatch := t.isPlaying(p)
 		if isPlaying {
-			e.PlayersInMatch[p] = blockingMatch
+			e.PlayersInMatch[p] = blockingMatch.matchData
 		}
 		isResting, restUntil := t.isResting(p)
 		if isResting {
@@ -292,9 +294,9 @@ func (t *PlayerTracker) handleCourtAssignment(e *CourtEvent) error {
 	if err := e.Next(); err != nil {
 		return err
 	}
-	players := playersInMatch(e.Match)
+	players := playersInMatch(e.Match.match)
 	for _, p := range players {
-		t.inMatch[p.Id] = e.MatchData
+		t.inMatch[p.Id] = e.Match
 	}
 	return nil
 }
@@ -303,7 +305,7 @@ func (t *PlayerTracker) handleCourtUnassignment(e *CourtEvent) error {
 	if err := e.Next(); err != nil {
 		return err
 	}
-	players := playersInMatch(e.Match)
+	players := playersInMatch(e.Match.match)
 	for _, p := range players {
 		delete(t.inMatch, p.Id)
 	}
@@ -320,11 +322,11 @@ func (t *PlayerTracker) handleScoreSet(e *ScoreEvent) error {
 	if !matchEnding {
 		return nil
 	}
-	players := playersInMatch(e.Match)
+	players := playersInMatch(e.Match.match)
 	for _, p := range players {
 		delete(t.inMatch, p.Id)
 	}
-	t.startPlayerRest(players, e.MatchData, t.restDuration)
+	t.startPlayerRest(players, e.Match, t.restDuration)
 	return nil
 }
 

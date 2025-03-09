@@ -135,10 +135,14 @@ func (m *WithdrawalManager) setPlayerStatus(
 	}
 
 	event := newStatusChangeEvent(app, player, newStatus, withdraw, competitions)
-	return m.onStatusChange.Trigger(event,
+	err := m.onStatusChange.Trigger(event,
 		m.statusChangeHandler,
 		(*StatusChangeEvent).saveStatusChange,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (m *WithdrawalManager) statusChangeHandler(e *StatusChangeEvent) error {

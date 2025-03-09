@@ -295,14 +295,18 @@ func (s *MatchScheduler) listScheduledMatches() []*ScheduledMatch {
 	return slices.Collect(s.schedule.IterateMatches())
 }
 
-func (s *MatchScheduler) setMatchScheduleStatus(matchData *MatchData, newStatus ScheduleStatus) {
+func (s *MatchScheduler) setMatchScheduleStatus(
+	realtimeNotifier realtimeNotifier,
+	matchData *MatchData,
+	newStatus ScheduleStatus,
+) {
 	scheduledMatch := s.scheduled[matchData.Id]
 	scheduledMatch.ScheduleStatus = newStatus
 
-	go realtimeNotify(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch)
+	realtimeNotifier.AddRealtimeNotification(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch, 3)
 }
 
-func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionTournament) {
+func (s *MatchScheduler) updateTournamentScheduleStatus(realtimeNotifier realtimeNotifier, tournament *CompetitionTournament) {
 	competition := tournament.Competition
 	matches := tournament.MatchList().Matches
 
@@ -316,12 +320,12 @@ func (s *MatchScheduler) updateTournamentScheduleStatus(tournament *CompetitionT
 		scheduledMatch.BlockingPlayers = blockingPlayers
 
 		if status != oldStatus || !blockingPlayersEq(blockingPlayers, oldBlockingPlayers) {
-			go realtimeNotify(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch)
+			realtimeNotifier.AddRealtimeNotification(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch, 3)
 		}
 	}
 }
 
-func (s *MatchScheduler) tournamentStartStop(competition *Competition, started bool) {
+func (s *MatchScheduler) tournamentStartStop(realtimeNotifier realtimeNotifier, competition *Competition, started bool) {
 	schedule := s.newSchedule()
 	s.schedule = schedule
 	s.scheduled = scheduledMap(schedule)
@@ -333,21 +337,16 @@ func (s *MatchScheduler) tournamentStartStop(competition *Competition, started b
 		realtimeEventType = core.ModelEventTypeDelete
 	}
 
-	go func() {
-		defer tops.mu.RUnlock()
-		tops.mu.RLock()
-
-		for _, round := range s.schedule.roundQueue {
-			if round.Competition.Id != competition.Id {
-				continue
-			}
-			for _, match := range round.Matches {
-				realtimeNotify(s.app, "scheduled_matches", realtimeEventType, match)
-			}
-			realtimeNotify(s.app, "scheduled_rounds", realtimeEventType, round)
+	for _, round := range s.schedule.roundQueue {
+		if round.Competition.Id != competition.Id {
+			continue
 		}
-		realtimeNotify(s.app, "schedule", core.ModelEventTypeUpdate, schedule)
-	}()
+		for _, match := range round.Matches {
+			realtimeNotifier.AddRealtimeNotification(s.app, "scheduled_matches", realtimeEventType, match, 3)
+		}
+		realtimeNotifier.AddRealtimeNotification(s.app, "scheduled_rounds", realtimeEventType, round, 4)
+	}
+	realtimeNotifier.AddRealtimeNotification(s.app, "schedule", core.ModelEventTypeUpdate, schedule, 5)
 }
 
 func (s *MatchScheduler) scheduleStatus(match *got.Match, competition *Competition) (*MatchData, ScheduleStatus, map[string]PlayerBlock) {
@@ -419,7 +418,7 @@ func (s *MatchScheduler) handleTournamentStart(e *PlanEvent) error {
 		return err
 	}
 
-	s.tournamentStartStop(e.Competition, true)
+	s.tournamentStartStop(e, e.Competition, true)
 	return nil
 }
 
@@ -427,7 +426,7 @@ func (s *MatchScheduler) handleTournamentPlanUpdate(e *PlanEvent) error {
 	if err := e.Next(); err != nil {
 		return err
 	}
-	s.updateTournamentScheduleStatus(e.Tournament)
+	s.updateTournamentScheduleStatus(e, e.Tournament)
 	return nil
 }
 
@@ -436,7 +435,7 @@ func (s *MatchScheduler) handleTournamentStop(e *PlanEvent) error {
 		return err
 	}
 
-	s.tournamentStartStop(e.Competition, false)
+	s.tournamentStartStop(e, e.Competition, false)
 	return nil
 }
 
@@ -450,7 +449,7 @@ func (s *MatchScheduler) handleCourtAssignment(e *CourtEvent) error {
 		return err
 	}
 
-	s.setMatchScheduleStatus(e.MatchData, Ready)
+	s.setMatchScheduleStatus(e, e.MatchData, Ready)
 	return nil
 }
 
@@ -464,7 +463,7 @@ func (s *MatchScheduler) handleCourtUnassignment(e *CourtEvent) error {
 		return err
 	}
 
-	s.setMatchScheduleStatus(e.MatchData, CourtWait)
+	s.setMatchScheduleStatus(e, e.MatchData, CourtWait)
 	return nil
 }
 
@@ -478,7 +477,7 @@ func (s *MatchScheduler) handleMatchStart(e *MatchEvent) error {
 		return err
 	}
 
-	s.setMatchScheduleStatus(e.MatchData, InProgress)
+	s.setMatchScheduleStatus(e, e.MatchData, InProgress)
 	return nil
 }
 
@@ -492,7 +491,7 @@ func (s *MatchScheduler) handleMatchCancel(e *MatchEvent) error {
 		return err
 	}
 
-	s.setMatchScheduleStatus(e.MatchData, Ready)
+	s.setMatchScheduleStatus(e, e.MatchData, Ready)
 	return nil
 }
 
@@ -507,7 +506,7 @@ func (s *MatchScheduler) handleScoreSet(e *ScoreEvent) error {
 	}
 
 	if matchStatus == InProgress {
-		s.setMatchScheduleStatus(e.MatchData, Done)
+		s.setMatchScheduleStatus(e, e.MatchData, Done)
 	}
 	return e.Next()
 }
@@ -523,21 +522,21 @@ func (s *MatchScheduler) handleMatchReset(e *ScoreEvent) error {
 	}
 
 	if e.MatchData.Court() == nil {
-		s.setMatchScheduleStatus(e.MatchData, CourtWait)
+		s.setMatchScheduleStatus(e, e.MatchData, CourtWait)
 	} else {
-		s.setMatchScheduleStatus(e.MatchData, Ready)
+		s.setMatchScheduleStatus(e, e.MatchData, Ready)
 	}
 	return nil
 }
 
 func (s *MatchScheduler) handleRestEnd(e *PlayerRestEvent) error {
-	s.updateTournamentScheduleStatus(e.Tournament)
+	s.updateTournamentScheduleStatus(e, e.Tournament)
 	return e.Next()
 }
 
 func (s *MatchScheduler) handleRestSettingsChange(e *MatchRestEvent) error {
 	for _, t := range e.Tournaments {
-		s.updateTournamentScheduleStatus(t)
+		s.updateTournamentScheduleStatus(e, t)
 	}
 	return e.Next()
 }

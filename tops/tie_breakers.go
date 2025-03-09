@@ -29,10 +29,14 @@ func newTieBreakerManager() *TieBreakerManager {
 
 func (m *TieBreakerManager) addTieBreaker(app core.App, competition *Competition, teams []*Team) error {
 	event := newTieBreakerEvent(app, competition, teams)
-	return m.onAdd.Trigger(event,
+	err := m.onAdd.Trigger(event,
 		m.tieBreakerAddHandler,
 		(*TieBreakerEvent).saveNewTieBreaker,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (m *TieBreakerManager) tieBreakerAddHandler(e *TieBreakerEvent) error {
@@ -69,10 +73,14 @@ func (m *TieBreakerManager) updateTieBreaker(app core.App, tieBreaker *TieBreake
 	}
 	event := newTieBreakerEvent(app, competition, teams)
 	event.TieBreaker = tieBreaker
-	return m.onUpdate.Trigger(event,
+	err = m.onUpdate.Trigger(event,
 		m.tieBreakerUpdateHandler,
 		(*TieBreakerEvent).saveUpdatedTieBreaker,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (m *TieBreakerManager) tieBreakerUpdateHandler(e *TieBreakerEvent) error {
@@ -95,7 +103,13 @@ func (m *TieBreakerManager) deleteTieBreaker(app core.App, tieBreaker *TieBreake
 	}
 	event := newTieBreakerEvent(app, competition, tieBreaker.TieBreakerRanking())
 	event.TieBreaker = tieBreaker
-	return m.onDelete.Trigger(event, (*TieBreakerEvent).saveDeletedTieBreaker)
+	err = m.onDelete.Trigger(event,
+		(*TieBreakerEvent).saveDeletedTieBreaker,
+	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func verifyTieBreaker(ties [][]*got.Slot, tieBreaker []*Team) error {

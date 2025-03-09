@@ -6,19 +6,19 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-func BindTournamentPlanHooks(app core.App) {
-	url := "/api/collections/tournament_plans"
+func BindTournamentMatchHooks(app core.App) {
+	url := "/api/collections/tournament_matches"
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		group := e.Router.Group(url)
 		group.Bind(apis.RequireAuth())
 
-		group.GET("/records", listTournamentPlans)
+		group.GET("/records", listTournamentMatches)
 
 		return e.Next()
 	})
 }
 
-func listTournamentPlans(e *core.RequestEvent) error {
-	return tops.TopsRecordListResponse(tops.ListTournaments(), e)
+func listTournamentMatches(e *core.RequestEvent) error {
+	return tops.TopsRecordListResponse(tops.ListMatches(), e)
 }

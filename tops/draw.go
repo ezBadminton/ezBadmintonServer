@@ -42,38 +42,54 @@ func newDrawManager(
 
 func (d *DrawManager) makeDraw(app core.App, comp *Competition) error {
 	event := newCompetitionEvent(app, comp)
-	return d.onDraw.Trigger(event,
+	err := d.onDraw.Trigger(event,
 		d.makeDrawHandler,
 		(*CompetitionEvent).saveCompetition,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (d *DrawManager) deleteDraw(app core.App, comp *Competition) error {
 	event := newCompetitionEvent(app, comp)
-	return d.onDrawDelete.Trigger(event,
+	err := d.onDrawDelete.Trigger(event,
 		d.deleteDrawHandler,
 		(*CompetitionEvent).saveCompetition,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (d *DrawManager) drawSwap(app core.App, competition *Competition, a, b string) error {
 	event := newCompetitionEvent(app, competition)
-	return d.onDrawSwap.Trigger(event,
+	err := d.onDrawSwap.Trigger(event,
 		func(e *CompetitionEvent) error {
 			return d.drawSwapHandler(e, a, b)
 		},
 		(*CompetitionEvent).saveCompetition,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (d *DrawManager) setSeeds(app core.App, competition *Competition, teams []*Team) error {
 	event := newCompetitionEvent(app, competition)
-	return d.onSetSeeds.Trigger(event,
+	err := d.onSetSeeds.Trigger(event,
 		func(e *CompetitionEvent) error {
 			return d.setSeedsHandler(e, teams)
 		},
 		(*CompetitionEvent).saveCompetition,
 	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
 }
 
 func (d *DrawManager) makeDrawHandler(e *CompetitionEvent) error {
@@ -176,6 +192,9 @@ func (d *DrawManager) handleUnregistration(re *RegistrationEvent) error {
 				return re.Next()
 			},
 		)
+		if err == nil {
+			ce.TriggerRealtimeNotifications()
+		}
 		ce.syncRegistrationParent(re)
 		return err
 	}
@@ -195,6 +214,9 @@ func (d *DrawManager) handleModeSettingsUpdate(se *TournamentModeSettingsEvent) 
 			return se.Next()
 		},
 	)
+	if err == nil {
+		ce.TriggerRealtimeNotifications()
+	}
 	ce.syncSettingsParent(se)
 	return err
 }
