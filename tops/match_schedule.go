@@ -521,11 +521,7 @@ func (s *MatchScheduler) handleMatchReset(e *ScoreEvent) error {
 		return err
 	}
 
-	if e.MatchData.Court() == nil {
-		s.setMatchScheduleStatus(e, e.MatchData, CourtWait)
-	} else {
-		s.setMatchScheduleStatus(e, e.MatchData, Ready)
-	}
+	s.setMatchScheduleStatus(e, e.MatchData, CourtWait)
 	return nil
 }
 

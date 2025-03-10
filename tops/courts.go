@@ -48,7 +48,8 @@ func (s *CourtStore) init(
 	courtProxyStore.RegisterUpdateHandler(s.updated)
 
 	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
-	matchManager.onReset.BindFunc(s.handleMatchReset)
+	// Priority after schedule status update
+	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, -1))
 
 	tournamentStore.onStop.BindFunc(s.handleTournamentStop)
 }
@@ -202,6 +203,10 @@ func (s *CourtStore) handleScoreSet(e *ScoreEvent) error {
 // Allow the match to retake the court it had if it
 // is not occupied
 func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+
 	currentCourt := e.MatchData.Court()
 	courtOccupied := s.isOccupied(currentCourt)
 
@@ -213,12 +218,6 @@ func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
 		// Re-assign the court (skip onCourtAssign)
 		courtEvent := newCourtEvent(e.App, e.MatchData, currentCourt)
 		err = s.onCourtAssign.Trigger(courtEvent,
-			func(ce *CourtEvent) error {
-				if err := e.Next(); err != nil {
-					return err
-				}
-				return ce.Next()
-			},
 			s.storeAssignment,
 		)
 		if err == nil {

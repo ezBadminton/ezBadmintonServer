@@ -131,7 +131,8 @@ func newTournamentStore(
 	matchManager.onStart.BindFunc(s.handleMatchStart)
 	matchManager.onCancel.BindFunc(s.handleMatchCancel)
 	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
-	matchManager.onReset.BindFunc(s.handleMatchReset)
+	// Priority after possible court re-assign
+	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, 1))
 
 	registrationStore.onUpdate.BindFunc(s.verifyRegistrationUpdate)
 	registrationStore.onDelete.BindFunc(s.verifyUnregistration)
