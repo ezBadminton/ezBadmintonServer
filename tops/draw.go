@@ -41,41 +41,47 @@ func newDrawManager(
 }
 
 func (d *DrawManager) makeDraw(app core.App, comp *Competition) error {
-	event := newCompetitionEvent(app, comp)
-	err := d.onDraw.Trigger(event,
-		d.makeDrawHandler,
-		(*CompetitionEvent).saveCompetition,
-	)
-	if err == nil {
-		event.TriggerRealtimeNotifications()
-	}
-	return err
+	return app.RunInTransaction(func(txApp core.App) error {
+		event := newCompetitionEvent(txApp, comp)
+		err := d.onDraw.Trigger(event,
+			d.makeDrawHandler,
+			(*CompetitionEvent).saveCompetition,
+		)
+		if err == nil {
+			event.TriggerRealtimeNotifications()
+		}
+		return err
+	})
 }
 
 func (d *DrawManager) deleteDraw(app core.App, comp *Competition) error {
-	event := newCompetitionEvent(app, comp)
-	err := d.onDrawDelete.Trigger(event,
-		d.deleteDrawHandler,
-		(*CompetitionEvent).saveCompetition,
-	)
-	if err == nil {
-		event.TriggerRealtimeNotifications()
-	}
-	return err
+	return app.RunInTransaction(func(txApp core.App) error {
+		event := newCompetitionEvent(txApp, comp)
+		err := d.onDrawDelete.Trigger(event,
+			d.deleteDrawHandler,
+			(*CompetitionEvent).saveCompetition,
+		)
+		if err == nil {
+			event.TriggerRealtimeNotifications()
+		}
+		return err
+	})
 }
 
 func (d *DrawManager) drawSwap(app core.App, competition *Competition, a, b string) error {
-	event := newCompetitionEvent(app, competition)
-	err := d.onDrawSwap.Trigger(event,
-		func(e *CompetitionEvent) error {
-			return d.drawSwapHandler(e, a, b)
-		},
-		(*CompetitionEvent).saveCompetition,
-	)
-	if err == nil {
-		event.TriggerRealtimeNotifications()
-	}
-	return err
+	return app.RunInTransaction(func(txApp core.App) error {
+		event := newCompetitionEvent(txApp, competition)
+		err := d.onDrawSwap.Trigger(event,
+			func(e *CompetitionEvent) error {
+				return d.drawSwapHandler(e, a, b)
+			},
+			(*CompetitionEvent).saveCompetition,
+		)
+		if err == nil {
+			event.TriggerRealtimeNotifications()
+		}
+		return err
+	})
 }
 
 func (d *DrawManager) setSeeds(app core.App, competition *Competition, teams []*Team) error {
@@ -104,7 +110,7 @@ func (d *DrawManager) makeDrawHandler(e *CompetitionEvent) error {
 	for _, team := range eligibleTeams {
 		isSeeded := slices.ContainsFunc(
 			seeded,
-			func(t *Team) bool { return t == team },
+			func(t *Team) bool { return t.Id == team.Id },
 		)
 		if !isSeeded {
 			unseeded = append(unseeded, team)
@@ -156,12 +162,18 @@ func (d *DrawManager) drawSwapHandler(e *CompetitionEvent, a, b string) error {
 }
 
 func (d *DrawManager) redraw(app core.App, comp *Competition) error {
-	event := newCompetitionEvent(app, comp)
-	return d.onDraw.Trigger(event,
-		d.reseedHandler,
-		d.makeDrawHandler,
-		(*CompetitionEvent).saveCompetition,
-	)
+	return app.RunInTransaction(func(txApp core.App) error {
+		event := newCompetitionEvent(txApp, comp)
+		err := d.onDraw.Trigger(event,
+			d.reseedHandler,
+			d.makeDrawHandler,
+			(*CompetitionEvent).saveCompetition,
+		)
+		if err == nil {
+			event.TriggerRealtimeNotifications()
+		}
+		return err
+	})
 }
 
 func (d *DrawManager) reseedHandler(e *CompetitionEvent) error {
@@ -181,7 +193,13 @@ func (d *DrawManager) setSeedsHandler(e *CompetitionEvent, seeds []*Team) error 
 }
 
 func (d *DrawManager) handleUnregistration(re *RegistrationEvent) error {
-	if isInDraw(re.Competition, re.Registration) {
+	if !isInDraw(re.Competition, re.Registration) {
+		return re.Next()
+	}
+
+	app := re.App
+	err := re.App.RunInTransaction(func(txApp core.App) error {
+		re.App = txApp
 		ce := newCompetitionEvent(re.App, re.Competition)
 		err := d.onDrawDelete.Trigger(ce,
 			d.deleteDrawHandler,
@@ -197,8 +215,9 @@ func (d *DrawManager) handleUnregistration(re *RegistrationEvent) error {
 		}
 		ce.syncRegistrationParent(re)
 		return err
-	}
-	return re.Next()
+	})
+	re.App = app
+	return err
 }
 
 func (d *DrawManager) handleModeSettingsUpdate(se *TournamentModeSettingsEvent) error {

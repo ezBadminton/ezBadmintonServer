@@ -182,23 +182,8 @@ func (s *TournamentStore) listStarted() []*CompetitionTournament {
 
 func (s *TournamentStore) listMatches() []*TournamentMatch {
 	matches := make([]*TournamentMatch, 0)
-	matchDataStore, _ := store.FindRecordStore[MatchData]()
-	for _, t := range s.list {
-		comp := t.Competition
-		matchIdGetter := createMatchIdGetter(comp.Id)
-		for i, m := range t.Tournament.MatchList().Matches {
-			id := matchIdGetter(i)
-			var matchData *MatchData
-			if t.Started {
-				matchData, _ = matchDataStore.FindProxy(id)
-			}
-			tMatch := &TournamentMatch{
-				BaseTopsRecord: BaseTopsRecord{Id: id},
-				match:          m,
-				matchData:      matchData,
-			}
-			matches = append(matches, tMatch)
-		}
+	for _, competitionMatches := range s.competitionMatches {
+		matches = append(matches, competitionMatches...)
 	}
 	return matches
 }
@@ -214,7 +199,9 @@ func (s *TournamentStore) setTournament(realtimeNotifier realtimeNotifier, compe
 	s.list = append(s.list, tournament)
 	slices.SortFunc(s.list, compareTournaments)
 
-	if !isUpdate {
+	if isUpdate {
+		s.updateTournamentMatches(tournament)
+	} else {
 		s.initTournamentMatches(tournament)
 	}
 
@@ -297,6 +284,14 @@ func (s *TournamentStore) initTournamentMatches(tournament *CompetitionTournamen
 		tMatches[i] = tMatch
 	}
 	s.competitionMatches[tournament.Competition.Id] = tMatches
+}
+
+func (s *TournamentStore) updateTournamentMatches(tournament *CompetitionTournament) {
+	tMatches := s.competitionMatches[tournament.Competition.Id]
+	matches := tournament.MatchList().Matches
+	for i := range tMatches {
+		tMatches[i].match = matches[i]
+	}
 }
 
 func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
