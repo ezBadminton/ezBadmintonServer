@@ -22,6 +22,10 @@ func matchesFinished(matches []*got.Match) bool {
 	return true
 }
 
+func matchReady(match *got.Match) bool {
+	return match.Location != nil && match.StartTime.IsZero()
+}
+
 func matchRunning(match *got.Match) bool {
 	return !match.StartTime.IsZero() && !matchFinished(match)
 }

@@ -92,7 +92,7 @@ func (t *PlayerTracker) init(
 func collectCurrentMatches(matches []*got.Match, tournamentStore *TournamentStore) map[string]*TournamentMatch {
 	inMatch := make(map[string]*TournamentMatch)
 	for _, m := range matches {
-		if !matchRunning(m) {
+		if !matchReady(m) && !matchRunning(m) {
 			continue
 		}
 

@@ -59,10 +59,10 @@ func InitTournamentOperations(app core.App) {
 		competitionManager,
 	)
 
+	playerTracker.init(tournamentStore, courtStore, matchManager, eventSettingsManager, scheduler)
 	scheduler.init(tournamentStore, courtStore, matchManager, playerTracker)
 	courtStore.init(scheduler, matchManager, tournamentStore)
 	withdrawalManager.init(tournamentStore, registrationStore)
-	playerTracker.init(tournamentStore, courtStore, matchManager, eventSettingsManager, scheduler)
 
 	tops = TournamentOperations{
 		tournamentStore:               tournamentStore,
