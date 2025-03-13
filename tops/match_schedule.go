@@ -362,17 +362,21 @@ func (s *MatchScheduler) updateTournamentScheduleStatus(realtimeNotifier realtim
 }
 
 func (s *MatchScheduler) tournamentStartStop(realtimeNotifier realtimeNotifier, competition *Competition, started bool) {
+	if !started {
+		s.realtimeNotification(realtimeNotifier, competition, core.ModelEventTypeDelete)
+	}
+
 	schedule := s.newSchedule()
 	s.schedule = schedule
 	s.scheduled = scheduledMap(schedule)
 
-	var realtimeEventType string
 	if started {
-		realtimeEventType = core.ModelEventTypeCreate
-	} else {
-		realtimeEventType = core.ModelEventTypeDelete
+		s.realtimeNotification(realtimeNotifier, competition, core.ModelEventTypeCreate)
 	}
+	realtimeNotifier.AddRealtimeNotification(s.app, "schedule", core.ModelEventTypeUpdate, schedule, 5)
+}
 
+func (s *MatchScheduler) realtimeNotification(realtimeNotifier realtimeNotifier, competition *Competition, realtimeEventType string) {
 	for _, round := range s.schedule.roundQueue {
 		if round.Competition.Id != competition.Id {
 			continue
@@ -382,7 +386,6 @@ func (s *MatchScheduler) tournamentStartStop(realtimeNotifier realtimeNotifier, 
 		}
 		realtimeNotifier.AddRealtimeNotification(s.app, "scheduled_rounds", realtimeEventType, round, 4)
 	}
-	realtimeNotifier.AddRealtimeNotification(s.app, "schedule", core.ModelEventTypeUpdate, schedule, 5)
 }
 
 func (s *MatchScheduler) scheduleStatus(match *got.Match, competition *Competition) (*MatchData, ScheduleStatus, map[string]PlayerBlock) {

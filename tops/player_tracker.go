@@ -341,24 +341,26 @@ func (t *PlayerTracker) handleMatchReset(e *ScoreEvent) error {
 }
 
 func (t *PlayerTracker) handleTournamentStop(e *PlanEvent) error {
-	if err := e.Next(); err != nil {
-		return err
-	}
+	inMatchPlayers := make([]*Player, 0)
 	matches := e.Tournament.MatchList().Matches
 	for _, match := range matches {
 		if match.Location == nil || !match.EndTime.IsZero() {
 			continue
 		}
-		players := playersInMatch(match)
-		for _, p := range players {
-			delete(t.inMatch, p.Id)
-		}
+		inMatchPlayers = append(inMatchPlayers, playersInMatch(match)...)
+	}
+
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	for _, p := range inMatchPlayers {
+		delete(t.inMatch, p.Id)
 	}
 	for _, matchData := range e.MatchData {
-		if matchData.EndTime().IsZero() {
-			continue
+		if !matchData.EndTime().IsZero() {
+			t.cancelRestGroup(matchData)
 		}
-		t.cancelRestGroup(matchData)
 	}
 	return nil
 }

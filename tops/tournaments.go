@@ -445,6 +445,7 @@ func (s *TournamentStore) startHandler(e *PlanEvent) error {
 
 func (s *TournamentStore) hydrateHandler(e *PlanEvent) error {
 	s.hydrate(e.Tournament)
+	e.AddRealtimeNotification(s.app, "tournament_plans", core.ModelEventTypeUpdate, e.Tournament, 0)
 	return e.Next()
 }
 
@@ -475,6 +476,7 @@ func (s *TournamentStore) stopHandler(e *PlanEvent) error {
 
 func (s *TournamentStore) dehydrateHandler(e *PlanEvent) error {
 	s.dehydrate(e.Tournament)
+	s.realtimeUpdateNotification(e, e.Tournament, s.competitionMatches[e.Competition.Id])
 	return e.Next()
 }
 
@@ -625,6 +627,9 @@ func (s *TournamentStore) collectPlayerMatches(match *got.Match) map[*Competitio
 	matchesToUpdate := make(map[*CompetitionTournament]map[*TournamentMatch]struct{}, 0)
 	for competitionId := range s.byCompetitionPlayer {
 		tournament := s.tournaments[competitionId]
+		if !tournament.Started {
+			continue
+		}
 		tournamentScheduleUpdates := make(map[*TournamentMatch]struct{}, 0)
 		for _, p := range players {
 			matches := s.byCompetitionPlayer[competitionId][p.Id]
