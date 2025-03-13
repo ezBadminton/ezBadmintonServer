@@ -306,22 +306,58 @@ func (s *MatchScheduler) setMatchScheduleStatus(
 	realtimeNotifier.AddRealtimeNotification(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch, 3)
 }
 
+func (s *MatchScheduler) triggerEventScheduleUpdates(e *MatchEvent, status ScheduleStatus) {
+	override := map[int]statusOverride{
+		e.Match.match.Id(): {status: status, matchData: e.MatchData},
+	}
+	for tournament, matches := range e.ScheduleUpdates {
+		competition := tournament.Competition
+		for m := range matches {
+			s.updateMatchScheduleStatus(e, m.match, competition, override)
+		}
+	}
+}
+
+type statusOverride struct {
+	status    ScheduleStatus
+	matchData *MatchData
+}
+
+func (s *MatchScheduler) updateMatchScheduleStatus(
+	realtimeNotifier realtimeNotifier,
+	match *got.Match,
+	competition *Competition,
+	statusOverrides map[int]statusOverride,
+) {
+	var matchData *MatchData
+	var status ScheduleStatus
+	var blockingPlayers map[string]PlayerBlock
+
+	override, ok := statusOverrides[match.Id()]
+	if ok {
+		matchData, status, blockingPlayers = override.matchData, override.status, nil
+	} else {
+		matchData, status, blockingPlayers = s.scheduleStatus(match, competition)
+	}
+
+	scheduledMatch := s.scheduled[matchData.Id]
+
+	oldStatus := scheduledMatch.ScheduleStatus
+	scheduledMatch.ScheduleStatus = status
+	oldBlockingPlayers := scheduledMatch.BlockingPlayers
+	scheduledMatch.BlockingPlayers = blockingPlayers
+
+	if status != oldStatus || !blockingPlayersEq(blockingPlayers, oldBlockingPlayers) {
+		realtimeNotifier.AddRealtimeNotification(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch, 3)
+	}
+}
+
 func (s *MatchScheduler) updateTournamentScheduleStatus(realtimeNotifier realtimeNotifier, tournament *CompetitionTournament) {
 	competition := tournament.Competition
 	matches := tournament.MatchList().Matches
 
 	for _, m := range matches {
-		matchData, status, blockingPlayers := s.scheduleStatus(m, competition)
-		scheduledMatch := s.scheduled[matchData.Id]
-
-		oldStatus := scheduledMatch.ScheduleStatus
-		scheduledMatch.ScheduleStatus = status
-		oldBlockingPlayers := scheduledMatch.BlockingPlayers
-		scheduledMatch.BlockingPlayers = blockingPlayers
-
-		if status != oldStatus || !blockingPlayersEq(blockingPlayers, oldBlockingPlayers) {
-			realtimeNotifier.AddRealtimeNotification(s.app, "scheduled_matches", core.ModelEventTypeUpdate, scheduledMatch, 3)
-		}
+		s.updateMatchScheduleStatus(realtimeNotifier, m, competition, nil)
 	}
 }
 
@@ -449,7 +485,7 @@ func (s *MatchScheduler) handleCourtAssignment(e *CourtEvent) error {
 		return err
 	}
 
-	s.setMatchScheduleStatus(e, e.MatchData, Ready)
+	s.triggerEventScheduleUpdates(e.MatchEvent, Ready)
 	return nil
 }
 
@@ -463,7 +499,7 @@ func (s *MatchScheduler) handleCourtUnassignment(e *CourtEvent) error {
 		return err
 	}
 
-	s.setMatchScheduleStatus(e, e.MatchData, CourtWait)
+	s.triggerEventScheduleUpdates(e.MatchEvent, CourtWait)
 	return nil
 }
 
@@ -506,9 +542,9 @@ func (s *MatchScheduler) handleScoreSet(e *ScoreEvent) error {
 	}
 
 	if matchStatus == InProgress {
-		s.setMatchScheduleStatus(e, e.MatchData, Done)
+		s.triggerEventScheduleUpdates(e.MatchEvent, Done)
 	}
-	return e.Next()
+	return nil
 }
 
 func (s *MatchScheduler) handleMatchReset(e *ScoreEvent) error {
@@ -526,13 +562,21 @@ func (s *MatchScheduler) handleMatchReset(e *ScoreEvent) error {
 }
 
 func (s *MatchScheduler) handleRestEnd(e *PlayerRestEvent) error {
-	s.updateTournamentScheduleStatus(e, e.Tournament)
+	for tournament, matches := range e.ScheduleUpdates {
+		competition := tournament.Competition
+		for m := range matches {
+			s.updateMatchScheduleStatus(e, m.match, competition, nil)
+		}
+	}
 	return e.Next()
 }
 
 func (s *MatchScheduler) handleRestSettingsChange(e *MatchRestEvent) error {
-	for _, t := range e.Tournaments {
-		s.updateTournamentScheduleStatus(e, t)
+	for tournament, matches := range e.ScheduleUpdates {
+		competition := tournament.Competition
+		for m := range matches {
+			s.updateMatchScheduleStatus(e, m.match, competition, nil)
+		}
 	}
 	return e.Next()
 }

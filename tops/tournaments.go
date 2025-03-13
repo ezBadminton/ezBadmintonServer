@@ -74,6 +74,8 @@ type TournamentStore struct {
 	hydratedMatches map[int]*TournamentMatch
 	// match id -> tournament
 	byMatch map[string]*CompetitionTournament
+	// competition id -> player id -> matches
+	byCompetitionPlayer map[string]map[string][]*TournamentMatch
 
 	// Before match data create. After e.Next() the match data has been persisted and the tournament hydrated
 	onStart *hook.Hook[*PlanEvent]
@@ -100,16 +102,17 @@ func newTournamentStore(
 	compStore, _ := store.FindRecordStore[Competition]()
 
 	s := &TournamentStore{
-		app:                app,
-		tournaments:        make(map[string]*CompetitionTournament),
-		matches:            make(map[string]*TournamentMatch),
-		competitionMatches: make(map[string][]*TournamentMatch),
-		list:               make([]*CompetitionTournament, 0),
-		hydratedMatches:    make(map[int]*TournamentMatch),
-		byMatch:            make(map[string]*CompetitionTournament),
-		onStart:            &hook.Hook[*PlanEvent]{},
-		onStop:             &hook.Hook[*PlanEvent]{},
-		onUpdate:           &hook.Hook[*PlanEvent]{},
+		app:                 app,
+		tournaments:         make(map[string]*CompetitionTournament),
+		matches:             make(map[string]*TournamentMatch),
+		competitionMatches:  make(map[string][]*TournamentMatch),
+		byCompetitionPlayer: make(map[string]map[string][]*TournamentMatch),
+		list:                make([]*CompetitionTournament, 0),
+		hydratedMatches:     make(map[int]*TournamentMatch),
+		byMatch:             make(map[string]*CompetitionTournament),
+		onStart:             &hook.Hook[*PlanEvent]{},
+		onStop:              &hook.Hook[*PlanEvent]{},
+		onUpdate:            &hook.Hook[*PlanEvent]{},
 	}
 
 	err := s.addTournaments(compStore.RecordList...)
@@ -127,10 +130,14 @@ func newTournamentStore(
 	// Priority for setting the e.Match
 	courtStore.onCourtAssign.Bind(priorityHandler(s.handleCourtAssignment, -1))
 	courtStore.onCourtUnassign.Bind(priorityHandler(s.handleCourtAssignment, -1))
+	// Priority for setting the e.RelatedByPlayers
+	courtStore.onCourtAssign.Bind(priorityHandler(s.prepareCourtAssignment, 1))
+	courtStore.onCourtUnassign.Bind(priorityHandler(s.prepareCourtAssignment, 1))
 
 	matchManager.onStart.BindFunc(s.handleMatchStart)
 	matchManager.onCancel.BindFunc(s.handleMatchCancel)
-	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
+	// Priority before player tracker
+	matchManager.onScoreSet.Bind(priorityHandler(s.handleScoreSet, 2))
 	// Priority after possible court re-assign
 	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, 1))
 
@@ -225,6 +232,7 @@ func (s *TournamentStore) update(realtimeNotifier realtimeNotifier, tournament *
 		func(e *PlanEvent) error {
 			e.Tournament.Update(nil)
 			matches := s.competitionMatches[e.Tournament.Competition.Id]
+			s.updatePlayerMatchMap(tournament.Competition)
 			s.realtimeUpdateNotification(realtimeNotifier, e.Tournament, matches)
 			return e.Next()
 		},
@@ -251,6 +259,7 @@ func (s *TournamentStore) removeTournament(realtimeNotifier realtimeNotifier, co
 	}
 	tMatches := s.competitionMatches[competition.Id]
 	delete(s.competitionMatches, competition.Id)
+	delete(s.byCompetitionPlayer, competition.Id)
 
 	delete(s.tournaments, competition.Id)
 	s.list = slices.DeleteFunc(s.list, func(t *CompetitionTournament) bool {
@@ -284,6 +293,7 @@ func (s *TournamentStore) initTournamentMatches(tournament *CompetitionTournamen
 		tMatches[i] = tMatch
 	}
 	s.competitionMatches[tournament.Competition.Id] = tMatches
+	s.updatePlayerMatchMap(tournament.Competition)
 }
 
 func (s *TournamentStore) updateTournamentMatches(tournament *CompetitionTournament) {
@@ -292,6 +302,22 @@ func (s *TournamentStore) updateTournamentMatches(tournament *CompetitionTournam
 	for i := range tMatches {
 		tMatches[i].match = matches[i]
 	}
+	s.updatePlayerMatchMap(tournament.Competition)
+}
+
+func (s *TournamentStore) updatePlayerMatchMap(competition *Competition) {
+	tMatches := s.competitionMatches[competition.Id]
+	playerMatches := make(map[string][]*TournamentMatch)
+	for _, match := range tMatches {
+		for _, p := range playersInMatch(match.match) {
+			_, ok := playerMatches[p.Id]
+			if !ok {
+				playerMatches[p.Id] = make([]*TournamentMatch, 0)
+			}
+			playerMatches[p.Id] = append(playerMatches[p.Id], match)
+		}
+	}
+	s.byCompetitionPlayer[competition.Id] = playerMatches
 }
 
 func (s *TournamentStore) addTournaments(competitions ...*Competition) error {
@@ -535,6 +561,8 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 		return err
 	}
 
+	e.MatchEvent.ScheduleUpdates = s.collectPlayerMatches(e.MatchEvent.Match.match)
+
 	e.Match.matchData = e.MatchData
 	e.Match.match.Score = score
 	if matchEnding {
@@ -580,6 +608,35 @@ func (s *TournamentStore) handleCourtAssignment(e *CourtEvent) error {
 	hydrateCourt(e.Match.match, e.MatchData.Court())
 	e.AddRealtimeNotification(e.App, "tournament_matches", core.ModelEventTypeUpdate, e.Match, 0)
 	return nil
+}
+
+func (s *TournamentStore) prepareCourtAssignment(e *CourtEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	e.MatchEvent.ScheduleUpdates = s.collectPlayerMatches(e.MatchEvent.Match.match)
+	return nil
+}
+
+// Collects the matches that the players of the given match are in
+// and maps them by competition
+func (s *TournamentStore) collectPlayerMatches(match *got.Match) map[*CompetitionTournament]map[*TournamentMatch]struct{} {
+	players := playersInMatch(match)
+	matchesToUpdate := make(map[*CompetitionTournament]map[*TournamentMatch]struct{}, 0)
+	for competitionId := range s.byCompetitionPlayer {
+		tournament := s.tournaments[competitionId]
+		tournamentScheduleUpdates := make(map[*TournamentMatch]struct{}, 0)
+		for _, p := range players {
+			matches := s.byCompetitionPlayer[competitionId][p.Id]
+			for _, m := range matches {
+				tournamentScheduleUpdates[m] = struct{}{}
+			}
+		}
+		if len(tournamentScheduleUpdates) > 0 {
+			matchesToUpdate[tournament] = tournamentScheduleUpdates
+		}
+	}
+	return matchesToUpdate
 }
 
 // Allow the replacement of players in a team during the tournament
@@ -686,18 +743,21 @@ func (s *TournamentStore) handleScheduleStatus(e *ScheduleStatusEvent) error {
 
 func (s *TournamentStore) handleRestEnd(e *PlayerRestEvent) error {
 	e.Tournament = s.byMatch[e.Match.Id]
+	e.MatchEvent.ScheduleUpdates = s.collectPlayerMatches(e.MatchEvent.Match.match)
 	return e.Next()
 }
 
 func (s *TournamentStore) handleRestSettingsChange(e *MatchRestEvent) error {
-	tournamentSet := make(map[*CompetitionTournament]any)
-	for _, m := range e.MatchData {
-		t := s.byMatch[m.Id]
-		tournamentSet[t] = struct{}{}
-	}
-	e.Tournaments = make([]*CompetitionTournament, 0, len(tournamentSet))
-	for t := range tournamentSet {
-		e.Tournaments = append(e.Tournaments, t)
+	for _, m := range e.Matches {
+		scheduleUpdates := s.collectPlayerMatches(m.match)
+		for tournament, matches := range scheduleUpdates {
+			tournamentUpdates, ok := e.ScheduleUpdates[tournament]
+			if ok {
+				maps.Copy(tournamentUpdates, matches)
+			} else {
+				e.ScheduleUpdates[tournament] = matches
+			}
+		}
 	}
 	return e.Next()
 }

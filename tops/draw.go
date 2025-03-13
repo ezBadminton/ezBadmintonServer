@@ -12,7 +12,7 @@ import (
 )
 
 type DrawManager struct {
-	// Beofre draw being made. After e.Next() the draw has been persisted.
+	// Before draw being made. After e.Next() the draw has been persisted.
 	onDraw *hook.Hook[*CompetitionEvent]
 	// Before draw being deleted. After e.Next() the deletion has been persisted.
 	onDrawDelete *hook.Hook[*CompetitionEvent]

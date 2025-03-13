@@ -75,7 +75,8 @@ func (t *PlayerTracker) init(
 	courtStore.onCourtAssign.BindFunc(t.handleCourtAssignment)
 	courtStore.onCourtUnassign.BindFunc(t.handleCourtUnassignment)
 
-	matchManager.onScoreSet.BindFunc(t.handleScoreSet)
+	// Priority before schedule update
+	matchManager.onScoreSet.Bind(priorityHandler(t.handleScoreSet, 1))
 	matchManager.onReset.BindFunc(t.handleMatchReset)
 
 	tournamentStore.onStop.BindFunc(t.handleTournamentStop)

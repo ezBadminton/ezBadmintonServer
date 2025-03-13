@@ -77,16 +77,18 @@ func (e *CompetitionEvent) syncToSettingsParent(parent *TournamentModeSettingsEv
 type MatchEvent struct {
 	BaseEvent
 
-	App       core.App
-	MatchData *MatchData
-	Match     *TournamentMatch
+	App             core.App
+	MatchData       *MatchData
+	Match           *TournamentMatch
+	ScheduleUpdates map[*CompetitionTournament]map[*TournamentMatch]struct{}
 }
 
 func newMatchEvent(app core.App, matchData *MatchData) *MatchEvent {
 	return &MatchEvent{
-		BaseEvent: newBaseEvent(),
-		App:       app,
-		MatchData: Clone(matchData),
+		BaseEvent:       newBaseEvent(),
+		App:             app,
+		MatchData:       Clone(matchData),
+		ScheduleUpdates: make(map[*CompetitionTournament]map[*TournamentMatch]struct{}),
 	}
 }
 
@@ -390,7 +392,7 @@ func (e *SettingsEvent) syncToRequest(re *core.RecordRequestEvent) {
 }
 
 type PlayerRestEvent struct {
-	BaseEvent
+	*MatchEvent
 
 	Players    []*Player
 	Match      *TournamentMatch
@@ -399,9 +401,13 @@ type PlayerRestEvent struct {
 
 func newPlayerRestEvent(players []*Player, match *TournamentMatch) *PlayerRestEvent {
 	return &PlayerRestEvent{
-		BaseEvent: newBaseEvent(),
-		Players:   players,
-		Match:     match,
+		MatchEvent: &MatchEvent{
+			BaseEvent:       newBaseEvent(),
+			Match:           match,
+			ScheduleUpdates: make(map[*CompetitionTournament]map[*TournamentMatch]struct{}),
+		},
+		Players: players,
+		Match:   match,
 	}
 }
 
@@ -412,14 +418,15 @@ func newPlayerRestEvent(players []*Player, match *TournamentMatch) *PlayerRestEv
 type MatchRestEvent struct {
 	BaseEvent
 
-	MatchData   []*TournamentMatch
-	Tournaments []*CompetitionTournament
+	Matches         []*TournamentMatch
+	ScheduleUpdates map[*CompetitionTournament]map[*TournamentMatch]struct{}
 }
 
 func newMatchRestEvent(matches []*TournamentMatch) *MatchRestEvent {
 	return &MatchRestEvent{
-		BaseEvent: newBaseEvent(),
-		MatchData: matches,
+		BaseEvent:       newBaseEvent(),
+		Matches:         matches,
+		ScheduleUpdates: make(map[*CompetitionTournament]map[*TournamentMatch]struct{}),
 	}
 }
 
