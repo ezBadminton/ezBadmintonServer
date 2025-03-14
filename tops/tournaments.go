@@ -563,8 +563,6 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 		return err
 	}
 
-	e.MatchEvent.ScheduleUpdates = s.collectPlayerMatches(e.MatchEvent.Match.match)
-
 	e.Match.matchData = e.MatchData
 	e.Match.match.Score = score
 	if matchEnding {
@@ -572,6 +570,9 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 		tournament.Ended = matchesFinished(tournament.MatchList().Matches)
 	}
 	s.update(e, tournament)
+
+	e.MatchEvent.ScheduleUpdates = s.collectPlayerMatches(e.MatchEvent.Match.match)
+
 	return nil
 }
 
