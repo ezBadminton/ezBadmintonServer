@@ -207,23 +207,10 @@ func (s *TournamentStore) setTournament(realtimeNotifier realtimeNotifier, compe
 	slices.SortFunc(s.list, compareTournaments)
 
 	if isUpdate {
-		s.updateTournamentMatches(tournament)
+		s.updateTournamentMatches(realtimeNotifier, tournament)
 	} else {
-		s.initTournamentMatches(tournament)
+		s.createTournamentMatches(realtimeNotifier, tournament)
 	}
-
-	var realtimeEventType string
-	if isUpdate {
-		realtimeEventType = core.ModelEventTypeUpdate
-	} else {
-		realtimeEventType = core.ModelEventTypeCreate
-	}
-
-	matches := s.competitionMatches[competition.Id]
-	for _, m := range matches {
-		realtimeNotifier.AddRealtimeNotification(s.app, "tournament_matches", realtimeEventType, m, 0)
-	}
-	realtimeNotifier.AddRealtimeNotification(s.app, "tournament_plans", realtimeEventType, tournament, 0)
 }
 
 func (s *TournamentStore) update(realtimeNotifier realtimeNotifier, tournament *CompetitionTournament) {
@@ -296,13 +283,34 @@ func (s *TournamentStore) initTournamentMatches(tournament *CompetitionTournamen
 	s.updatePlayerMatchMap(tournament.Competition)
 }
 
-func (s *TournamentStore) updateTournamentMatches(tournament *CompetitionTournament) {
+func (s *TournamentStore) createTournamentMatches(realtimeNotifier realtimeNotifier, tournament *CompetitionTournament) {
+	s.initTournamentMatches(tournament)
 	tMatches := s.competitionMatches[tournament.Competition.Id]
-	matches := tournament.MatchList().Matches
-	for i := range tMatches {
-		tMatches[i].match = matches[i]
+	for _, match := range tMatches {
+		realtimeNotifier.AddRealtimeNotification(s.app, "tournament_matches", core.ModelEventTypeCreate, match, 0)
 	}
-	s.updatePlayerMatchMap(tournament.Competition)
+	realtimeNotifier.AddRealtimeNotification(s.app, "tournament_plans", core.ModelEventTypeCreate, tournament, 0)
+}
+
+func (s *TournamentStore) updateTournamentMatches(realtimeNotifier realtimeNotifier, tournament *CompetitionTournament) {
+	oldTMatches := s.competitionMatches[tournament.Competition.Id]
+	s.initTournamentMatches(tournament)
+	tMatches := s.competitionMatches[tournament.Competition.Id]
+	numOldMatches, numMatches := len(oldTMatches), len(tMatches)
+	matchDelta := numMatches - numOldMatches
+	for i := range max(0, matchDelta) {
+		addedMatch := tMatches[numOldMatches+i]
+		realtimeNotifier.AddRealtimeNotification(s.app, "tournament_matches", core.ModelEventTypeCreate, addedMatch, 0)
+	}
+	for i := range max(0, -matchDelta) {
+		removedMatch := oldTMatches[numMatches+i]
+		realtimeNotifier.AddRealtimeNotification(s.app, "tournament_matches", core.ModelEventTypeDelete, removedMatch, 0)
+	}
+	for i := range numMatches + min(0, -matchDelta) {
+		updatedMatch := tMatches[i]
+		realtimeNotifier.AddRealtimeNotification(s.app, "tournament_matches", core.ModelEventTypeUpdate, updatedMatch, 0)
+	}
+	realtimeNotifier.AddRealtimeNotification(s.app, "tournament_plans", core.ModelEventTypeUpdate, tournament, 0)
 }
 
 func (s *TournamentStore) updatePlayerMatchMap(competition *Competition) {
