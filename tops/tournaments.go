@@ -914,13 +914,14 @@ func (s *TournamentStore) dehydrate(tournament *CompetitionTournament) {
 		m.EndTime = time.Time{}
 		m.WithdrawnPlayers = nil
 
-		delete(s.hydratedMatches, m.Id())
 		matchData := s.hydratedMatches[m.Id()]
+		delete(s.hydratedMatches, m.Id())
 		if matchData != nil {
 			s.matches[matchData.Id].matchData = nil
 			delete(s.byMatch, matchData.Id)
 		}
 	}
+	tournament.Update(nil)
 	tournament.Started = false
 	tournament.Ended = false
 }
