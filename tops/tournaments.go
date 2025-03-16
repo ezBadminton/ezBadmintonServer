@@ -138,8 +138,7 @@ func newTournamentStore(
 	matchManager.onCancel.BindFunc(s.handleMatchCancel)
 	// Priority before player tracker
 	matchManager.onScoreSet.Bind(priorityHandler(s.handleScoreSet, 2))
-	// Priority after possible court re-assign
-	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, 1))
+	matchManager.onReset.BindFunc(s.handleMatchReset)
 
 	registrationStore.onUpdate.BindFunc(s.verifyRegistrationUpdate)
 	registrationStore.onDelete.BindFunc(s.verifyUnregistration)
@@ -584,7 +583,7 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 	return nil
 }
 
-func (s *TournamentStore) handleMatchReset(e *ScoreEvent) error {
+func (s *TournamentStore) handleMatchReset(e *MatchResetEvent) error {
 	if !s.isEditable(e.MatchData) {
 		return errors.New("the match is not in an editable state")
 	}
@@ -605,6 +604,21 @@ func (s *TournamentStore) handleMatchReset(e *ScoreEvent) error {
 	tournament := s.byMatch[e.MatchData.Id]
 	tournament.Ended = false
 	s.update(e, tournament)
+
+	filteredDependantMatches := make([]*ScheduledMatch, 0)
+	for _, match := range e.DependantMatches {
+		matchTournament := s.byMatch[match.Match.Id]
+		if matchTournament.Id != tournament.Id {
+			continue
+		}
+		tournamentMatch := s.matches[match.Match.Id]
+		players := playersInMatch(tournamentMatch.match)
+		if len(players) < 2*tournament.Competition.TeamSize() {
+			filteredDependantMatches = append(filteredDependantMatches, match)
+		}
+	}
+	e.DependantMatches = filteredDependantMatches
+
 	return nil
 }
 

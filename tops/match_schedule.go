@@ -169,7 +169,7 @@ func (s *MatchScheduler) init(
 	matchManager.onStart.BindFunc(s.handleMatchStart)
 	matchManager.onCancel.BindFunc(s.handleMatchCancel)
 	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
-	matchManager.onReset.BindFunc(s.handleMatchReset)
+	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, -1))
 
 	// Priority after TournamentStore
 	playerTracker.onRestEnd.Bind(priorityHandler(s.handleRestEnd, 1))
@@ -502,7 +502,14 @@ func (s *MatchScheduler) handleCourtUnassignment(e *CourtEvent) error {
 		return err
 	}
 
-	s.triggerEventScheduleUpdates(e.MatchEvent, CourtWait)
+	var status ScheduleStatus
+	if e.FromReset {
+		status = Wait
+	} else {
+		status = CourtWait
+	}
+
+	s.triggerEventScheduleUpdates(e.MatchEvent, status)
 	return nil
 }
 
@@ -550,10 +557,18 @@ func (s *MatchScheduler) handleScoreSet(e *ScoreEvent) error {
 	return nil
 }
 
-func (s *MatchScheduler) handleMatchReset(e *ScoreEvent) error {
+func (s *MatchScheduler) handleMatchReset(e *MatchResetEvent) error {
 	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
 	if matchStatus != Done {
 		return errors.New("the match is not done and can not have its score reset")
+	}
+
+	for match := range s.schedule.IterateMatches() {
+		if match.ScheduleStatus == Ready {
+			// Set all ready matches as dependant. Will be further filtered down
+			// by the TournamentStore's match reset handler
+			e.DependantMatches = append(e.DependantMatches, match)
+		}
 	}
 
 	if err := e.Next(); err != nil {

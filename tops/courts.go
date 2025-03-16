@@ -49,7 +49,7 @@ func (s *CourtStore) init(
 
 	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
 	// Priority after schedule status update
-	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, -1))
+	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, -2))
 
 	tournamentStore.onStop.BindFunc(s.handleTournamentStop)
 }
@@ -202,7 +202,7 @@ func (s *CourtStore) handleScoreSet(e *ScoreEvent) error {
 
 // Allow the match to retake the court it had if it
 // is not occupied
-func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
+func (s *CourtStore) handleMatchReset(e *MatchResetEvent) error {
 	if err := e.Next(); err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
 		e.MatchData.SetCourt(nil)
 		err = e.Next()
 	} else {
-		// Re-assign the court (skip onCourtAssign)
+		// Re-assign the court
 		courtEvent := newCourtEvent(e.App, e.MatchData, currentCourt)
 		err = s.onCourtAssign.Trigger(courtEvent,
 			s.storeAssignment,
@@ -224,6 +224,20 @@ func (s *CourtStore) handleMatchReset(e *ScoreEvent) error {
 			courtEvent.TriggerRealtimeNotifications()
 		}
 	}
+
+	for _, match := range e.DependantMatches {
+		event := newCourtEvent(e.App, match.Match, nil)
+		event.FromReset = true
+		err := s.onCourtUnassign.Trigger(event,
+			s.courtUnassignmentHandler,
+			(*CourtEvent).saveMatchData,
+			s.storeUnassignment,
+		)
+		if err == nil {
+			event.TriggerRealtimeNotifications()
+		}
+	}
+
 	return err
 }
 

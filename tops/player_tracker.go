@@ -78,7 +78,7 @@ func (t *PlayerTracker) init(
 
 	// Priority before schedule update
 	matchManager.onScoreSet.Bind(priorityHandler(t.handleScoreSet, 1))
-	matchManager.onReset.BindFunc(t.handleMatchReset)
+	matchManager.onReset.Bind(priorityHandler(t.handleMatchReset, 1))
 
 	tournamentStore.onStop.BindFunc(t.handleTournamentStop)
 
@@ -332,7 +332,7 @@ func (t *PlayerTracker) handleScoreSet(e *ScoreEvent) error {
 	return nil
 }
 
-func (t *PlayerTracker) handleMatchReset(e *ScoreEvent) error {
+func (t *PlayerTracker) handleMatchReset(e *MatchResetEvent) error {
 	if err := e.Next(); err != nil {
 		return err
 	}

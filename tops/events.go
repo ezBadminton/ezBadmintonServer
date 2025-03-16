@@ -100,12 +100,16 @@ type CourtEvent struct {
 	*MatchEvent
 
 	Court *Court
+	// When the event is due to another match being reset
+	// this is true.
+	FromReset bool
 }
 
 func newCourtEvent(app core.App, matchData *MatchData, court *Court) *CourtEvent {
 	return &CourtEvent{
 		MatchEvent: newMatchEvent(app, matchData),
 		Court:      court,
+		FromReset:  false,
 	}
 }
 
@@ -142,6 +146,21 @@ func (e *ScoreEvent) saveScoreData() error {
 		return err
 	}
 	return e.Next()
+}
+
+type MatchResetEvent struct {
+	*ScoreEvent
+
+	// Matches that can no longer be ready because their
+	// qualifications depend on the reset match
+	DependantMatches []*ScheduledMatch
+}
+
+func newMatchResetEvent(app core.App, matchData *MatchData) *MatchResetEvent {
+	return &MatchResetEvent{
+		ScoreEvent:       newScoreEvent(app, matchData),
+		DependantMatches: make([]*ScheduledMatch, 0),
+	}
 }
 
 type RegistrationEvent struct {
