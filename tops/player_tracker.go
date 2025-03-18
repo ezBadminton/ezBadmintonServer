@@ -77,6 +77,7 @@ func (t *PlayerTracker) init(
 	courtStore.onCourtUnassign.Bind(priorityHandler(t.handleCourtUnassignment, 1))
 
 	// Priority before schedule update
+	matchManager.onEnd.Bind(priorityHandler(t.handleMatchEnd, 1))
 	matchManager.onScoreSet.Bind(priorityHandler(t.handleScoreSet, 1))
 	matchManager.onReset.Bind(priorityHandler(t.handleMatchReset, 1))
 
@@ -275,6 +276,14 @@ func (t *PlayerTracker) calculateRestDuration(match *TournamentMatch) time.Durat
 	return restDuration
 }
 
+func (t *PlayerTracker) startMatchPlayerRest(match *TournamentMatch) {
+	players := playersInMatch(match.match)
+	for _, p := range players {
+		delete(t.inMatch, p.Id)
+	}
+	t.startPlayerRest(players, match, t.restDuration)
+}
+
 func (t *PlayerTracker) handleScheduleStatus(e *ScheduleStatusEvent) error {
 	players := playersInMatch(e.Match)
 	e.PlayersInMatch = make(map[*Player]*MatchData)
@@ -314,6 +323,15 @@ func (t *PlayerTracker) handleCourtUnassignment(e *CourtEvent) error {
 	return nil
 }
 
+func (t *PlayerTracker) handleMatchEnd(e *MatchEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	t.startMatchPlayerRest(e.Match)
+	return nil
+}
+
 func (t *PlayerTracker) handleScoreSet(e *ScoreEvent) error {
 	matchEnding := e.MatchData.EndTime().IsZero()
 
@@ -321,14 +339,9 @@ func (t *PlayerTracker) handleScoreSet(e *ScoreEvent) error {
 		return err
 	}
 
-	if !matchEnding {
-		return nil
+	if matchEnding {
+		t.startMatchPlayerRest(e.Match)
 	}
-	players := playersInMatch(e.Match.match)
-	for _, p := range players {
-		delete(t.inMatch, p.Id)
-	}
-	t.startPlayerRest(players, e.Match, t.restDuration)
 	return nil
 }
 

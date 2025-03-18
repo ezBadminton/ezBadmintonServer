@@ -137,6 +137,7 @@ func newTournamentStore(
 	matchManager.onStart.BindFunc(s.handleMatchStart)
 	matchManager.onCancel.BindFunc(s.handleMatchCancel)
 	// Priority before player tracker
+	matchManager.onEnd.Bind(priorityHandler(s.handleMatchEnd, 2))
 	matchManager.onScoreSet.Bind(priorityHandler(s.handleScoreSet, 2))
 	matchManager.onReset.BindFunc(s.handleMatchReset)
 
@@ -545,6 +546,7 @@ func (s *TournamentStore) handleMatchCancel(e *MatchEvent) error {
 	match := s.matches[e.MatchData.Id]
 	match.matchData = e.MatchData
 	match.match.StartTime = time.Time{}
+	match.match.EndTime = time.Time{}
 
 	tournament := s.byMatch[e.MatchData.Id]
 	tournament.UpdateEditableMatches()
@@ -553,8 +555,25 @@ func (s *TournamentStore) handleMatchCancel(e *MatchEvent) error {
 	return nil
 }
 
+func (s *TournamentStore) handleMatchEnd(e *MatchEvent) error {
+	e.Match = s.matches[e.MatchData.Id]
+
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	e.Match.matchData = e.MatchData
+	e.Match.match.EndTime = e.MatchData.EndTime().Time()
+
+	e.ScheduleUpdates = s.collectPlayerMatches(e.Match.match)
+
+	e.AddRealtimeNotification(e.App, "tournament_matches", core.ModelEventTypeUpdate, e.Match, 0)
+
+	return nil
+}
+
 func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
-	if !e.MatchData.EndTime().IsZero() && !s.isEditable(e.MatchData) {
+	if len(e.MatchData.Sets()) != 0 && !s.isEditable(e.MatchData) {
 		return errors.New("the match is not in an editable state")
 	}
 
@@ -565,6 +584,7 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 		return err
 	}
 	matchEnding := e.MatchData.EndTime().IsZero()
+	scoreIsNew := len(e.MatchData.Sets()) == 0
 
 	if err := e.Next(); err != nil {
 		return err
@@ -574,6 +594,8 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 	e.Match.match.Score = score
 	if matchEnding {
 		e.Match.match.EndTime = e.MatchData.EndTime().Time()
+	}
+	if scoreIsNew {
 		tournament.Ended = matchesFinished(tournament.MatchList().Matches)
 	}
 	s.update(e, tournament)

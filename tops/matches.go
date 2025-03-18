@@ -14,6 +14,8 @@ type MatchManager struct {
 	onStart *hook.Hook[*MatchEvent]
 	// Before match is canceled. After e.Next() the zeroed start time has been persisted.
 	onCancel *hook.Hook[*MatchEvent]
+	// Before match is ended (without score set). After e.Next() the end time has been persisted.
+	onEnd *hook.Hook[*MatchEvent]
 	// Before score is set. After e.Next() the score data has been persisted.
 	onScoreSet *hook.Hook[*ScoreEvent]
 	// Before match reset. After e.Next() the score data deletion has been persisted.
@@ -24,6 +26,7 @@ func newMatchManager() *MatchManager {
 	manager := &MatchManager{
 		onStart:    &hook.Hook[*MatchEvent]{},
 		onCancel:   &hook.Hook[*MatchEvent]{},
+		onEnd:      &hook.Hook[*MatchEvent]{},
 		onScoreSet: &hook.Hook[*ScoreEvent]{},
 		onReset:    &hook.Hook[*MatchResetEvent]{},
 	}
@@ -61,6 +64,24 @@ func (m *MatchManager) cancelMatch(app core.App, matchData *MatchData) error {
 
 func (m *MatchManager) cancelMatchHandler(e *MatchEvent) error {
 	e.MatchData.SetStartTime(types.DateTime{})
+	e.MatchData.SetEndTime(types.DateTime{})
+	return e.Next()
+}
+
+func (m *MatchManager) endMatch(app core.App, matchData *MatchData) error {
+	event := newMatchEvent(app, matchData)
+	err := m.onEnd.Trigger(event,
+		m.endMatchHandler,
+		(*MatchEvent).saveMatchData,
+	)
+	if err == nil {
+		event.TriggerRealtimeNotifications()
+	}
+	return err
+}
+
+func (m *MatchManager) endMatchHandler(e *MatchEvent) error {
+	e.MatchData.SetEndTime(types.NowDateTime())
 	return e.Next()
 }
 

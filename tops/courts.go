@@ -48,6 +48,7 @@ func (s *CourtStore) init(
 	courtProxyStore.RegisterUpdateHandler(s.updated)
 
 	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
+	matchManager.onEnd.BindFunc(s.handleMatchEnd)
 	// Priority after schedule status update
 	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, -2))
 
@@ -187,6 +188,14 @@ func (s *CourtStore) courtUnassignmentHandler(e *CourtEvent) error {
 func (s *CourtStore) storeUnassignment(e *CourtEvent) error {
 	delete(s.occupied, e.Court.Id)
 	return e.Next()
+}
+
+func (s *CourtStore) handleMatchEnd(e *MatchEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	delete(s.occupied, e.MatchData.Court().Id)
+	return nil
 }
 
 func (s *CourtStore) handleScoreSet(e *ScoreEvent) error {

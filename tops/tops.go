@@ -235,6 +235,13 @@ func CancelMatch(app core.App, matchData *MatchData) error {
 	return tops.matchManager.cancelMatch(app, matchData)
 }
 
+func EndMatch(app core.App, matchData *MatchData) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.matchManager.endMatch(app, matchData)
+}
+
 func SetMatchScore(app core.App, matchData *MatchData, score [][]int) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()

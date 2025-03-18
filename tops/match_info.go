@@ -13,6 +13,10 @@ func matchFinished(match *got.Match) bool {
 	return !errors.Is(err, got.ErrNoScore)
 }
 
+func matchEnded(match *got.Match) bool {
+	return !match.EndTime.IsZero()
+}
+
 func matchesFinished(matches []*got.Match) bool {
 	for _, match := range matches {
 		if !matchFinished(match) {

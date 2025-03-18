@@ -17,13 +17,14 @@ import (
 type ScheduleStatus int
 
 const (
-	Done       ScheduleStatus = iota // Match finished
-	InProgress                       // Currently running
-	Ready                            // Court assigned, ready for call-out
-	CourtWait                        // Match ready, waiting for court assignment
-	PlayerRest                       // Match ready, but player rest time
-	PlayerWait                       // Match ready, but player in other match
-	Wait                             // Match not ready, waiting for qualifications
+	Done         ScheduleStatus = iota // Match finished
+	ScoreUnknown                       // Match finished but score not yet known
+	InProgress                         // Currently running
+	Ready                              // Court assigned, ready for call-out
+	CourtWait                          // Match ready, waiting for court assignment
+	PlayerRest                         // Match ready, but player rest time
+	PlayerWait                         // Match ready, but player in other match
+	Wait                               // Match not ready, waiting for qualifications
 )
 
 type PlayerBlockMode string
@@ -168,6 +169,7 @@ func (s *MatchScheduler) init(
 
 	matchManager.onStart.BindFunc(s.handleMatchStart)
 	matchManager.onCancel.BindFunc(s.handleMatchCancel)
+	matchManager.onEnd.BindFunc(s.handleMatchEnd)
 	matchManager.onScoreSet.BindFunc(s.handleScoreSet)
 	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, -1))
 
@@ -400,6 +402,10 @@ func (s *MatchScheduler) scheduleStatusHandler(e *ScheduleStatusEvent) error {
 		e.Status = Done
 		return e.Next()
 	}
+	if matchEnded(match) {
+		e.Status = ScoreUnknown
+		return e.Next()
+	}
 	if matchStarted(match) {
 		e.Status = InProgress
 		return e.Next()
@@ -529,7 +535,7 @@ func (s *MatchScheduler) handleMatchStart(e *MatchEvent) error {
 
 func (s *MatchScheduler) handleMatchCancel(e *MatchEvent) error {
 	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
-	if matchStatus != InProgress {
+	if matchStatus != ScoreUnknown && matchStatus != InProgress {
 		return errors.New("the match is not in progress and can not be canceled")
 	}
 
@@ -541,10 +547,24 @@ func (s *MatchScheduler) handleMatchCancel(e *MatchEvent) error {
 	return nil
 }
 
+func (s *MatchScheduler) handleMatchEnd(e *MatchEvent) error {
+	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
+	if matchStatus != InProgress {
+		return errors.New("the match is not in progess and can not be ended")
+	}
+
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	s.triggerEventScheduleUpdates(e, ScoreUnknown)
+	return nil
+}
+
 func (s *MatchScheduler) handleScoreSet(e *ScoreEvent) error {
 	matchStatus := s.scheduled[e.MatchData.Id].ScheduleStatus
-	if matchStatus != InProgress && matchStatus != Done {
-		return errors.New("the match is not in progress or done and can not have its score set/edited")
+	if matchStatus != ScoreUnknown && matchStatus != InProgress && matchStatus != Done {
+		return errors.New("the match is not in progress or ended and can not have its score set/edited")
 	}
 
 	if err := e.Next(); err != nil {

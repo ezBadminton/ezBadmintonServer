@@ -18,6 +18,7 @@ func BindMatchHooks(app core.App) {
 
 		group.POST("/start", startMarch)
 		group.POST("/cancel", cancelMatch)
+		group.POST("/end", endMatch)
 		group.POST("/score", setMatchScore)
 		group.POST("/reset", resetMatch)
 
@@ -39,6 +40,16 @@ func cancelMatch(e *core.RequestEvent) error {
 	matchData := e.Get("matchdata").(*MatchData)
 
 	if err := tops.CancelMatch(e.App, matchData); err != nil {
+		return e.BadRequestError(err.Error(), err)
+	}
+
+	return e.NoContent(http.StatusOK)
+}
+
+func endMatch(e *core.RequestEvent) error {
+	matchData := e.Get("matchdata").(*MatchData)
+
+	if err := tops.EndMatch(e.App, matchData); err != nil {
 		return e.BadRequestError(err.Error(), err)
 	}
 
