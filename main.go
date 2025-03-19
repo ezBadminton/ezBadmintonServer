@@ -63,6 +63,10 @@ func main() {
 		return nil
 	})
 
+	app.Cron().Add("organizer_ping", "*/4 * * * *", func() {
+		tops.PingOrganizerClients(app)
+	})
+
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
 	}

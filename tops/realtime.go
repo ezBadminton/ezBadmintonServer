@@ -84,7 +84,29 @@ func realtimeNotify(app core.App, subscription string, action string, topsRecord
 
 	clients := app.SubscriptionsBroker().Clients()
 	for _, client := range clients {
-		if !client.HasSubscription(subscription) {
+		if client.IsDiscarded() || !client.HasSubscription(subscription) {
+			continue
+		}
+		auth, ok := client.Get("auth").(*core.Record)
+		if !ok || auth.Collection().Name != CName[TournamentOrganizer]() {
+			continue
+		}
+		client.Send(message)
+	}
+
+	return nil
+}
+
+// To prevent the SSE connections from being cleaned-up after being idle
+// the organizers are pinged
+func PingOrganizerClients(app core.App) error {
+	message := subscriptions.Message{
+		Name: "ping",
+	}
+
+	clients := app.SubscriptionsBroker().Clients()
+	for _, client := range clients {
+		if client.IsDiscarded() || !client.HasSubscription("ping") {
 			continue
 		}
 		auth, ok := client.Get("auth").(*core.Record)
