@@ -212,21 +212,21 @@ func (s *CourtStore) handleScoreSet(e *ScoreEvent) error {
 // Allow the match to retake the court it had if it
 // is not occupied
 func (s *CourtStore) handleMatchReset(e *MatchResetEvent) error {
+	currentCourt := e.MatchData.Court()
+	courtOccupied := s.isOccupied(currentCourt)
+
+	if courtOccupied {
+		e.MatchData.SetCourt(nil)
+	}
+
 	if err := e.Next(); err != nil {
 		return err
 	}
 
-	currentCourt := e.MatchData.Court()
-	courtOccupied := s.isOccupied(currentCourt)
-
-	var err error
-	if courtOccupied {
-		e.MatchData.SetCourt(nil)
-		err = e.Next()
-	} else {
+	if !courtOccupied {
 		// Re-assign the court
 		courtEvent := newCourtEvent(e.App, e.MatchData, currentCourt)
-		err = s.onCourtAssign.Trigger(courtEvent,
+		err := s.onCourtAssign.Trigger(courtEvent,
 			s.storeAssignment,
 		)
 		if err == nil {
@@ -247,7 +247,7 @@ func (s *CourtStore) handleMatchReset(e *MatchResetEvent) error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (s *CourtStore) handleTournamentStop(e *PlanEvent) error {
