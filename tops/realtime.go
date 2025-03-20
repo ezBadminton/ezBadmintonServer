@@ -88,7 +88,7 @@ func realtimeNotify(app core.App, subscription string, action string, topsRecord
 			continue
 		}
 		auth, ok := client.Get("auth").(*core.Record)
-		if !ok || auth.Collection().Name != CName[TournamentOrganizer]() {
+		if !ok || auth == nil || auth.Collection().Name != CName[TournamentOrganizer]() {
 			continue
 		}
 		client.Send(message)
@@ -110,7 +110,7 @@ func PingOrganizerClients(app core.App) error {
 			continue
 		}
 		auth, ok := client.Get("auth").(*core.Record)
-		if !ok || auth.Collection().Name != CName[TournamentOrganizer]() {
+		if !ok || auth == nil || auth.Collection().Name != CName[TournamentOrganizer]() {
 			continue
 		}
 		client.Send(message)
