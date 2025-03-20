@@ -35,6 +35,17 @@ func (m *TournamentMatch) ToMap() map[string]any {
 	if m.matchData != nil {
 		matchData := m.matchData.Record.FieldsData()
 		maps.Copy(result, matchData)
+		if m.match.Score != nil {
+			score := make([][]int, 0)
+			points1 := m.match.Score.Points1()
+			points2 := m.match.Score.Points2()
+			for i := range points1 {
+				score = append(score, []int{points1[i], points2[i]})
+			}
+			result["sets"] = score
+		} else {
+			delete(result, "sets")
+		}
 	}
 	return m.BaseTopsRecord.ToMap(result)
 }
@@ -731,6 +742,7 @@ func (s *TournamentStore) handleStatusChange(e *StatusChangeEvent) error {
 			removeWithdrawnFromMatches(tPlayer, withdrawal.ChangedMatches)
 		}
 		tournament := s.tournaments[withdrawal.Competition.Id]
+		s.hydrate(tournament)
 		s.update(e, tournament)
 	}
 	return nil
@@ -897,11 +909,12 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 		data := matchData[i]
 		match := matches[i]
 
+		withdrawn := data.WithdrawnTeams()
+		hydrateWithdrawnTeams(match, withdrawn)
+
 		sets := data.Sets()
-		if len(sets) > 0 {
-			if err := hydrateScore(match, sets, scoreSettings); err != nil {
-				return err
-			}
+		if err := hydrateScore(match, sets, scoreSettings); err != nil {
+			return err
 		}
 
 		court := data.Court()
@@ -911,9 +924,6 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 		match.StartTime = startTime.Time()
 		endTime := data.EndTime()
 		match.EndTime = endTime.Time()
-
-		withdrawn := data.WithdrawnTeams()
-		hydrateWithdrawnTeams(match, withdrawn)
 
 		s.hydratedMatches[match.Id()] = s.matches[data.Id]
 		s.matches[data.Id].matchData = data
@@ -987,6 +997,19 @@ func (s *TournamentStore) isRegistrationActive(reg *Registration) bool {
 }
 
 func hydrateScore(match *got.Match, sets []*MatchSet, scoreSettings badminton.ScoreSettings) error {
+	withdrawn := match.WithdrawnSlots()
+	if len(withdrawn) == 1 && match.Slot1 == withdrawn[0] {
+		match.Score = badminton.MaxScore(scoreSettings).Invert()
+		return nil
+	}
+	if len(withdrawn) == 1 && match.Slot2 == withdrawn[0] {
+		match.Score = badminton.MaxScore(scoreSettings)
+		return nil
+	}
+	if len(withdrawn) == 2 || len(sets) == 0 {
+		match.Score = nil
+		return nil
+	}
 	score, err := scoreDataToScore(sets, scoreSettings)
 	if err != nil {
 		return err
