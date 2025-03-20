@@ -48,9 +48,9 @@ func (t *numberedText) parse() {
 		isDigit := unicode.IsDigit(r)
 
 		if isDigit && textBuf.Len() > 0 {
-			t.addSpan(textBuf, false)
+			t.addSpan(&textBuf, false)
 		} else if !isDigit && numBuf.Len() > 0 {
-			t.addSpan(numBuf, true)
+			t.addSpan(&numBuf, true)
 		}
 
 		if isDigit {
@@ -61,13 +61,13 @@ func (t *numberedText) parse() {
 	}
 
 	if textBuf.Len() > 0 {
-		t.addSpan(textBuf, false)
+		t.addSpan(&textBuf, false)
 	} else if numBuf.Len() > 0 {
-		t.addSpan(numBuf, true)
+		t.addSpan(&numBuf, true)
 	}
 }
 
-func (t *numberedText) addSpan(buf strings.Builder, isNumber bool) {
+func (t *numberedText) addSpan(buf *strings.Builder, isNumber bool) {
 	s := buf.String()
 	buf.Reset()
 
