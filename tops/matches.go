@@ -22,7 +22,7 @@ type MatchManager struct {
 	onReset *hook.Hook[*MatchResetEvent]
 }
 
-func newMatchManager() *MatchManager {
+func newMatchManager(withdrawalManager *WithdrawalManager) *MatchManager {
 	manager := &MatchManager{
 		onStart:    &hook.Hook[*MatchEvent]{},
 		onCancel:   &hook.Hook[*MatchEvent]{},
@@ -30,6 +30,10 @@ func newMatchManager() *MatchManager {
 		onScoreSet: &hook.Hook[*ScoreEvent]{},
 		onReset:    &hook.Hook[*MatchResetEvent]{},
 	}
+
+	// Priorty before court handler
+	withdrawalManager.onStatusChange.Bind(priorityHandler(manager.handleStatusChange, 2))
+
 	return manager
 }
 
@@ -137,4 +141,32 @@ func (m *MatchManager) resetMatchHandler(e *MatchResetEvent) error {
 	e.MatchData.SetStartTime(types.DateTime{})
 	e.MatchData.SetEndTime(types.DateTime{})
 	return e.Next()
+}
+
+func (m *MatchManager) handleStatusChange(e *StatusChangeEvent) error {
+	if !e.Withdraw {
+		return e.Next()
+	}
+
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	for _, withdrawal := range e.Withdrawals {
+		for i, match := range withdrawal.ChangedMatchData {
+			if !match.StartTime().IsZero() && match.EndTime().IsZero() {
+				event := newMatchEvent(e.App, match)
+				err := m.onCancel.Trigger(event,
+					m.cancelMatchHandler,
+					(*MatchEvent).saveMatchData,
+				)
+				if err == nil {
+					event.TriggerRealtimeNotifications()
+					withdrawal.ChangedMatchData[i] = event.MatchData
+				}
+			}
+		}
+	}
+
+	return nil
 }

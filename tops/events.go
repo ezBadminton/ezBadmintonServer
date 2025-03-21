@@ -375,7 +375,8 @@ type WithdrawEvent struct {
 	Registration     *Registration
 	WithdrawalPolicy got.WithdrawalPolicy
 	// The matches that the registered team withdraws/reenters
-	ChangedMatches []*got.Match
+	ChangedMatches   []*got.Match
+	ChangedMatchData []*MatchData
 }
 
 func newWithdrawEvent(competition *Competition, event *StatusChangeEvent) *WithdrawEvent {

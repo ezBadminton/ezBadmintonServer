@@ -31,6 +31,7 @@ func newCourtStore() *CourtStore {
 func (s *CourtStore) init(
 	scheduler *MatchScheduler,
 	matchManager *MatchManager,
+	withdrawalManager *WithdrawalManager,
 	tournamentStore *TournamentStore,
 ) {
 	courtProxyStore, _ := store.FindRecordStore[Court]()
@@ -53,6 +54,9 @@ func (s *CourtStore) init(
 	matchManager.onReset.Bind(priorityHandler(s.handleMatchReset, -2))
 
 	tournamentStore.onStop.BindFunc(s.handleTournamentStop)
+
+	// Priority before tournament plan update
+	withdrawalManager.onStatusChange.Bind(priorityHandler(s.handleStatusChange, 1))
 }
 
 func (s *CourtStore) deleteCourt(e *core.RecordRequestEvent) error {
@@ -264,6 +268,38 @@ func (s *CourtStore) handleTournamentStop(e *PlanEvent) error {
 			delete(s.occupied, court.Id)
 		}
 	}
+	return nil
+}
+
+func (s *CourtStore) handleStatusChange(e *StatusChangeEvent) error {
+	if !e.Withdraw {
+		return e.Next()
+	}
+
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	for _, withdrawal := range e.Withdrawals {
+		for i, m := range withdrawal.ChangedMatchData {
+			court := m.Court()
+			if m.StartTime().IsZero() && court != nil {
+				event := newCourtEvent(e.App, m, nil)
+				err := s.onCourtUnassign.Trigger(event,
+					s.courtUnassignmentHandler,
+					(*CourtEvent).saveMatchData,
+					s.storeUnassignment,
+				)
+				if err == nil {
+					event.TriggerRealtimeNotifications()
+					withdrawal.ChangedMatchData[i] = event.MatchData
+				} else {
+					return err
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

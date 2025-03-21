@@ -134,14 +134,17 @@ func (m *WithdrawalManager) setPlayerStatus(
 		return errors.New("can not withdraw/reenter from competitions with this status change")
 	}
 
-	event := newStatusChangeEvent(app, player, newStatus, withdraw, competitions)
-	err := m.onStatusChange.Trigger(event,
-		m.statusChangeHandler,
-		(*StatusChangeEvent).saveStatusChange,
-	)
-	if err == nil {
-		event.TriggerRealtimeNotifications()
-	}
+	err := app.RunInTransaction(func(txApp core.App) error {
+		event := newStatusChangeEvent(txApp, player, newStatus, withdraw, competitions)
+		err := m.onStatusChange.Trigger(event,
+			m.statusChangeHandler,
+			(*StatusChangeEvent).saveStatusChange,
+		)
+		if err == nil {
+			event.TriggerRealtimeNotifications()
+		}
+		return err
+	})
 	return err
 }
 
@@ -157,12 +160,16 @@ func (m *WithdrawalManager) statusChangeHandler(e *StatusChangeEvent) error {
 	}
 
 	for _, withdrawal := range e.Withdrawals {
-		updatedData := m.tournamentStore.matchesToMatchData(withdrawal.ChangedMatches)
+		updatedData := make([]*MatchData, len(withdrawal.ChangedMatchData))
+		for i, m := range withdrawal.ChangedMatchData {
+			updatedData[i] = Clone(m)
+		}
 		if e.Withdraw {
 			updatedData = addWithdrawnToData(withdrawal.Registration.Team, updatedData)
 		} else {
 			updatedData = removeWithdrawnFromData(withdrawal.Registration.Team, updatedData)
 		}
+		withdrawal.ChangedMatchData = updatedData
 		e.ChangedMatchData = append(e.ChangedMatchData, updatedData...)
 	}
 

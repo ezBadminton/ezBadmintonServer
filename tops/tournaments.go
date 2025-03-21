@@ -155,7 +155,7 @@ func newTournamentStore(
 	registrationStore.onUpdate.BindFunc(s.verifyRegistrationUpdate)
 	registrationStore.onDelete.BindFunc(s.verifyUnregistration)
 
-	// Priority for settings e.WithdrawalPolicy
+	// Priority for setting e.WithdrawalPolicy
 	withdrawalManager.onWithdraw.Bind(priorityHandler(s.verifyWithdrawal, -1))
 	withdrawalManager.onStatusChange.BindFunc(s.handleStatusChange)
 
@@ -722,7 +722,13 @@ func (s *TournamentStore) verifyWithdrawal(e *WithdrawEvent) error {
 		return errors.New("can not withdraw from competition that is not in progress")
 	}
 	e.WithdrawalPolicy = tournament
-	return e.Next()
+
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	e.ChangedMatchData = s.matchesToMatchData(e.ChangedMatches)
+	return nil
 }
 
 func (s *TournamentStore) handleStatusChange(e *StatusChangeEvent) error {
@@ -742,7 +748,13 @@ func (s *TournamentStore) handleStatusChange(e *StatusChangeEvent) error {
 			removeWithdrawnFromMatches(tPlayer, withdrawal.ChangedMatches)
 		}
 		tournament := s.tournaments[withdrawal.Competition.Id]
-		s.hydrate(tournament)
+		scoreSettings, _ := newScoreSettings(tournament.Competition.TournamentModeSettings())
+		for i := range withdrawal.ChangedMatchData {
+			match := withdrawal.ChangedMatches[i]
+			data := withdrawal.ChangedMatchData[i]
+
+			s.hydrateMatch(match, data, tournament, scoreSettings)
+		}
 		s.update(e, tournament)
 	}
 	return nil
@@ -909,31 +921,43 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 		data := matchData[i]
 		match := matches[i]
 
-		withdrawn := data.WithdrawnTeams()
-		hydrateWithdrawnTeams(match, withdrawn)
-
-		sets := data.Sets()
-		if err := hydrateScore(match, sets, scoreSettings); err != nil {
+		if err := s.hydrateMatch(match, data, tournament, scoreSettings); err != nil {
 			return err
 		}
-
-		court := data.Court()
-		hydrateCourt(match, court)
-
-		startTime := data.StartTime()
-		match.StartTime = startTime.Time()
-		endTime := data.EndTime()
-		match.EndTime = endTime.Time()
-
-		s.hydratedMatches[match.Id()] = s.matches[data.Id]
-		s.matches[data.Id].matchData = data
-		s.byMatch[data.Id] = tournament
 	}
 
 	tournament.Update(nil)
 
 	tournament.Ended = matchesFinished(matches)
 
+	return nil
+}
+
+func (s *TournamentStore) hydrateMatch(
+	match *got.Match,
+	matchData *MatchData,
+	tournament *CompetitionTournament,
+	scoreSettings badminton.ScoreSettings,
+) error {
+	withdrawn := matchData.WithdrawnTeams()
+	hydrateWithdrawnTeams(match, withdrawn)
+
+	sets := matchData.Sets()
+	if err := hydrateScore(match, sets, scoreSettings); err != nil {
+		return err
+	}
+
+	court := matchData.Court()
+	hydrateCourt(match, court)
+
+	startTime := matchData.StartTime()
+	match.StartTime = startTime.Time()
+	endTime := matchData.EndTime()
+	match.EndTime = endTime.Time()
+
+	s.hydratedMatches[match.Id()] = s.matches[matchData.Id]
+	s.matches[matchData.Id].matchData = matchData
+	s.byMatch[matchData.Id] = tournament
 	return nil
 }
 
