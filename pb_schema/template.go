@@ -149,7 +149,6 @@ type Team struct {
 	// system: id
 	Id       string
 	players  []*Player
-	resigned bool
 	created  types.DateTime
 	updated  types.DateTime
 }

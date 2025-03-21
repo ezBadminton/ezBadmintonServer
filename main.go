@@ -11,6 +11,7 @@ import (
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 )
 
 func main() {
@@ -65,6 +66,10 @@ func main() {
 
 	app.Cron().Add("organizer_ping", "*/4 * * * *", func() {
 		tops.PingOrganizerClients(app)
+	})
+
+	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
+		Automigrate: false,
 	})
 
 	if err := app.Start(); err != nil {

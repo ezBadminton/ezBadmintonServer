@@ -562,14 +562,6 @@ func (p *Team) SetPlayers(players []*Player) {
 	p.SetExpand(e)
 }
 
-func (p *Team) Resigned() bool {
-	return p.GetBool("resigned")
-}
-
-func (p *Team) SetResigned(resigned bool) {
-	p.Set("resigned", resigned)
-}
-
 func (p *Team) Created() types.DateTime {
 	return p.GetDateTime("created")
 }
