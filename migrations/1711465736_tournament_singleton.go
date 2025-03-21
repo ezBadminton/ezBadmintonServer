@@ -17,6 +17,7 @@ func init() {
 
 		tournament := TournamentEvent{}
 		tournament.SetProxyRecord(core.NewRecord(tournamentCollection))
+		tournament.Id = "snonkychallenge"
 		tournament.SetTitle("TheTournament")
 		tournament.SetDontReprintGameSheets(true)
 		tournament.SetPrintQrCodes(true)
