@@ -5,6 +5,7 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 	m "github.com/pocketbase/pocketbase/migrations"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 func init() {
@@ -21,8 +22,10 @@ func init() {
 		tournament.SetTitle("TheTournament")
 		tournament.SetDontReprintGameSheets(true)
 		tournament.SetPrintQrCodes(true)
-		tournament.SetPlayerRestTime(20)
+		tournament.SetPlayerRestTime(10)
 		tournament.SetQueueMode(Manual)
+		tournament.SetRaw("created", types.NowDateTime())
+		tournament.SetRaw("updated", types.NowDateTime())
 
 		return app.Save(tournament)
 	}, func(app core.App) error {
