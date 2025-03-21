@@ -22,6 +22,9 @@ func BindMatchHooks(app core.App) {
 		group.POST("/score", setMatchScore)
 		group.POST("/reset", resetMatch)
 
+		rootGroup.POST("/matches/markprint", markPrint).
+			Bind(bodyIdList[MatchData]("matches"))
+
 		return e.Next()
 	})
 }
@@ -78,6 +81,15 @@ func resetMatch(e *core.RequestEvent) error {
 		return e.BadRequestError(err.Error(), err)
 	}
 
+	return e.NoContent(http.StatusOK)
+}
+
+func markPrint(e *core.RequestEvent) error {
+	matchData := e.Get("matches").([]*MatchData)
+
+	if err := tops.MarkMatchSheetsAsPrinted(e.App, matchData); err != nil {
+		return e.InternalServerError("something went wrong", nil)
+	}
 	return e.NoContent(http.StatusOK)
 }
 

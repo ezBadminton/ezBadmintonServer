@@ -1027,6 +1027,30 @@ func (s *TournamentStore) isRegistrationActive(reg *Registration) bool {
 	return isActive
 }
 
+func (s *TournamentStore) markMatchSheetsAsPrinted(app core.App, matchData []*MatchData) error {
+	for i := range matchData {
+		matchData[i] = Clone(matchData[i])
+		matchData[i].SetGameSheetPrinted(true)
+	}
+	err := app.RunInTransaction(func(txApp core.App) error {
+		for _, m := range matchData {
+			if err := txApp.Save(m); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, m := range matchData {
+		tournamentMatch := s.matches[m.Id]
+		tournamentMatch.matchData = m
+		go realtimeNotify(app, "tournament_matches", core.ModelEventTypeUpdate, tournamentMatch)
+	}
+	return nil
+}
+
 func hydrateScore(match *got.Match, sets []*MatchSet, scoreSettings badminton.ScoreSettings) error {
 	withdrawn := match.WithdrawnSlots()
 	if len(withdrawn) == 1 && match.Slot1 == withdrawn[0] {

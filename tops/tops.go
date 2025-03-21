@@ -337,3 +337,10 @@ func DeleteCompetitions(app core.App, competitions []*Competition) error {
 
 	return tops.competitionManager.deleteCompetitions(app, competitions)
 }
+
+func MarkMatchSheetsAsPrinted(app core.App, matchData []*MatchData) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.tournamentStore.markMatchSheetsAsPrinted(app, matchData)
+}
