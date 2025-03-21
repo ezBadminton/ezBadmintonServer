@@ -310,7 +310,7 @@ func (s *MatchScheduler) setMatchScheduleStatus(
 
 func (s *MatchScheduler) triggerEventScheduleUpdates(e *MatchEvent, status ScheduleStatus) {
 	override := map[int]statusOverride{
-		e.Match.match.Id(): {status: status, matchData: e.MatchData},
+		e.Match.match.Id(): {override: status, onlyReplace: -1},
 	}
 	for tournament, matches := range e.ScheduleUpdates {
 		competition := tournament.Competition
@@ -321,8 +321,8 @@ func (s *MatchScheduler) triggerEventScheduleUpdates(e *MatchEvent, status Sched
 }
 
 type statusOverride struct {
-	status    ScheduleStatus
-	matchData *MatchData
+	override    ScheduleStatus
+	onlyReplace ScheduleStatus
 }
 
 func (s *MatchScheduler) updateMatchScheduleStatus(
@@ -335,13 +335,14 @@ func (s *MatchScheduler) updateMatchScheduleStatus(
 	var status ScheduleStatus
 	var blockingPlayers map[string]PlayerBlock
 
+	matchData, status, blockingPlayers = s.scheduleStatus(match, competition)
+
 	override, ok := statusOverrides[match.Id()]
 	if ok {
-		matchData, status, blockingPlayers = override.matchData, override.status, nil
-	} else {
-		matchData, status, blockingPlayers = s.scheduleStatus(match, competition)
+		if override.onlyReplace == -1 || override.onlyReplace == status {
+			status = override.override
+		}
 	}
-
 	scheduledMatch := s.scheduled[matchData.Id]
 
 	oldStatus := scheduledMatch.ScheduleStatus
@@ -595,7 +596,10 @@ func (s *MatchScheduler) handleMatchReset(e *MatchResetEvent) error {
 		return err
 	}
 
-	s.setMatchScheduleStatus(e, e.MatchData, CourtWait)
+	override := map[int]statusOverride{
+		e.Match.match.Id(): {override: CourtWait, onlyReplace: Ready},
+	}
+	s.updateMatchScheduleStatus(e, e.Match.match, e.Competition, override)
 	return nil
 }
 

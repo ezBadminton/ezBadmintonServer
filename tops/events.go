@@ -154,12 +154,17 @@ type MatchResetEvent struct {
 	// Matches that can no longer be ready because their
 	// qualifications depend on the reset match
 	DependantMatches []*ScheduledMatch
+	// When a match is reset it is attempted to re-assign it to the
+	// court it had but only if CanStayOnCourt is true
+	CanStayOnCourt bool
+	Competition    *Competition
 }
 
 func newMatchResetEvent(app core.App, matchData *MatchData) *MatchResetEvent {
 	return &MatchResetEvent{
 		ScoreEvent:       newScoreEvent(app, matchData),
 		DependantMatches: make([]*ScheduledMatch, 0),
+		CanStayOnCourt:   true,
 	}
 }
 

@@ -150,6 +150,7 @@ func newTournamentStore(
 	// Priority before player tracker
 	matchManager.onEnd.Bind(priorityHandler(s.handleMatchEnd, 2))
 	matchManager.onScoreSet.Bind(priorityHandler(s.handleScoreSet, 2))
+	matchManager.onReset.Bind(priorityHandler(s.prepareMatchReset, -4))
 	matchManager.onReset.BindFunc(s.handleMatchReset)
 
 	registrationStore.onUpdate.BindFunc(s.verifyRegistrationUpdate)
@@ -616,6 +617,12 @@ func (s *TournamentStore) handleScoreSet(e *ScoreEvent) error {
 	return nil
 }
 
+func (s *TournamentStore) prepareMatchReset(e *MatchResetEvent) error {
+	e.Match = s.matches[e.MatchData.Id]
+	e.Competition = s.byMatch[e.Match.Id].Competition
+	return e.Next()
+}
+
 func (s *TournamentStore) handleMatchReset(e *MatchResetEvent) error {
 	if !s.isEditable(e.MatchData) {
 		return errors.New("the match is not in an editable state")
@@ -625,7 +632,7 @@ func (s *TournamentStore) handleMatchReset(e *MatchResetEvent) error {
 		return err
 	}
 
-	match := s.matches[e.MatchData.Id]
+	match := e.Match
 	match.matchData = e.MatchData
 	match.match.Score = nil
 	match.match.StartTime = time.Time{}

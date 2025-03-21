@@ -79,6 +79,7 @@ func (t *PlayerTracker) init(
 	// Priority before schedule update
 	matchManager.onEnd.Bind(priorityHandler(t.handleMatchEnd, 1))
 	matchManager.onScoreSet.Bind(priorityHandler(t.handleScoreSet, 1))
+	matchManager.onReset.Bind(priorityHandler(t.prepareMatchReset, -3))
 	matchManager.onReset.Bind(priorityHandler(t.handleMatchReset, 1))
 
 	tournamentStore.onStop.BindFunc(t.handleTournamentStop)
@@ -343,6 +344,26 @@ func (t *PlayerTracker) handleScoreSet(e *ScoreEvent) error {
 		t.startMatchPlayerRest(e.Match)
 	}
 	return nil
+}
+
+func (t *PlayerTracker) prepareMatchReset(e *MatchResetEvent) error {
+	players := playersInMatch(e.Match.match)
+	for _, p := range players {
+		if isPlaying, _ := t.isPlaying(p); isPlaying {
+			e.CanStayOnCourt = false
+			break
+		}
+		_, isResting := t.inRest[p.Id]
+		if !isResting {
+			continue
+		}
+		lastMatch := t.lastMatches[p.Id]
+		if lastMatch.Id != e.Match.Id {
+			e.CanStayOnCourt = false
+			break
+		}
+	}
+	return e.Next()
 }
 
 func (t *PlayerTracker) handleMatchReset(e *MatchResetEvent) error {
