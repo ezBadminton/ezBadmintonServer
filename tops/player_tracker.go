@@ -34,7 +34,7 @@ type PlayerTracker struct {
 
 	// When the rest period after a match ends the event informs about which players are not resting anymore
 	onRestEnd *hook.Hook[*PlayerRestEvent]
-	// When the rest duration setting changes the event informs about which matches left/reentered their rest period
+	// When the rest duration setting changes the event informs about which matches need their rest period updated
 	onRestChanged *hook.Hook[*MatchRestEvent]
 }
 
@@ -210,9 +210,9 @@ func (t *PlayerTracker) handleRestTimeChange(e *SettingsEvent) error {
 	}
 	t.restDuration = time.Duration(newRestTime) * time.Minute
 
-	oldRestingMatches := make(map[*TournamentMatch]any)
+	oldRestingMatches := make([]*TournamentMatch, 0)
 	for playerId := range t.inRest {
-		oldRestingMatches[t.lastMatches[playerId]] = struct{}{}
+		oldRestingMatches = append(oldRestingMatches, t.lastMatches[playerId])
 	}
 	t.inRest = make(map[string]any)
 	t.restGroups = make(map[string]restGroup)
@@ -221,19 +221,20 @@ func (t *PlayerTracker) handleRestTimeChange(e *SettingsEvent) error {
 
 	newRestingMatches := t.initRestTimers()
 
-	changedRestingMatches := make([]*TournamentMatch, 0)
+	changedSet := make(map[string]*TournamentMatch)
 	for _, m := range newRestingMatches {
-		_, ok := oldRestingMatches[m]
-		if !ok {
-			changedRestingMatches = append(changedRestingMatches, m)
-		}
-		delete(oldRestingMatches, m)
+		changedSet[m.Id] = m
 	}
-	for m := range oldRestingMatches {
+	for _, m := range oldRestingMatches {
+		changedSet[m.Id] = m
+	}
+
+	changedRestingMatches := make([]*TournamentMatch, 0, len(changedSet))
+	for _, m := range changedSet {
 		changedRestingMatches = append(changedRestingMatches, m)
 	}
 
-	if len(changedRestingMatches) > 0 {
+	if len(changedSet) > 0 {
 		event := newMatchRestEvent(changedRestingMatches)
 		t.onRestChanged.Trigger(event)
 		event.TriggerRealtimeNotifications()
