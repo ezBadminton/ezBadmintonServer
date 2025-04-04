@@ -1,7 +1,9 @@
 package api_test
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -9,6 +11,7 @@ import (
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/hooks"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -25,6 +28,8 @@ func newTestApp(t testing.TB) *tests.TestApp {
 	return app
 }
 
+// A persistent test app keeps its data across test scenarios
+// as long as the previous scenarios call persistTestData
 func newPersistentTestApp(t testing.TB) *tests.TestApp {
 	dataPath := persistedDataPath
 	if dataPath == "" {
@@ -38,23 +43,58 @@ func newPersistentTestApp(t testing.TB) *tests.TestApp {
 	return app
 }
 
+// Persist the data for the next persistent test app before the scenario is being cleaned up
 func persistTestData(t testing.TB, app *tests.TestApp, res *http.Response) {
 	currentDataDir := app.DataDir()
 	tempPath, err := tests.TempDirClone(currentDataDir)
 	if err != nil {
 		t.Fatal("Failed to persist test data")
 	}
-	cleanUpPersistedTestData(t, app, res)
+	cleanUpPersistedTestData(t)
 	persistedDataPath = tempPath
 }
 
-func cleanUpPersistedTestData(t testing.TB, app *tests.TestApp, res *http.Response) {
+func cleanUpPersistedTestData(t testing.TB) {
 	if persistedDataPath != "" {
 		if err := os.RemoveAll(persistedDataPath); err != nil {
 			t.Fatal(err)
 		}
 	}
 	persistedDataPath = ""
+}
+
+func generateAuthorization(t testing.TB) string {
+	app := newPersistentTestApp(t)
+	defer app.Cleanup()
+
+	organizerCName := CName[TournamentOrganizer]()
+
+	record := &core.Record{}
+	err := app.RecordQuery(organizerCName).Limit(1).One(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := record.NewAuthToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return token
+}
+
+func authHeader(token string) map[string]string {
+	return map[string]string{
+		"Authorization": token,
+	}
+}
+
+func recordToRequestBody(t testing.TB, record core.RecordProxy) io.Reader {
+	rawJson, err := record.ProxyRecord().MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bytes.NewReader(rawJson)
 }
 
 var commonScenarios commonTestScenarios

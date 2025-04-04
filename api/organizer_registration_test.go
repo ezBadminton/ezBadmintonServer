@@ -11,6 +11,8 @@ import (
 )
 
 func TestOrganizerRegistration(t *testing.T) {
+	defer cleanUpPersistedTestData(t)
+
 	organizerCName := CName[TournamentOrganizer]()
 
 	scenarios := []tests.ApiScenario{
@@ -30,7 +32,6 @@ func TestOrganizerRegistration(t *testing.T) {
 			ExpectedStatus:  200,
 			ExpectedContent: []string{"OrganizerUserExists", "true"},
 			TestAppFactory:  newPersistentTestApp,
-			AfterTestFunc:   cleanUpPersistedTestData,
 		},
 	}
 
