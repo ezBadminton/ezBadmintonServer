@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -97,29 +98,78 @@ func recordToRequestBody(t testing.TB, record core.RecordProxy) io.Reader {
 	return bytes.NewReader(rawJson)
 }
 
-var commonScenarios commonTestScenarios
-
-type commonTestScenarios struct {
-	registerOrganizer tests.ApiScenario
+func unmarshalListRespose(res *http.Response) map[string]any {
+	buf := bytes.Buffer{}
+	buf.ReadFrom(res.Body)
+	responseJson := map[string]any{}
+	json.Unmarshal(buf.Bytes(), &responseJson)
+	return responseJson
 }
 
-func init() {
-	organizerCName := CName[TournamentOrganizer]()
+func unmarshalRecords[P Proxy, PP ProxyP[P]](app *tests.TestApp, res *http.Response) []PP {
+	responseJson := unmarshalListRespose(res)
+	items := responseJson["items"].([]any)
 
-	commonScenarios = commonTestScenarios{
-		registerOrganizer: tests.ApiScenario{
-			Name:   "register tournament organizer",
-			Method: http.MethodPost,
-			URL:    fmt.Sprintf("/api/collections/%s/records", organizerCName),
-			Body: strings.NewReader(`{
+	cName := CName[P, PP]()
+	collection, _ := app.FindCachedCollectionByNameOrId(cName)
+	records := make([]PP, 0, len(items))
+	for _, item := range items {
+		record := core.NewRecord(collection)
+		recordData := item.(map[string]any)
+		record.Load(recordData)
+		pRecord, _ := WrapRecord[P, PP](record)
+		records = append(records, pRecord)
+	}
+	return records
+}
+
+var commonScenarios commonTestScenarios
+
+type commonTestScenarios struct{}
+
+func (_ commonTestScenarios) registerOrganizer() *tests.ApiScenario {
+	organizerCName := CName[TournamentOrganizer]()
+	return &tests.ApiScenario{
+		Name:   "register tournament organizer",
+		Method: http.MethodPost,
+		URL:    fmt.Sprintf("/api/collections/%s/records", organizerCName),
+		Body: strings.NewReader(`{
 				"username": "testuser",
 				"password": "12345",
 				"passwordConfirm": "12345"
 			}`),
-			ExpectedStatus:  200,
-			ExpectedContent: []string{organizerCName, "testuser"},
-			TestAppFactory:  newPersistentTestApp,
-			AfterTestFunc:   persistTestData,
-		},
+		ExpectedStatus:  200,
+		ExpectedContent: []string{organizerCName, "testuser"},
+		TestAppFactory:  newPersistentTestApp,
+		AfterTestFunc:   persistTestData,
 	}
+}
+
+func (_ commonTestScenarios) registerTeam(headers map[string]string, competition *Competition, players []*Player) *tests.ApiScenario {
+	sb := strings.Builder{}
+	for i, player := range players {
+		sb.WriteRune('"')
+		sb.WriteString(player.Id)
+		sb.WriteRune('"')
+		if i < len(players)-1 {
+			sb.WriteRune(',')
+		}
+	}
+	playerIdList := sb.String()
+	return &tests.ApiScenario{
+		Name:    "register a team",
+		Method:  http.MethodPost,
+		URL:     fmt.Sprintf("/api/ezbadminton/admin/registration/%v", competition.Id),
+		Headers: headers,
+		Body: strings.NewReader(fmt.Sprintf(`{
+				"players": [%v]
+			}`, playerIdList)),
+		ExpectedStatus: 200,
+		TestAppFactory: newPersistentTestApp,
+		AfterTestFunc:  persistTestData,
+	}
+}
+
+func init() {
+	commonScenarios = commonTestScenarios{}
 }

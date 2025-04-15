@@ -40,7 +40,13 @@ func newDrawManager(
 	return m
 }
 
+var ErrNoModeSettings error = errors.New("competition can not have a draw made because it has no tournament mode settings set")
+
 func (d *DrawManager) makeDraw(app core.App, comp *Competition) error {
+	if comp.TournamentModeSettings() == nil {
+		return ErrNoModeSettings
+	}
+
 	return app.RunInTransaction(func(txApp core.App) error {
 		event := newCompetitionEvent(txApp, comp)
 		err := d.onDraw.Trigger(event,

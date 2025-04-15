@@ -15,7 +15,7 @@ func TestOrganizerRegistration(t *testing.T) {
 
 	organizerCName := CName[TournamentOrganizer]()
 
-	scenarios := []tests.ApiScenario{
+	scenarios := []*tests.ApiScenario{
 		{
 			Name:            "does tournament organizer account exist in new database",
 			Method:          http.MethodGet,
@@ -24,7 +24,7 @@ func TestOrganizerRegistration(t *testing.T) {
 			ExpectedContent: []string{"OrganizerUserExists", "false"},
 			TestAppFactory:  newTestApp,
 		},
-		commonScenarios.registerOrganizer,
+		commonScenarios.registerOrganizer(),
 		{
 			Name:            "does tournament organizer account exist after registration",
 			Method:          http.MethodGet,

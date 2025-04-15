@@ -25,8 +25,7 @@ func TestCompetitionCreation(t *testing.T) {
 	womensDoubles.SetTeamSize(2)
 	womensDoubles.SetGenderCategory(Female)
 
-	commonScenarios.registerOrganizer.Test(t)
-
+	commonScenarios.registerOrganizer().Test(t)
 	headers := authHeader(generateAuthorization(t))
 
 	scenarios := []tests.ApiScenario{
@@ -76,4 +75,21 @@ func TestCompetitionCreation(t *testing.T) {
 	for _, scenario := range scenarios {
 		scenario.Test(t)
 	}
+}
+
+func createTestCompetition(t testing.TB, teamSize int, genderCategory GenderCategory) *Competition {
+	app := newPersistentTestApp(t)
+	defer app.Cleanup()
+
+	competition, _ := NewProxy[Competition](app)
+	competition.SetTeamSize(teamSize)
+	competition.SetGenderCategory(genderCategory)
+
+	if err := app.Save(competition); err != nil {
+		t.Fatal(err)
+	}
+
+	persistTestData(t, app, nil)
+
+	return competition
 }
