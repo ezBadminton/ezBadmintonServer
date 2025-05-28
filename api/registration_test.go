@@ -171,7 +171,7 @@ func TestPlayerAdd(t *testing.T) {
 func TestTeamRegistration(t *testing.T) {
 	defer cleanUpPersistedTestData(t)
 
-	players := createTestPlayers(t, 6)
+	players := createTestPlayers(t, 6, NotAttending)
 	singles := createTestCompetition(t, 1, Female)
 	doubles := createTestCompetition(t, 2, Male)
 
@@ -346,7 +346,7 @@ func TestTeamRegistration(t *testing.T) {
 	}
 }
 
-func createTestPlayers(t testing.TB, amount int) []*Player {
+func createTestPlayers(t testing.TB, amount int, status PlayerStatus) []*Player {
 	app := newPersistentTestApp(t)
 	defer app.Cleanup()
 
@@ -356,7 +356,7 @@ func createTestPlayers(t testing.TB, amount int) []*Player {
 		player, _ := NewProxy[Player](app)
 		player.SetFirstName(fmt.Sprintf("%v", i))
 		player.SetLastName(fmt.Sprintf("-%v-", i))
-		player.SetStatus(NotAttending)
+		player.SetStatus(status)
 		if err := app.Save(player); err != nil {
 			t.Fatal(err)
 		}

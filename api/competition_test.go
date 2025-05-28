@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
+	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -86,6 +87,16 @@ func createTestCompetition(t testing.TB, teamSize int, genderCategory GenderCate
 	competition.SetGenderCategory(genderCategory)
 
 	if err := app.Save(competition); err != nil {
+		t.Fatal(err)
+	}
+
+	tEventStore, _ := store.FindRecordStore[TournamentEvent]()
+	tEvent := tEventStore.RecordList[0]
+
+	tEvent = Clone(tEvent)
+	tEvent.SetPlayerRestTime(0)
+
+	if err := app.Save(tEvent); err != nil {
 		t.Fatal(err)
 	}
 

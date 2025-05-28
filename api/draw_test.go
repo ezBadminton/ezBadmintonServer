@@ -23,7 +23,7 @@ func TestDraw(t *testing.T) {
 	commonScenarios.registerOrganizer().Test(t)
 	headers := authHeader(generateAuthorization(t))
 
-	players := createTestPlayers(t, 4)
+	players := createTestPlayers(t, 4, NotAttending)
 	competition := createTestCompetition(t, 1, Female)
 
 	modeSettings, _ := NewProxy[TournamentModeSettings](app)

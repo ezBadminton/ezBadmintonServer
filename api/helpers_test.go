@@ -12,6 +12,8 @@ import (
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
 	"github.com/ezBadminton/ezBadmintonServer/hooks"
+	"github.com/ezBadminton/ezBadmintonServer/store"
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
@@ -41,6 +43,28 @@ func newPersistentTestApp(t testing.TB) *tests.TestApp {
 		t.Fatal(err)
 	}
 	hooks.InitHooksAndApi(app)
+	return app
+}
+
+// Returns a test app instance like newPersistentTestApp but additionally
+// triggers the serve event. For use without the ApiScenario.
+func newPersistentTestAppAndServe(t testing.TB) *tests.TestApp {
+	app := newPersistentTestApp(t)
+
+	baseRouter, err := apis.NewRouter(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	serveEvent := new(core.ServeEvent)
+	serveEvent.App = app
+	serveEvent.Router = baseRouter
+
+	err = app.OnServe().Trigger(serveEvent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return app
 }
 
@@ -168,6 +192,210 @@ func (_ commonTestScenarios) registerTeam(headers map[string]string, competition
 		TestAppFactory: newPersistentTestApp,
 		AfterTestFunc:  persistTestData,
 	}
+}
+
+type testCompetitionSettings struct {
+	tType              TournamentType
+	numTeams, teamSize int
+}
+
+// Creates players, puts them into teams, registers them to a newly
+// created competition, sets the tournement mode, makes a draw
+// and starts the tournament
+// Returns the competition, the teams, the players and the tournament plan.
+func (_ commonTestScenarios) setUpTestTournament(
+	settings testCompetitionSettings,
+	t *testing.T, headers map[string]string,
+) (*Competition, []*Team, []*Player, map[string]any) {
+	numPlayers := settings.numTeams * settings.teamSize
+	players := createTestPlayers(t, numPlayers, Attending)
+	competition := createTestCompetition(t, settings.teamSize, Any)
+	registrationURL := fmt.Sprintf("/api/ezbadminton/admin/registration/%v", competition.Id)
+	drawURL := fmt.Sprintf("/api/ezbadminton/admin/draw/%v/make", competition.Id)
+	startURL := fmt.Sprintf("/api/ezbadminton/admin/tournaments/%v/start", competition.Id)
+
+	for i := range settings.numTeams {
+		playerIds := make([]string, settings.teamSize)
+		basePlayerIndex := i * settings.teamSize
+		for playerI := range settings.teamSize {
+			player := players[basePlayerIndex+playerI]
+			playerIds[playerI] = player.Id
+		}
+
+		body := map[string]any{
+			"players": playerIds,
+		}
+
+		rawJson, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		json := bytes.NewReader(rawJson)
+
+		registrationScenario := tests.ApiScenario{
+			Name:           "register a team for a general competition setup",
+			Method:         http.MethodPost,
+			URL:            registrationURL,
+			Headers:        headers,
+			Body:           json,
+			ExpectedStatus: 200,
+			TestAppFactory: newPersistentTestApp,
+			AfterTestFunc:  persistTestData,
+		}
+
+		registrationScenario.Test(t)
+	}
+
+	competitionCName := CName[Competition]()
+	teamIds := make([]string, 0)
+	registrationFetchScenario := tests.ApiScenario{
+		Name:            "fetch the registered team IDs of a general competition setup",
+		Method:          http.MethodGet,
+		URL:             fmt.Sprintf("/api/collections/%v/records/%v", competitionCName, competition.Id),
+		Headers:         headers,
+		ExpectedStatus:  200,
+		TestAppFactory:  newPersistentTestApp,
+		ExpectedContent: []string{"registrations"},
+		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+			response := unmarshalListRespose(res)
+			ids := response["registrations"].([]any)
+			for _, id := range ids {
+				teamIds = append(teamIds, id.(string))
+			}
+		},
+	}
+	registrationFetchScenario.Test(t)
+
+	app := newPersistentTestApp(t)
+	defer app.Cleanup()
+
+	teams := make([]*Team, 0)
+	for _, id := range teamIds {
+		team, err := store.FindProxy[Team](id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		teams = append(teams, team)
+	}
+
+	modeSettings, _ := NewProxy[TournamentModeSettings](app)
+	modeSettings.SetType(settings.tType)
+	modeSettings.SetSeedingMode(TieredSeeds)
+	modeSettings.SetWinningPoints(21)
+	modeSettings.SetWinningSets(2)
+	modeSettings.SetMaxPoints(30)
+	modeSettings.SetTwoPointMargin(true)
+	modeSettings.SetRaw("competitions", []string{competition.Id})
+	modeSettings.WithCustomData(true)
+
+	modeSettingsCName := CName[TournamentModeSettings]()
+	modeSettingsScenario := tests.ApiScenario{
+		Name:            "set tournament mode settings for general competition setup",
+		Method:          http.MethodPost,
+		URL:             fmt.Sprintf("/api/collections/%v/records", modeSettingsCName),
+		Headers:         headers,
+		Body:            recordToRequestBody(t, modeSettings),
+		ExpectedStatus:  200,
+		ExpectedContent: []string{modeSettingsCName},
+		TestAppFactory:  newPersistentTestApp,
+		AfterTestFunc:   persistTestData,
+	}
+	modeSettingsScenario.Test(t)
+
+	drawScenario := tests.ApiScenario{
+		Name:           "make draw for general competition setup",
+		Method:         http.MethodPost,
+		URL:            drawURL,
+		Headers:        headers,
+		ExpectedStatus: 200,
+		TestAppFactory: newPersistentTestApp,
+		AfterTestFunc:  persistTestData,
+	}
+	drawScenario.Test(t)
+
+	startScenario := tests.ApiScenario{
+		Name:           "start competition for general competition setup",
+		Method:         http.MethodPost,
+		URL:            startURL,
+		Headers:        headers,
+		ExpectedStatus: 200,
+		TestAppFactory: newPersistentTestApp,
+		AfterTestFunc:  persistTestData,
+	}
+	startScenario.Test(t)
+
+	var plan map[string]any
+	tournamentFetchScenario := tests.ApiScenario{
+		Name:            "fetch tournament plan of general competition setup",
+		Method:          http.MethodGet,
+		URL:             "/api/collections/tournament_plans/records",
+		Headers:         headers,
+		ExpectedStatus:  200,
+		ExpectedContent: []string{"items"},
+		TestAppFactory:  newPersistentTestApp,
+		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+			response := unmarshalListRespose(res)
+			plans := response["items"].([]any)
+			for _, p := range plans {
+				p := p.(map[string]any)
+				if p["competition"].(string) == competition.Id {
+					plan = p
+				}
+			}
+		},
+	}
+	tournamentFetchScenario.Test(t)
+
+	return competition, teams, players, plan
+}
+
+func setUpCourts(t testing.TB, amount int) []*Court {
+	app := newPersistentTestAppAndServe(t)
+	defer app.Cleanup()
+
+	gym, _ := NewProxy[Gymnasium](app)
+	if err := app.Save(gym); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range amount {
+		court, _ := NewProxy[Court](app)
+		court.SetGymnasium(gym)
+		court.SetName(fmt.Sprintf("Court %v", i))
+		if err := app.Save(court); err != nil {
+			t.Fatal(err)
+		}
+	}
+	persistTestData(t, app, nil)
+
+	courtStore, _ := store.FindRecordStore[Court]()
+	courts := courtStore.RecordList
+
+	return courts
+}
+
+func fetchSingleEliminationRounds(t testing.TB, tPlan map[string]any) [][]*MatchData {
+	tournament := tPlan["tournament"].(map[string]any)
+	tType := tournament["type"].(string)
+	if tType != "SingleElimination" {
+		t.Fatal("the given tournament plan is not of a single elimination tournament")
+	}
+	rounds := tournament["rounds"].([]any)
+	result := make([][]*MatchData, 0)
+	for _, round := range rounds {
+		round := round.([]any)
+		roundData := make([]*MatchData, 0)
+		for _, matchId := range round {
+			matchId := matchId.(string)
+			matchData, err := store.FindProxy[MatchData](matchId)
+			if err != nil {
+				t.Fatal(err)
+			}
+			roundData = append(roundData, matchData)
+		}
+		result = append(result, roundData)
+	}
+	return result
 }
 
 func init() {
