@@ -40,7 +40,7 @@ func (s *CourtStore) init(
 	slices.SortFunc(s.list, compareCourts)
 	s.occupied = make(map[string]string)
 	for m := range scheduler.schedule.IterateMatches() {
-		if m.ScheduleStatus == InProgress {
+		if m.ScheduleStatus == Ready || m.ScheduleStatus == InProgress {
 			s.occupied[m.Match.Court().Id] = m.Id
 		}
 	}
