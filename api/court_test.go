@@ -224,6 +224,15 @@ func TestImplicitCourtAssignment(t *testing.T) {
 			AfterTestFunc:  persistTestData,
 		},
 		{
+			Name:            "try to unassign court of running match",
+			Method:          http.MethodPost,
+			URL:             fmt.Sprintf("/api/ezbadminton/admin/courts/%v/unassign", semi1.Id),
+			Headers:         headers,
+			ExpectedStatus:  400,
+			ExpectedContent: []string{"can not be unassigned"},
+			TestAppFactory:  newPersistentTestApp,
+		},
+		{
 			Name:    "set match score",
 			Method:  http.MethodPost,
 			URL:     fmt.Sprintf("/api/ezbadminton/admin/matches/%v/score", semi1.Id),
