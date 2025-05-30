@@ -30,6 +30,7 @@ type TournamentOperations struct {
 	categorizationManager         *CategorizationManager
 	tournamentModeSettingsManager *TournamentModeSettingsManager
 	competitionManager            *CompetitionManager
+	lampionImporter               *LampionImporter
 }
 
 func InitTournamentOperations(app core.App) {
@@ -61,6 +62,7 @@ func InitTournamentOperations(app core.App) {
 		tournamentModeSettingsManager,
 		competitionManager,
 	)
+	lampionImporter := newLampionImporter(app)
 
 	playerTracker.init(tournamentStore, courtStore, matchManager, eventSettingsManager, scheduler)
 	scheduler.init(tournamentStore, courtStore, matchManager, playerTracker)
@@ -82,6 +84,7 @@ func InitTournamentOperations(app core.App) {
 		categorizationManager:         categorizationManager,
 		tournamentModeSettingsManager: tournamentModeSettingsManager,
 		competitionManager:            competitionManager,
+		lampionImporter:               lampionImporter,
 	}
 }
 
@@ -368,4 +371,11 @@ func MarkMatchSheetsAsPrinted(app core.App, matchData []*MatchData) error {
 	tops.mu.Lock()
 
 	return tops.tournamentStore.markMatchSheetsAsPrinted(app, matchData)
+}
+
+func ImportLampionTournament() error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.lampionImporter.importLampionTournament()
 }
