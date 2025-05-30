@@ -124,7 +124,7 @@ func TestDraw(t *testing.T) {
 			ExpectedContent: []string{"items"},
 			TestAppFactory:  newPersistentTestApp,
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				response := unmarshalListRespose(res)
+				response := unmarshalJsonResponse(res)
 				plans := response["items"].([]any)
 				if len(plans) != 0 {
 					t.Fatal("a tournament plan exists despite no draw existing yet")
@@ -166,7 +166,7 @@ func TestDraw(t *testing.T) {
 			ExpectedContent: []string{"items"},
 			TestAppFactory:  newPersistentTestApp,
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				response := unmarshalListRespose(res)
+				response := unmarshalJsonResponse(res)
 				plans := response["items"].([]any)
 				if len(plans) != 1 {
 					t.Fatal("no tournament plan exists after a draw was made")
@@ -332,7 +332,7 @@ func TestDraw(t *testing.T) {
 			ExpectedContent: []string{"items"},
 			TestAppFactory:  newPersistentTestApp,
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				response := unmarshalListRespose(res)
+				response := unmarshalJsonResponse(res)
 				plans := response["items"].([]any)
 				if len(plans) != 0 {
 					t.Fatal("the tournament plan is not deleted after the draw was deleted")

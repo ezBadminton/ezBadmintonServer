@@ -223,7 +223,7 @@ func TestTeamRegistration(t *testing.T) {
 			ExpectedContent: []string{"items"},
 			TestAppFactory:  newPersistentTestApp,
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				response := unmarshalListRespose(res)
+				response := unmarshalJsonResponse(res)
 				registrations := response["items"].([]any)
 				if len(registrations) != 0 {
 					t.Fatal("the initial registrations are not empty")
@@ -287,7 +287,7 @@ func TestTeamRegistration(t *testing.T) {
 			ExpectedContent: []string{"items"},
 			TestAppFactory:  newPersistentTestApp,
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				response := unmarshalListRespose(res)
+				response := unmarshalJsonResponse(res)
 				registrations := response["items"].([]any)
 				if len(registrations) != 2 {
 					t.Fatal("the registrations are not present")
@@ -332,7 +332,7 @@ func TestTeamRegistration(t *testing.T) {
 			ExpectedContent: []string{"items"},
 			TestAppFactory:  newPersistentTestApp,
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				response := unmarshalListRespose(res)
+				response := unmarshalJsonResponse(res)
 				registrations := response["items"].([]any)
 				if len(registrations) != 1 {
 					t.Fatal("the registration was not deleted")

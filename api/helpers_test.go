@@ -122,7 +122,7 @@ func recordToRequestBody(t testing.TB, record core.RecordProxy) io.Reader {
 	return bytes.NewReader(rawJson)
 }
 
-func unmarshalListRespose(res *http.Response) map[string]any {
+func unmarshalJsonResponse(res *http.Response) map[string]any {
 	buf := bytes.Buffer{}
 	buf.ReadFrom(res.Body)
 	responseJson := map[string]any{}
@@ -131,7 +131,7 @@ func unmarshalListRespose(res *http.Response) map[string]any {
 }
 
 func unmarshalRecords[P Proxy, PP ProxyP[P]](app *tests.TestApp, res *http.Response) []PP {
-	responseJson := unmarshalListRespose(res)
+	responseJson := unmarshalJsonResponse(res)
 	items := responseJson["items"].([]any)
 
 	cName := CName[P, PP]()
@@ -257,7 +257,7 @@ func (_ commonTestScenarios) setUpTestTournament(
 		TestAppFactory:  newPersistentTestApp,
 		ExpectedContent: []string{"registrations"},
 		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-			response := unmarshalListRespose(res)
+			response := unmarshalJsonResponse(res)
 			ids := response["registrations"].([]any)
 			for _, id := range ids {
 				teamIds = append(teamIds, id.(string))
@@ -334,7 +334,7 @@ func (_ commonTestScenarios) setUpTestTournament(
 		ExpectedContent: []string{"items"},
 		TestAppFactory:  newPersistentTestApp,
 		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-			response := unmarshalListRespose(res)
+			response := unmarshalJsonResponse(res)
 			plans := response["items"].([]any)
 			for _, p := range plans {
 				p := p.(map[string]any)
@@ -396,6 +396,39 @@ func fetchSingleEliminationRounds(t testing.TB, tPlan map[string]any) [][]*Match
 		result = append(result, roundData)
 	}
 	return result
+}
+
+func matchupFromMatchData(t *testing.T, headers map[string]string, matchId string) (string, string) {
+	var match map[string]any
+	matchFetchScenario := tests.ApiScenario{
+		Name:            "Fetch tournament matches to look up a matchup",
+		Method:          http.MethodGet,
+		URL:             "/api/collections/tournament_matches/records",
+		Headers:         headers,
+		ExpectedStatus:  200,
+		ExpectedContent: []string{"items"},
+		TestAppFactory:  newPersistentTestApp,
+		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+			response := unmarshalJsonResponse(res)
+			items := response["items"].([]any)
+			for _, item := range items {
+				item := item.(map[string]any)
+				id := item["id"].(string)
+				if id == matchId {
+					match = item
+				}
+			}
+		},
+	}
+	matchFetchScenario.Test(t)
+
+	if match == nil {
+		t.Fatal("the matchup could not be found")
+	}
+
+	slot1 := match["slot1"].(map[string]any)["occupant"].(string)
+	slot2 := match["slot2"].(map[string]any)["occupant"].(string)
+	return slot1, slot2
 }
 
 func init() {
