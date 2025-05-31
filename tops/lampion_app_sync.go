@@ -17,10 +17,10 @@ type LampionSync struct {
 	ApiKey string
 }
 
-func initLampionSync(matchManager *MatchManager) {
+func newLampionSync(matchManager *MatchManager) *LampionSync {
 	apiKey := os.Getenv("LAMPION_API_KEY")
 	if apiKey == "" {
-		return
+		return nil
 	}
 	sync := &LampionSync{
 		Url:    "https://lampionturnier-app.tgcamberg1848.de/api",
@@ -28,6 +28,8 @@ func initLampionSync(matchManager *MatchManager) {
 	}
 	matchManager.onStart.Bind(priorityHandler(sync.handleMatchStart, -5))
 	matchManager.onScoreSet.Bind(priorityHandler(sync.handleMatchScore, -5))
+
+	return sync
 }
 
 func (l *LampionSync) handleMatchStart(e *MatchEvent) error {
