@@ -43,9 +43,6 @@ func passThroughTournamentPlans(e *core.RequestEvent) error {
 	if err != nil {
 		return e.BadRequestError("can not find file in body", err)
 	}
-	if err != nil {
-		return e.InternalServerError("something went wrong", err)
-	}
 	defer f.Close()
 
 	filename := fileHeader.Filename
