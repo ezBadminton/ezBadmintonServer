@@ -63,6 +63,7 @@ func InitTournamentOperations(app core.App) {
 		competitionManager,
 	)
 	lampionImporter := newLampionImporter(app)
+	initLampionSync(matchManager)
 
 	playerTracker.init(tournamentStore, courtStore, matchManager, eventSettingsManager, scheduler)
 	scheduler.init(tournamentStore, courtStore, matchManager, playerTracker)

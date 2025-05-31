@@ -549,6 +549,7 @@ func (s *TournamentStore) handleMatchStart(e *MatchEvent) error {
 	match := s.matches[e.MatchData.Id]
 	match.matchData = e.MatchData
 	match.match.StartTime = e.MatchData.StartTime().Time()
+	e.Match = match
 
 	tournament := s.byMatch[e.MatchData.Id]
 	tournament.UpdateEditableMatches()
