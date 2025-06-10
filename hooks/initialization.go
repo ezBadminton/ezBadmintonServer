@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"github.com/ezBadminton/ezBadmintonServer/api"
+	"github.com/ezBadminton/ezBadmintonServer/infoscreens"
 	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
 	"github.com/pocketbase/pocketbase/core"
@@ -26,12 +27,14 @@ func InitHooksAndApi(app core.App) {
 	api.BindCategoryHooks(app)
 	api.BindTournamentModeSettingsHooks(app)
 	api.BindCompetitionHooks(app)
+	api.BindInfoScreenControlHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if err := store.InitStores(e.App); err != nil {
 			return err
 		}
 		tops.InitTournamentOperations(e.App)
+		infoscreens.InitTokenManager(app)
 
 		return e.Next()
 	})

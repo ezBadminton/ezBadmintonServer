@@ -920,6 +920,62 @@ func (p *TournamentOrganizer) SetUpdated(updated types.DateTime) {
 	p.Set("updated", updated)
 }
 
+type InfoscreenUser struct {
+	core.BaseRecordProxy
+}
+
+func (p *InfoscreenUser) CollectionName() string {
+	return "infoscreen_users"
+}
+
+func (p *InfoscreenUser) Username() string {
+	return p.GetString("username")
+}
+
+func (p *InfoscreenUser) SetUsername(username string) {
+	p.Set("username", username)
+}
+
+func (p *InfoscreenUser) InfoItems() string {
+	return p.GetString("infoItems")
+}
+
+func (p *InfoscreenUser) SetInfoItems(infoItems string) {
+	p.Set("infoItems", infoItems)
+}
+
+func (p *InfoscreenUser) ControllerToken() string {
+	return p.GetString("controllerToken")
+}
+
+func (p *InfoscreenUser) SetControllerToken(controllerToken string) {
+	p.Set("controllerToken", controllerToken)
+}
+
+func (p *InfoscreenUser) InitToken() string {
+	return p.GetString("initToken")
+}
+
+func (p *InfoscreenUser) SetInitToken(initToken string) {
+	p.Set("initToken", initToken)
+}
+
+func (p *InfoscreenUser) Created() types.DateTime {
+	return p.GetDateTime("created")
+}
+
+func (p *InfoscreenUser) SetCreated(created types.DateTime) {
+	p.Set("created", created)
+}
+
+func (p *InfoscreenUser) Updated() types.DateTime {
+	return p.GetDateTime("updated")
+}
+
+func (p *InfoscreenUser) SetUpdated(updated types.DateTime) {
+	p.Set("updated", updated)
+}
+
 type AgeGroupType int
 
 const (

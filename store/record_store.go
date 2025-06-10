@@ -52,9 +52,10 @@ func InitStores(app core.App) error {
 	storeCh := make(chan namedStore)
 
 	var wg sync.WaitGroup
-	wg.Add(14) // !NB Update this when adding/removing stores
+	wg.Add(15) // !NB Update this when adding/removing stores
 
 	go initStoreWg[TournamentOrganizer](app, &wg, errCh, storeCh)
+	go initStoreWg[InfoscreenUser](app, &wg, errCh, storeCh)
 	go initStoreWg[AgeGroup](app, &wg, errCh, storeCh)
 	go initStoreWg[Club](app, &wg, errCh, storeCh)
 	go initStoreWg[Competition](app, &wg, errCh, storeCh)

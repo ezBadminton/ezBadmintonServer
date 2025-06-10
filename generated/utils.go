@@ -8,7 +8,7 @@ import (
 )
 
 type Proxy interface {
-	Users | PlayingLevel | Club | Player | Competition | Team | Gymnasium | Court | MatchData | MatchSet | TournamentOrganizer | AgeGroup | TournamentEvent | TournamentModeSettings | TieBreaker
+	Users | PlayingLevel | Club | Player | Competition | Team | Gymnasium | Court | MatchData | MatchSet | TournamentOrganizer | InfoscreenUser | AgeGroup | TournamentEvent | TournamentModeSettings | TieBreaker
 }
 
 // This interface constrains a type parameter of
@@ -39,7 +39,7 @@ type Proxy interface {
 //
 //	MyFunc[*ProxyType]()
 //
-// And even works with other type paramters:
+// And even works with other type parameters:
 //
 //	func MyFunc2[P Proxy, PP ProxyP[P]]() {
 //	    MyFunc[PP]()
@@ -74,7 +74,7 @@ func NewProxy[P Proxy, PP ProxyP[P]](app core.App) (PP, error) {
 
 // Wraps a record in a newly created proxy
 //
-//	proxy := WrapProxy[ProxyType](record)
+//	proxy := WrapRecord[ProxyType](record)
 func WrapRecord[P Proxy, PP ProxyP[P]](record *core.Record) (PP, error) {
 	collectionName := record.Collection().Name
 	proxyCollectionName := PP.CollectionName(nil)

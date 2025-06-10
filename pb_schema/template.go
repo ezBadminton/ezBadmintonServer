@@ -147,10 +147,10 @@ type Competition struct {
 type Team struct {
 	// collection-name: teams
 	// system: id
-	Id       string
-	players  []*Player
-	created  types.DateTime
-	updated  types.DateTime
+	Id      string
+	players []*Player
+	created types.DateTime
+	updated types.DateTime
 }
 
 type Gymnasium struct {
@@ -221,6 +221,28 @@ type TournamentOrganizer struct {
 	username string
 	created  types.DateTime
 	updated  types.DateTime
+}
+
+type InfoscreenUser struct {
+	// collection-name: infoscreen_users
+	// system: id
+	Id string
+	// system: password
+	password string
+	// system: tokenKey
+	tokenKey string
+	// system: email
+	email string
+	// system: emailVisibility
+	emailVisibility bool
+	// system: verified
+	verified        bool
+	username        string
+	infoItems       string
+	controllerToken string
+	initToken       string
+	created         types.DateTime
+	updated         types.DateTime
 }
 
 type AgeGroup struct {
