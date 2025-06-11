@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
@@ -244,20 +245,18 @@ func (l *LampionImporter) createAndRegisterTeams(rawEntries []any, players map[s
 
 // Returns first name, last name, club name
 func parsePlayer(rawName, rawClubName string) (string, string, string) {
-	if rawName == "" || rawName == "Freimeldung" {
+	if rawName == "" || rawName == "frei" {
 		return "", "", ""
 	}
 	var firstName, lastName string
 	var split []string
 	if strings.Contains(rawName, ", ") {
 		split = strings.Split(rawName, ", ")
-		firstName, lastName = split[1], split[0]
 	} else if strings.Contains(rawName, ",") {
 		split = strings.Split(rawName, ",")
-		firstName, lastName = split[1], split[0]
 	} else {
 		split = strings.Split(rawName, " ")
-		firstName, lastName = split[0], split[1]
+		slices.Reverse(split)
 	}
 	if len(split) != 2 {
 		fmt.Println("Unexpected name:")
@@ -265,6 +264,8 @@ func parsePlayer(rawName, rawClubName string) (string, string, string) {
 		fmt.Println(rawClubName)
 		return "", "", ""
 	}
+
+	firstName, lastName = split[1], split[0]
 
 	return firstName, lastName, rawClubName
 }
