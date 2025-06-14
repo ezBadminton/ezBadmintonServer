@@ -160,7 +160,7 @@ func (l *LampionImporter) createPlayers(rawEntries []any, clubs map[string]*Club
 		for _, playerIndex := range []string{"1", "2"} {
 			rawName := entry[fmt.Sprintf("Spieler%v", playerIndex)].(string)
 			rawClubName := entry[fmt.Sprintf("Verein%v", playerIndex)].(string)
-			firstName, lastName, clubName := parsePlayer(rawName, rawClubName)
+			firstName, lastName, clubName := l.parsePlayer(rawName, rawClubName)
 			if firstName == "" {
 				continue
 			}
@@ -218,7 +218,7 @@ func (l *LampionImporter) createAndRegisterTeams(rawEntries []any, players map[s
 		for _, playerIndex := range []string{"1", "2"} {
 			rawName := entry[fmt.Sprintf("Spieler%v", playerIndex)].(string)
 			rawClubName := entry[fmt.Sprintf("Verein%v", playerIndex)].(string)
-			firstName, lastName, clubName := parsePlayer(rawName, rawClubName)
+			firstName, lastName, clubName := l.parsePlayer(rawName, rawClubName)
 			if firstName == "" {
 				continue
 			}
@@ -234,7 +234,8 @@ func (l *LampionImporter) createAndRegisterTeams(rawEntries []any, players map[s
 
 		if err := tops.registrationStore.registerTeam(l.App, team, competition); err != nil {
 			if strings.Contains(err.Error(), "already registered") {
-				fmt.Printf("The player %v %v is registered multiple times.\n", teamMembers[0].FirstName(), teamMembers[0].LastName())
+				warnMsg := fmt.Sprintf("The player %v %v is registered multiple times.\n", teamMembers[0].FirstName(), teamMembers[0].LastName())
+				l.App.Logger().Warn(warnMsg, "Meldungs-ID", entry["ID"])
 			} else {
 				return err
 			}
@@ -244,7 +245,7 @@ func (l *LampionImporter) createAndRegisterTeams(rawEntries []any, players map[s
 }
 
 // Returns first name, last name, club name
-func parsePlayer(rawName, rawClubName string) (string, string, string) {
+func (l *LampionImporter) parsePlayer(rawName, rawClubName string) (string, string, string) {
 	if rawName == "" || rawName == "frei" {
 		return "", "", ""
 	}
@@ -259,9 +260,8 @@ func parsePlayer(rawName, rawClubName string) (string, string, string) {
 		slices.Reverse(split)
 	}
 	if len(split) != 2 {
-		fmt.Println("Unexpected name:")
-		fmt.Println(rawName)
-		fmt.Println(rawClubName)
+		warnMsg := fmt.Sprintf("Unexpected name:\n%v\n%v\n", rawName, rawClubName)
+		l.App.Logger().Warn(warnMsg)
 		return "", "", ""
 	}
 
