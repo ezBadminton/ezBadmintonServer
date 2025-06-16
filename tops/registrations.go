@@ -354,6 +354,47 @@ func (s *RegistrationStore) handleCompetitonDeletion(ce *CompetitionEvent) error
 	return nil
 }
 
+func (s *RegistrationStore) handlePlayerDeletion(e *core.RecordEvent) error {
+	teams := findTeamsOfPlayer(e.Record)
+	if len(teams) == 0 {
+		return e.Next()
+	}
+
+	for _, team := range teams {
+		competition, _ := findCompetitionOfTeam(team)
+		if len(competition.Matches()) != 0 {
+			return errors.New("can not delete player who is participating in a running competiton")
+		}
+	}
+
+	player, err := store.FindProxy[Player](e.Record.Id)
+	if err != nil {
+		return err
+	}
+
+	app := e.App
+	err = e.App.RunInTransaction(func(txApp core.App) error {
+		e.App = txApp
+		for _, team := range teams {
+			team = Clone(team)
+			players := slices.DeleteFunc(team.Players(), func(p *Player) bool { return p.Id == player.Id })
+			team.SetPlayers(players)
+			if len(players) == 0 {
+				if err := s.deleteTeam(e.App, team); err != nil {
+					return err
+				}
+			} else {
+				if err := s.updateTeam(e.App, team); err != nil {
+					return err
+				}
+			}
+		}
+		return e.Next()
+	})
+	e.App = app
+	return err
+}
+
 func (s *RegistrationStore) verifyWithdrawal(e *WithdrawEvent) error {
 	reg, ok := s.byCompetitionPlayer[e.Competition.Id][e.StatusChangeEvent.Player.Id]
 	if !ok {
@@ -399,4 +440,16 @@ func findCompetitionOfTeam(t *Team) (*Competition, bool) {
 		}
 	}
 	return competition, withdrawn
+}
+
+func findTeamsOfPlayer(player *core.Record) []*Team {
+	teams := make([]*Team, 0)
+	relMap := store.RelationParentsByFieldName(player)
+	for parent := range relMap {
+		parentProxy, ok := store.FindRecord(parent).(*Team)
+		if ok {
+			teams = append(teams, parentProxy)
+		}
+	}
+	return teams
 }

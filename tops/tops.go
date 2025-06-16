@@ -305,6 +305,13 @@ func ChangeEventSettings(e *core.RecordRequestEvent) error {
 	return tops.eventSettingsManager.changeSettings(e)
 }
 
+func DeletePlayer(e *core.RecordEvent) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.registrationStore.handlePlayerDeletion(e)
+}
+
 func DeleteCategory(e *core.RecordRequestEvent) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()

@@ -32,6 +32,10 @@ func BindRegistrationHooks(app core.App) {
 
 		return e.Next()
 	})
+
+	playerCName := CName[Player]()
+	app.OnRecordDelete(playerCName).BindFunc(tops.DeletePlayer)
+
 }
 
 func listRegistrations(e *core.RequestEvent) error {
