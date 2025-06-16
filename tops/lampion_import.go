@@ -2,10 +2,12 @@ package tops
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
@@ -16,6 +18,18 @@ import (
 type LampionImporter struct {
 	App core.App
 	Url string
+}
+
+type parsedPlayer struct {
+	FirstName, LastName, ClubName string
+	player                        *Player
+}
+
+type parsedRegistration struct {
+	Discipline   string
+	PlayingLevel string
+	Players      []*parsedPlayer
+	Seed         int
 }
 
 func newLampionImporter(app core.App) *LampionImporter {
@@ -76,20 +90,23 @@ func (l *LampionImporter) setUpCompetitions() error {
 		mixedDoubles,
 	}
 
+	playingLevelStore, _ := store.FindRecordStore[PlayingLevel]()
+	levels := playingLevelStore.ListRecords()
+
 	for i, name := range levelNames {
 		level, _ := NewProxy[PlayingLevel](l.App)
 		level.SetIndex(i)
 		level.SetName(name)
-		if err := l.App.Save(level); err != nil {
-			return err
+		if err := l.App.Save(level); err == nil {
+			levels = append(levels, level)
 		}
+	}
 
+	for _, level := range levels {
 		for _, competition := range competitions {
 			competition := Clone(competition)
 			competition.SetPlayingLevel(level)
-			if err := l.App.Save(competition); err != nil {
-				return err
-			}
+			l.App.Save(competition)
 		}
 	}
 
@@ -107,38 +124,171 @@ func (l *LampionImporter) importEntries() error {
 	json.Unmarshal(buf.Bytes(), &responseJson)
 
 	rawEntries := responseJson["Meldungen"].([]any)
-	clubs, err := l.createClubs(rawEntries)
+
+	parsedPlayers, parsedRegistrations := l.parsePlayers(rawEntries)
+	playersToCreate, playersToDelete := l.filterPlayers(parsedPlayers)
+	clubs, err := l.createClubs(playersToCreate)
 	if err != nil {
 		return err
 	}
 
-	players, err := l.createPlayers(rawEntries, clubs)
+	err = l.createPlayers(playersToCreate, clubs)
 	if err != nil {
 		return err
 	}
 
-	err = l.createAndRegisterTeams(rawEntries, players)
+	err = l.deletePlayers(playersToDelete)
+	if err != nil {
+		return err
+	}
+
+	err = l.createAndRegisterTeams(parsedRegistrations)
 	return err
 }
 
-func (l *LampionImporter) createClubs(rawEntries []any) (map[string]*Club, error) {
-	nameSet := map[string]any{}
+func (l *LampionImporter) parsePlayers(rawEntries []any) (map[string]*parsedPlayer, []*parsedRegistration) {
+	playerSet := make(map[string]*parsedPlayer)
+	registrations := make([]*parsedRegistration, 0)
 
 	for _, entry := range rawEntries {
 		entry := entry.(map[string]any)
-
-		club1 := entry["Verein1"].(string)
-		club2 := entry["Verein2"].(string)
-		if club1 != "" {
-			nameSet[club1] = struct{}{}
+		parsedEntries := make([]*parsedPlayer, 0)
+		for _, playerIndex := range []string{"1", "2"} {
+			rawName := entry[fmt.Sprintf("Spieler%v", playerIndex)].(string)
+			rawClubName := entry[fmt.Sprintf("Verein%v", playerIndex)].(string)
+			firstName, lastName, clubName := l.parsePlayer(rawName, rawClubName)
+			if firstName == "" {
+				continue
+			}
+			player, ok := playerSet[firstName+lastName+clubName]
+			if ok {
+				parsedEntries = append(parsedEntries, player)
+				continue
+			}
+			player = &parsedPlayer{
+				FirstName: firstName,
+				LastName:  lastName,
+				ClubName:  clubName,
+			}
+			parsedEntries = append(parsedEntries, player)
 		}
-		if club2 != "" {
-			nameSet[club2] = struct{}{}
+
+		if len(parsedEntries) == 0 {
+			continue
+		}
+
+		discipline := entry["Disziplin"].(string)[:2]
+		playingLevel := entry["Spielklasse"].(string)
+
+		seed := 0
+		seedString, ok := entry["Setzplatz"].(string)
+		if ok {
+			seed, _ = strconv.Atoi(seedString)
+		}
+
+		registration := &parsedRegistration{
+			Discipline:   discipline,
+			PlayingLevel: playingLevel,
+			Players:      parsedEntries,
+			Seed:         seed,
+		}
+
+		registrations = append(registrations, registration)
+		for _, player := range parsedEntries {
+			playerSet[player.FirstName+player.LastName+player.ClubName] = player
+		}
+	}
+
+	return playerSet, registrations
+}
+
+// Separates the players into players that need to be created and players
+// that need to be deleted
+func (l *LampionImporter) filterPlayers(importedPlayers map[string]*parsedPlayer) ([]*parsedPlayer, []*Player) {
+	competitionStore, _ := store.FindRecordStore[Competition]()
+	playerStore, _ := store.FindRecordStore[Player]()
+
+	existingPlayers := make(map[string]*Player)
+	playersInCompetitions := make(map[string]*Player)
+
+	for _, player := range playerStore.RecordList {
+		firstName := player.FirstName()
+		lastName := player.LastName()
+		clubName := ""
+		if player.Club() != nil {
+			clubName = player.Club().Name()
+		}
+
+		existingPlayers[firstName+lastName+clubName] = player
+	}
+
+	for _, competition := range competitionStore.RecordList {
+		if len(competition.Matches()) == 0 {
+			continue
+		}
+
+		for _, team := range competition.Draw() {
+			for _, player := range team.Players() {
+				firstName := player.FirstName()
+				lastName := player.LastName()
+				clubName := ""
+				if player.Club() != nil {
+					clubName = player.Club().Name()
+				}
+
+				playersInCompetitions[firstName+lastName+clubName] = player
+			}
+		}
+	}
+
+	for key, importedPlayer := range importedPlayers {
+		player, exists := existingPlayers[key]
+		if exists {
+			importedPlayer.player = player
+			delete(importedPlayers, key)
+			delete(existingPlayers, key)
+		}
+	}
+
+	for key := range playersInCompetitions {
+		delete(existingPlayers, key)
+	}
+
+	playersToCreate := make([]*parsedPlayer, 0)
+	playersToDelete := make([]*Player, 0)
+
+	for _, player := range importedPlayers {
+		playersToCreate = append(playersToCreate, player)
+	}
+	for _, player := range existingPlayers {
+		playersToDelete = append(playersToDelete, player)
+	}
+
+	return playersToCreate, playersToDelete
+}
+
+func (l *LampionImporter) createClubs(players []*parsedPlayer) (map[string]*Club, error) {
+	nameSet := map[string]any{}
+
+	for _, parsedPlayer := range players {
+		clubName := parsedPlayer.ClubName
+		if clubName != "" {
+			nameSet[clubName] = struct{}{}
 		}
 	}
 
 	clubs := make(map[string]*Club)
+
+	clubStore, _ := store.FindRecordStore[Club]()
+	for _, club := range clubStore.RecordList {
+		clubs[club.Name()] = club
+	}
+
 	for clubName := range nameSet {
+		_, exists := clubs[clubName]
+		if exists {
+			continue
+		}
 		club, _ := NewProxy[Club](l.App)
 		club.SetName(clubName)
 		if err := l.App.Save(club); err != nil {
@@ -150,97 +300,118 @@ func (l *LampionImporter) createClubs(rawEntries []any) (map[string]*Club, error
 	return clubs, nil
 }
 
-func (l *LampionImporter) createPlayers(rawEntries []any, clubs map[string]*Club) (map[string]*Player, error) {
-	nameSet := map[string]any{}
+func (l *LampionImporter) createPlayers(importedPlayers []*parsedPlayer, clubs map[string]*Club) error {
+	for _, importedPlayer := range importedPlayers {
+		club, _ := clubs[importedPlayer.ClubName]
+		player, _ := NewProxy[Player](l.App)
+		player.SetStatus(NotAttending)
+		player.SetFirstName(importedPlayer.FirstName)
+		player.SetLastName(importedPlayer.LastName)
+		player.SetClub(club)
 
-	players := make(map[string]*Player)
-
-	for _, entry := range rawEntries {
-		entry := entry.(map[string]any)
-		for _, playerIndex := range []string{"1", "2"} {
-			rawName := entry[fmt.Sprintf("Spieler%v", playerIndex)].(string)
-			rawClubName := entry[fmt.Sprintf("Verein%v", playerIndex)].(string)
-			firstName, lastName, clubName := l.parsePlayer(rawName, rawClubName)
-			if firstName == "" {
-				continue
-			}
-			_, ok := nameSet[firstName+lastName+clubName]
-			if ok {
-				continue
-			}
-			nameSet[firstName+lastName+clubName] = struct{}{}
-
-			club, _ := clubs[clubName]
-			player, _ := NewProxy[Player](l.App)
-			player.SetStatus(NotAttending)
-			player.SetFirstName(firstName)
-			player.SetLastName(lastName)
-			player.SetClub(club)
-
-			if err := l.App.Save(player); err != nil {
-				return nil, err
-			}
-
-			players[firstName+lastName+clubName] = player
+		if err := l.App.Save(player); err != nil {
+			return err
 		}
+
+		importedPlayer.player = player
 	}
-	return players, nil
+	return nil
 }
 
-func (l *LampionImporter) createAndRegisterTeams(rawEntries []any, players map[string]*Player) error {
-	competitions := map[string]map[string]*Competition{}
+func (l *LampionImporter) deletePlayers(players []*Player) error {
+	for _, player := range players {
+		if err := l.App.Delete(player); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	playingLevelStore, _ := store.FindRecordStore[PlayingLevel]()
-	for _, level := range playingLevelStore.RecordList {
-		competitions[level.Name()] = map[string]*Competition{}
+func (l *LampionImporter) createAndRegisterTeams(importedRegistrations []*parsedRegistration) error {
+	registrations := make(map[string][]*parsedRegistration)
+
+	for _, registration := range importedRegistrations {
+		key := registration.Discipline + registration.PlayingLevel
+		_, ok := registrations[key]
+		if !ok {
+			registrations[key] = make([]*parsedRegistration, 0)
+		}
+		registrations[key] = append(registrations[key], registration)
 	}
 
 	competitionStore, _ := store.FindRecordStore[Competition]()
 	for _, competition := range competitionStore.RecordList {
-		switch {
-		case competition.TeamSize() == 1 && competition.GenderCategory() == Female:
-			competitions[competition.PlayingLevel().Name()]["DE"] = competition
-		case competition.TeamSize() == 1 && competition.GenderCategory() == Male:
-			competitions[competition.PlayingLevel().Name()]["HE"] = competition
-		case competition.TeamSize() == 2 && competition.GenderCategory() == Female:
-			competitions[competition.PlayingLevel().Name()]["DD"] = competition
-		case competition.TeamSize() == 2 && competition.GenderCategory() == Male:
-			competitions[competition.PlayingLevel().Name()]["HD"] = competition
-		case competition.TeamSize() == 2 && competition.GenderCategory() == Mixed:
-			competitions[competition.PlayingLevel().Name()]["MD"] = competition
+		if len(competition.Matches()) != 0 {
+			continue
 		}
-	}
 
-	for _, entry := range rawEntries {
-		entry := entry.(map[string]any)
-		team, _ := NewProxy[Team](l.App)
-		teamMembers := make([]*Player, 0)
-		for _, playerIndex := range []string{"1", "2"} {
-			rawName := entry[fmt.Sprintf("Spieler%v", playerIndex)].(string)
-			rawClubName := entry[fmt.Sprintf("Verein%v", playerIndex)].(string)
-			firstName, lastName, clubName := l.parsePlayer(rawName, rawClubName)
-			if firstName == "" {
-				continue
-			}
+		competition = Clone(competition)
 
-			player := players[firstName+lastName+clubName]
-			teamMembers = append(teamMembers, player)
-		}
-		team.SetPlayers(teamMembers)
-
-		playingLevel := entry["Spielklasse"].(string)
-		discipline := entry["Disziplin"].(string)[:2]
-		competition := competitions[playingLevel][discipline]
-
-		if err := tops.registrationStore.registerTeam(l.App, team, competition); err != nil {
-			if strings.Contains(err.Error(), "already registered") {
-				warnMsg := fmt.Sprintf("The player %v %v is registered multiple times.\n", teamMembers[0].FirstName(), teamMembers[0].LastName())
-				l.App.Logger().Warn(warnMsg, "Meldungs-ID", entry["ID"])
-			} else {
+		for _, team := range competition.Registrations() {
+			if err := tops.registrationStore.deleteTeam(l.App, team); err != nil {
 				return err
 			}
 		}
+		competition.SetRegistrations([]*Team{})
+		competition.SetDraw([]*Team{})
+		competition.SetSeeds([]*Team{})
+
+		key := ""
+		switch {
+		case competition.TeamSize() == 1 && competition.GenderCategory() == Female:
+			key = "DE"
+		case competition.TeamSize() == 1 && competition.GenderCategory() == Male:
+			key = "HE"
+		case competition.TeamSize() == 2 && competition.GenderCategory() == Female:
+			key = "DD"
+		case competition.TeamSize() == 2 && competition.GenderCategory() == Male:
+			key = "HD"
+		case competition.TeamSize() == 2 && competition.GenderCategory() == Mixed:
+			key = "MD"
+		}
+		key = key + competition.PlayingLevel().Name()
+
+		regs := registrations[key]
+		seeds := make(map[*Team]int, 0)
+
+		for _, registration := range regs {
+			team, _ := NewProxy[Team](l.App)
+			teamMembers := make([]*Player, 0, len(registration.Players))
+			for _, importedPlayer := range registration.Players {
+				teamMembers = append(teamMembers, importedPlayer.player)
+			}
+			team.SetPlayers(teamMembers)
+
+			if err := tops.registrationStore.registerTeam(l.App, team, competition); err != nil {
+				if strings.Contains(err.Error(), "already registered") {
+					warnMsg := fmt.Sprintf("The player %v %v is registered multiple times.\n", teamMembers[0].FirstName(), teamMembers[0].LastName())
+					l.App.Logger().Warn(warnMsg)
+				} else {
+					return err
+				}
+			}
+			if registration.Seed > 0 {
+				seeds[team] = registration.Seed
+			}
+		}
+
+		if len(seeds) == 0 {
+			continue
+		}
+
+		seededTeams := make([]*Team, 0, len(seeds))
+		for team := range seeds {
+			seededTeams = append(seededTeams, team)
+		}
+
+		slices.SortFunc(seededTeams, func(a, b *Team) int { return cmp.Compare(seeds[a], seeds[b]) })
+
+		competition.SetSeeds(seededTeams)
+		if err := l.App.Save(competition); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
