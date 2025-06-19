@@ -354,10 +354,10 @@ func (s *RegistrationStore) handleCompetitonDeletion(ce *CompetitionEvent) error
 	return nil
 }
 
-func (s *RegistrationStore) handlePlayerDeletion(e *core.RecordEvent) error {
-	teams := findTeamsOfPlayer(e.Record)
+func (s *RegistrationStore) handleTeamPlayerDeletion(app core.App, player *Player) error {
+	teams := findTeamsOfPlayer(player.Record)
 	if len(teams) == 0 {
-		return e.Next()
+		return nil
 	}
 
 	for _, team := range teams {
@@ -367,31 +367,23 @@ func (s *RegistrationStore) handlePlayerDeletion(e *core.RecordEvent) error {
 		}
 	}
 
-	player, err := store.FindProxy[Player](e.Record.Id)
-	if err != nil {
-		return err
-	}
-
-	app := e.App
-	err = e.App.RunInTransaction(func(txApp core.App) error {
-		e.App = txApp
+	err := app.RunInTransaction(func(txApp core.App) error {
 		for _, team := range teams {
 			team = Clone(team)
 			players := slices.DeleteFunc(team.Players(), func(p *Player) bool { return p.Id == player.Id })
 			team.SetPlayers(players)
 			if len(players) == 0 {
-				if err := s.deleteTeam(e.App, team); err != nil {
+				if err := s.deleteTeam(txApp, team); err != nil {
 					return err
 				}
 			} else {
-				if err := s.updateTeam(e.App, team); err != nil {
+				if err := s.updateTeam(txApp, team); err != nil {
 					return err
 				}
 			}
 		}
-		return e.Next()
+		return nil
 	})
-	e.App = app
 	return err
 }
 

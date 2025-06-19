@@ -305,11 +305,11 @@ func ChangeEventSettings(e *core.RecordRequestEvent) error {
 	return tops.eventSettingsManager.changeSettings(e)
 }
 
-func DeletePlayer(e *core.RecordEvent) error {
+func DeletePlayerFromTeam(app core.App, player *Player) error {
 	defer tops.mu.Unlock()
 	tops.mu.Lock()
 
-	return tops.registrationStore.handlePlayerDeletion(e)
+	return tops.registrationStore.handleTeamPlayerDeletion(app, player)
 }
 
 func DeleteCategory(e *core.RecordRequestEvent) error {

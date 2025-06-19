@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	. "github.com/ezBadminton/ezBadmintonServer/generated"
+	"github.com/ezBadminton/ezBadmintonServer/store"
 	"github.com/ezBadminton/ezBadmintonServer/tops"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -34,8 +35,7 @@ func BindRegistrationHooks(app core.App) {
 	})
 
 	playerCName := CName[Player]()
-	app.OnRecordDelete(playerCName).BindFunc(tops.DeletePlayer)
-
+	app.OnRecordDeleteRequest(playerCName).BindFunc(deletePlayerFromTeam)
 }
 
 func listRegistrations(e *core.RequestEvent) error {
@@ -81,4 +81,21 @@ func deleteTeam(e *core.RequestEvent) error {
 	}
 
 	return e.NoContent(http.StatusOK)
+}
+
+func deletePlayerFromTeam(e *core.RecordRequestEvent) error {
+	app := e.App
+	err := e.App.RunInTransaction(func(txApp core.App) error {
+		e.App = txApp
+		player, err := store.FindProxy[Player](e.Record.Id)
+		if err != nil {
+			return err
+		}
+		if err := tops.DeletePlayerFromTeam(e.App, player); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+	e.App = app
+	return err
 }
