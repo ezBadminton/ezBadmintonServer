@@ -127,6 +127,7 @@ func (l *LampionImporter) importEntries() error {
 
 	parsedPlayers, parsedRegistrations := l.parsePlayers(rawEntries)
 	playersToCreate, playersToDelete := l.filterPlayers(parsedPlayers)
+
 	clubs, err := l.createClubs(playersToCreate)
 	if err != nil {
 		return err
@@ -143,7 +144,22 @@ func (l *LampionImporter) importEntries() error {
 	}
 
 	err = l.createAndRegisterTeams(parsedRegistrations)
-	return err
+	if err != nil {
+		return err
+	}
+
+	l.App.Logger().Info(
+		"Lampion import",
+		"number of registrations",
+		len(parsedRegistrations),
+		"number of unique players",
+		len(parsedPlayers),
+		"number of newly imported players",
+		len(playersToCreate),
+		"number of deleted players",
+		len(playersToDelete),
+	)
+	return nil
 }
 
 func (l *LampionImporter) parsePlayers(rawEntries []any) (map[string]*parsedPlayer, []*parsedRegistration) {
