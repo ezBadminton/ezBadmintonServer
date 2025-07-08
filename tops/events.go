@@ -298,6 +298,7 @@ func (e *PlanEvent) saveStartedPlan() error {
 
 func (e *PlanEvent) saveStoppedPlan() error {
 	e.Competition.SetMatches(nil)
+	e.Competition.SetQualificationOverride(nil)
 	err := e.App.RunInTransaction(func(txApp core.App) error {
 		if err := txApp.Save(e.Competition); err != nil {
 			return err
@@ -576,6 +577,22 @@ func newTournamentModeSettingsEvent(app core.App, settings *TournamentModeSettin
 		App:         app,
 		Settings:    settings,
 		Competition: competition,
+	}
+}
+
+type QualificationOverrideEvent struct {
+	*CompetitionEvent
+
+	ChangedTeams []*Team
+
+	QualificationOverride []*Team
+	Tournament            *got.GroupKnockout
+}
+
+func newQualificationOverrideEvent(app core.App, competition *Competition, changedTeams ...*Team) *QualificationOverrideEvent {
+	return &QualificationOverrideEvent{
+		CompetitionEvent: newCompetitionEvent(app, competition),
+		ChangedTeams:     changedTeams,
 	}
 }
 

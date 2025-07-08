@@ -139,6 +139,7 @@ type Competition struct {
 	draw                   []*Team
 	matches                []*MatchData
 	tieBreakers            []*TieBreaker
+	qualificationOverride  []*Team
 	rngSeed                int
 	created                types.DateTime
 	updated                types.DateTime

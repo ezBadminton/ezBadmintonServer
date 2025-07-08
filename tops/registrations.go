@@ -51,6 +51,7 @@ func newRegistrationStore(
 	app core.App,
 	withdrawalManager *WithdrawalManager,
 	competitionManager *CompetitionManager,
+	qualificationOverrideManager *QualificationOverrideManager,
 ) *RegistrationStore {
 	teamStore, _ := store.FindRecordStore[Team]()
 
@@ -75,6 +76,8 @@ func newRegistrationStore(
 	withdrawalManager.onWithdraw.Bind(priorityHandler(s.verifyWithdrawal, -1))
 
 	competitionManager.onDelete.BindFunc(s.handleCompetitonDeletion)
+
+	qualificationOverrideManager.onUpdate.BindFunc(s.verifyQualificationOverride)
 
 	return s
 }
@@ -393,6 +396,19 @@ func (s *RegistrationStore) verifyWithdrawal(e *WithdrawEvent) error {
 		return errors.New("can not withdraw from competition where player is not registered")
 	}
 	e.Registration = reg
+	return e.Next()
+}
+
+func (s *RegistrationStore) verifyQualificationOverride(e *QualificationOverrideEvent) error {
+	for _, team := range e.ChangedTeams {
+		reg, ok := s.byTeam[team.Id]
+		if !ok || reg.Competition.Id != e.Competition.Id {
+			return errors.New("team is not registered in this competition")
+		}
+		if reg.Withdrawn {
+			return errors.New("can not add a withdrawn team to the qualifications")
+		}
+	}
 	return e.Next()
 }
 

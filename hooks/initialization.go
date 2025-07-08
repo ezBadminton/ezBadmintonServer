@@ -22,6 +22,7 @@ func InitHooksAndApi(app core.App) {
 	api.BindMatchHooks(app)
 	api.BindStartStopHooks(app)
 	api.BindTieBreakerHooks(app)
+	api.BindQualificationOverrideHooks(app)
 	api.BindMatchScheduleHooks(app)
 	api.BindEventSettingsHooks(app)
 	api.BindCategoryHooks(app)

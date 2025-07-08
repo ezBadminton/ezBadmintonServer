@@ -24,6 +24,7 @@ type TournamentOperations struct {
 	drawManager                   *DrawManager
 	withdrawalManager             *WithdrawalManager
 	tieBreakerManager             *TieBreakerManager
+	qualificationOverrideManager  *QualificationOverrideManager
 	eventSettingsManager          *EventSettingsManager
 	playerTracker                 *PlayerTracker
 	categorizationManager         *CategorizationManager
@@ -34,6 +35,7 @@ type TournamentOperations struct {
 func InitTournamentOperations(app core.App) {
 	withdrawalManager := newWithdrawalManager()
 	tieBreakerManager := newTieBreakerManager()
+	qualificationOverrideManager := newQualificationOverrideManager()
 	courtStore := newCourtStore()
 	eventSettingsManager := newEventSettingsManager()
 	tournamentModeSettingsManager := newTournamentModeSettingsManager()
@@ -42,7 +44,7 @@ func InitTournamentOperations(app core.App) {
 	matchManager := newMatchManager(withdrawalManager)
 	scheduler := newMatchScheduler(app)
 	categorizationManager := newCategorizationManager(eventSettingsManager)
-	registrationStore := newRegistrationStore(app, withdrawalManager, competitionManager)
+	registrationStore := newRegistrationStore(app, withdrawalManager, competitionManager, qualificationOverrideManager)
 	drawManager := newDrawManager(registrationStore, tournamentModeSettingsManager)
 	tournamentStore := newTournamentStore(
 		app,
@@ -52,6 +54,7 @@ func InitTournamentOperations(app core.App) {
 		registrationStore,
 		withdrawalManager,
 		tieBreakerManager,
+		qualificationOverrideManager,
 		scheduler,
 		playerTracker,
 		categorizationManager,
@@ -73,6 +76,7 @@ func InitTournamentOperations(app core.App) {
 		drawManager:                   drawManager,
 		withdrawalManager:             withdrawalManager,
 		tieBreakerManager:             tieBreakerManager,
+		qualificationOverrideManager:  qualificationOverrideManager,
 		eventSettingsManager:          eventSettingsManager,
 		playerTracker:                 playerTracker,
 		categorizationManager:         categorizationManager,
@@ -144,6 +148,20 @@ func SetSeeds(app core.App, competition *Competition, seeds []*Team) error {
 	tops.mu.Lock()
 
 	return tops.drawManager.setSeeds(app, competition, seeds)
+}
+
+func QualificationOverrideSwap(app core.App, competition *Competition, a, b *Team) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.qualificationOverrideManager.overrideSwap(app, competition, a, b)
+
+}
+func QualificationOverrideReset(app core.App, competition *Competition) error {
+	defer tops.mu.Unlock()
+	tops.mu.Lock()
+
+	return tops.qualificationOverrideManager.overrideReset(app, competition)
 }
 
 func ListRegistrations() []*Registration {

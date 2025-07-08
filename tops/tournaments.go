@@ -104,6 +104,7 @@ func newTournamentStore(
 	registrationStore *RegistrationStore,
 	withdrawalManager *WithdrawalManager,
 	tieBreakerManager *TieBreakerManager,
+	qualificationOverrideManager *QualificationOverrideManager,
 	scheduler *MatchScheduler,
 	playerTracker *PlayerTracker,
 	categorizationManager *CategorizationManager,
@@ -167,6 +168,11 @@ func newTournamentStore(
 	tieBreakerManager.onUpdate.BindFunc(s.handleTieBreakerChange)
 	tieBreakerManager.onDelete.BindFunc(s.verifyTieBreakerChange)
 	tieBreakerManager.onDelete.BindFunc(s.handleTieBreakerDelete)
+
+	qualificationOverrideManager.onUpdate.BindFunc(s.verifyQualificationOverride)
+	qualificationOverrideManager.onUpdate.BindFunc(s.handleQualificationOverride)
+	qualificationOverrideManager.onReset.BindFunc(s.verifyQualificationOverride)
+	qualificationOverrideManager.onReset.BindFunc(s.handleQualificationOverride)
 
 	// Priority for setting the started tournament(s)/match data in the events
 	scheduler.onReschedule.Bind(priorityHandler(s.handleReschedule, -1))
@@ -812,6 +818,44 @@ func (s *TournamentStore) handleTieBreakerDelete(e *TieBreakerEvent) error {
 	return nil
 }
 
+func (s *TournamentStore) verifyQualificationOverride(e *QualificationOverrideEvent) error {
+	tournament := s.tournaments[e.Competition.Id]
+	groupKnockout, ok := tournament.Tournament.(*got.GroupKnockout)
+
+	if !ok {
+		return errors.New("only group knockout tournaments can have qualification overrides")
+	}
+	qualificationComplete := groupKnockout.GroupPhase.FinalRanking.QualificationComplete
+	koStarted := groupKnockout.KnockOut.MatchesStarted()
+	if !qualificationComplete || koStarted {
+		return errors.New("qualification overrides can only be changed while the group phase is completed and the k.o. phase matches have not been started")
+	}
+
+	e.Tournament = groupKnockout
+
+	return e.Next()
+}
+
+func (s *TournamentStore) handleQualificationOverride(e *QualificationOverrideEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+
+	tournament := s.tournaments[e.Competition.Id]
+	groupKnockout := tournament.Tournament.(*got.GroupKnockout)
+
+	overrideTeams := e.QualificationOverride
+	qualificationOverride := make([]got.Player, 0, len(overrideTeams))
+	for _, team := range overrideTeams {
+		qualificationOverride = append(qualificationOverride, TournamentPlayer{team})
+	}
+	groupKnockout.OverrideQualifications(qualificationOverride)
+
+	s.update(e, tournament)
+
+	return nil
+}
+
 func (s *TournamentStore) handleReschedule(e *RescheduleEvent) error {
 	e.StartedTournaments = s.listStarted()
 	return e.Next()
@@ -933,6 +977,16 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 		}
 	}
 
+	groupKnockout, ok := tournament.Tournament.(*got.GroupKnockout)
+	if ok {
+		overrideTeams := comp.QualificationOverride()
+		qualificationOverride := make([]got.Player, 0, len(overrideTeams))
+		for _, team := range overrideTeams {
+			qualificationOverride = append(qualificationOverride, TournamentPlayer{team})
+		}
+		groupKnockout.OverrideQualifications(qualificationOverride)
+	}
+
 	tournament.Update(nil)
 
 	tournament.Ended = matchesFinished(matches)
@@ -984,6 +1038,12 @@ func (s *TournamentStore) dehydrate(tournament *CompetitionTournament) {
 			delete(s.byMatch, matchData.Id)
 		}
 	}
+
+	groupKnockout, ok := tournament.Tournament.(*got.GroupKnockout)
+	if ok {
+		groupKnockout.OverrideQualifications([]got.Player{})
+	}
+
 	tournament.Update(nil)
 	tournament.Started = false
 	tournament.Ended = false

@@ -1203,6 +1203,19 @@ func init() {
 						"type": "number"
 					},
 					{
+						"cascadeDelete": false,
+						"collectionId": "rvbyk7qe1ac5r5d",
+						"hidden": false,
+						"id": "relation3559072063",
+						"maxSelect": 999,
+						"minSelect": 0,
+						"name": "qualificationOverride",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",

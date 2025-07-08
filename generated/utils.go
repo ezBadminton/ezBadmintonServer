@@ -125,6 +125,7 @@ var Relations = map[string]map[string][]RelationField{
 			{"registrations", true},
 			{"seeds", true},
 			{"draw", true},
+			{"qualificationOverride", true},
 		},
 		"match_data": {
 			{"matches", true},

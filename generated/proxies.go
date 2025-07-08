@@ -507,6 +507,29 @@ func (p *Competition) SetTieBreakers(tieBreakers []*TieBreaker) {
 	p.SetExpand(e)
 }
 
+func (p *Competition) QualificationOverride() []*Team {
+	rels := p.ExpandedAll("qualificationOverride")
+	proxies := make([]*Team, len(rels))
+	for i := range len(rels) {
+		proxies[i] = &Team{}
+		proxies[i].Record = rels[i]
+	}
+	return proxies
+}
+
+func (p *Competition) SetQualificationOverride(qualificationOverride []*Team) {
+	records := make([]*core.Record, len(qualificationOverride))
+	ids := make([]string, len(qualificationOverride))
+	for i, r := range qualificationOverride {
+		records[i] = r.Record
+		ids[i] = r.Record.Id
+	}
+	p.Record.Set("qualificationOverride", ids)
+	e := p.Expand()
+	e["qualificationOverride"] = records
+	p.SetExpand(e)
+}
+
 func (p *Competition) RngSeed() int {
 	return p.GetInt("rngSeed")
 }
