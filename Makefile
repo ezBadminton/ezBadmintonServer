@@ -2,7 +2,7 @@ all: build-windows-amd64 build-windows-arm64 build-linux-amd64 build-linux-arm64
 
 build:
 	@echo Building ezBadmintonServer for $(GOOS)-$(GOARCH). Version: $(VERSION)
-	go build -o ezBadmintonServer-$(GOOS)-$(GOARCH)-$(VERSION)$(EXTENSION)
+	go build -ldflags "-X 'github.com/ezBadminton/ezBadmintonServer/api.BuildVersion=$(VERSION)'" -o ezBadmintonServer-$(GOOS)-$(GOARCH)-$(VERSION)$(EXTENSION)
 
 build-windows-amd64:
 	make build GOOS=windows GOARCH=amd64 EXTENSION=.exe
