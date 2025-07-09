@@ -83,12 +83,13 @@ func realtimeNotify(app core.App, subscription string, action string, topsRecord
 	}
 
 	clients := app.SubscriptionsBroker().Clients()
+	pingedAuths := []string{CName[TournamentOrganizer](), CName[InfoscreenUser]()}
 	for _, client := range clients {
 		if client.IsDiscarded() || !client.HasSubscription(subscription) {
 			continue
 		}
 		auth, ok := client.Get("auth").(*core.Record)
-		if !ok || auth == nil || auth.Collection().Name != CName[TournamentOrganizer]() {
+		if !ok || auth == nil || !slices.Contains(pingedAuths, auth.Collection().Name) {
 			continue
 		}
 		client.Send(message)
@@ -105,11 +106,11 @@ func PingOrganizerClients(app core.App) error {
 	}
 
 	clients := app.SubscriptionsBroker().Clients()
+	pingedAuths := []string{CName[TournamentOrganizer](), CName[InfoscreenUser]()}
 	for _, client := range clients {
 		if client.IsDiscarded() || !client.HasSubscription("ping") {
 			continue
 		}
-		pingedAuths := []string{CName[TournamentOrganizer](), CName[InfoscreenUser]()}
 		auth, ok := client.Get("auth").(*core.Record)
 		if !ok || auth == nil || !slices.Contains(pingedAuths, auth.Collection().Name) {
 			continue
