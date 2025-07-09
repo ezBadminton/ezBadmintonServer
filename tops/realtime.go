@@ -109,8 +109,9 @@ func PingOrganizerClients(app core.App) error {
 		if client.IsDiscarded() || !client.HasSubscription("ping") {
 			continue
 		}
+		pingedAuths := []string{CName[TournamentOrganizer](), CName[InfoscreenUser]()}
 		auth, ok := client.Get("auth").(*core.Record)
-		if !ok || auth == nil || auth.Collection().Name != CName[TournamentOrganizer]() {
+		if !ok || auth == nil || !slices.Contains(pingedAuths, auth.Collection().Name) {
 			continue
 		}
 		client.Send(message)
