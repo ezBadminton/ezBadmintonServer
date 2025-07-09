@@ -274,7 +274,7 @@ func (t *PlayerTracker) initRestTimers() []*TournamentMatch {
 
 func (t *PlayerTracker) calculateRestDuration(match *TournamentMatch) time.Duration {
 	restUntil := match.matchData.EndTime().Add(t.restDuration)
-	restDuration := restUntil.Time().Sub(time.Now())
+	restDuration := time.Until(restUntil.Time())
 	return restDuration
 }
 

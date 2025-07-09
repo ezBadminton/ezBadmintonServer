@@ -31,7 +31,7 @@ type PlayerBlockMode string
 
 const (
 	Playing PlayerBlockMode = "playing"
-	Resting                 = "resting"
+	Resting PlayerBlockMode = "resting"
 )
 
 type PlayerBlock struct {
@@ -666,7 +666,7 @@ func blockingPlayersEq(a, b map[string]PlayerBlock) bool {
 			return false
 		}
 		if blockA.Mode == Playing {
-			if blockA.BlockingMatch.Id != blockA.BlockingMatch.Id {
+			if blockA.BlockingMatch.Id != blockB.BlockingMatch.Id {
 				return false
 			}
 		} else {
