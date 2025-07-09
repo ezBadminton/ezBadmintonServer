@@ -29,6 +29,7 @@ func InitHooksAndApi(app core.App) {
 	api.BindTournamentModeSettingsHooks(app)
 	api.BindCompetitionHooks(app)
 	api.BindInfoScreenControlHooks(app)
+	api.BindVersionApiHooks(app)
 
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		if err := store.InitStores(e.App); err != nil {
