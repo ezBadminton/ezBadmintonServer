@@ -300,10 +300,8 @@ type TournamentEvent struct {
 	dontReprintGameSheets bool
 	printQrCodes          bool
 	playerRestTime        int
-	// select: QueueMode(manual, autoCourtAssignment, auto)
-	queueMode int
-	created   types.DateTime
-	updated   types.DateTime
+	created               types.DateTime
+	updated               types.DateTime
 }
 
 type TournamentModeSettings struct {

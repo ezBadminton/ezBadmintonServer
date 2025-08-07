@@ -23,7 +23,6 @@ func init() {
 		tournament.SetDontReprintGameSheets(true)
 		tournament.SetPrintQrCodes(true)
 		tournament.SetPlayerRestTime(10)
-		tournament.SetQueueMode(Manual)
 		tournament.SetRaw("created", types.NowDateTime())
 		tournament.SetRaw("updated", types.NowDateTime())
 

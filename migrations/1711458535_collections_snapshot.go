@@ -2073,21 +2073,6 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "ea0rngxn",
-						"maxSelect": 1,
-						"name": "queueMode",
-						"presentable": false,
-						"required": true,
-						"system": false,
-						"type": "select",
-						"values": [
-							"manual",
-							"autoCourtAssignment",
-							"auto"
-						]
-					},
-					{
-						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
 						"onCreate": true,

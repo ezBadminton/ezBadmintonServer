@@ -1097,25 +1097,6 @@ func (p *AgeGroup) SetUpdated(updated types.DateTime) {
 	p.Set("updated", updated)
 }
 
-type QueueMode int
-
-const (
-	Manual QueueMode = iota
-	AutoCourtAssignment
-	Auto
-)
-
-var zzQueueModeSelectNameMap = map[string]QueueMode{
-	"manual":              0,
-	"autoCourtAssignment": 1,
-	"auto":                2,
-}
-var zzQueueModeSelectIotaMap = map[QueueMode]string{
-	0: "manual",
-	1: "autoCourtAssignment",
-	2: "auto",
-}
-
 type TournamentEvent struct {
 	core.BaseRecordProxy
 }
@@ -1170,23 +1151,6 @@ func (p *TournamentEvent) PlayerRestTime() int {
 
 func (p *TournamentEvent) SetPlayerRestTime(playerRestTime int) {
 	p.Set("playerRestTime", playerRestTime)
-}
-
-func (p *TournamentEvent) QueueMode() QueueMode {
-	option := p.GetString("queueMode")
-	i, ok := zzQueueModeSelectNameMap[option]
-	if !ok {
-		panic("Unknown select value")
-	}
-	return i
-}
-
-func (p *TournamentEvent) SetQueueMode(queueMode QueueMode) {
-	i, ok := zzQueueModeSelectIotaMap[queueMode]
-	if !ok {
-		panic("Unknown select value")
-	}
-	p.Set("queueMode", i)
 }
 
 func (p *TournamentEvent) Created() types.DateTime {
