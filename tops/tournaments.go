@@ -991,6 +991,8 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 
 	tournament.Ended = matchesFinished(matches)
 
+	s.updatePlayerMatchMap(tournament.Competition)
+
 	return nil
 }
 
