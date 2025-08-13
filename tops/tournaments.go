@@ -979,12 +979,7 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 
 	groupKnockout, ok := tournament.Tournament.(*got.GroupKnockout)
 	if ok {
-		overrideTeams := comp.QualificationOverride()
-		qualificationOverride := make([]got.Player, 0, len(overrideTeams))
-		for _, team := range overrideTeams {
-			qualificationOverride = append(qualificationOverride, TournamentPlayer{team})
-		}
-		groupKnockout.OverrideQualifications(qualificationOverride)
+		hydrateGroupKnockout(groupKnockout, comp)
 	}
 
 	tournament.Update(nil)
@@ -994,6 +989,25 @@ func (s *TournamentStore) hydrate(tournament *CompetitionTournament) error {
 	s.updatePlayerMatchMap(tournament.Competition)
 
 	return nil
+}
+
+// Group knockout tournaments have specific data that needs to be loaded during hydration
+// This data is:
+//   - Qualification overrides. When the tournament administration manually changed the qulaified teams.
+//   - Tie breakers
+func hydrateGroupKnockout(groupKnockout *got.GroupKnockout, competition *Competition) {
+	overrideTeams := competition.QualificationOverride()
+	qualificationOverride := make([]got.Player, 0, len(overrideTeams))
+	for _, team := range overrideTeams {
+		qualificationOverride = append(qualificationOverride, TournamentPlayer{team})
+	}
+	groupKnockout.OverrideQualifications(qualificationOverride)
+
+	tieBreakers := competition.TieBreakers()
+	for _, tieBreaker := range tieBreakers {
+		teams := tieBreaker.TieBreakerRanking()
+		insertTieBreaker(teams, groupKnockout.GroupPhase)
+	}
 }
 
 func (s *TournamentStore) hydrateMatch(
