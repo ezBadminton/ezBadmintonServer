@@ -23,7 +23,7 @@ var (
 // The infoscreen API accepts requests when a token
 // is present in the Authorization header.
 // Every screen has an initialization token that
-// refreshes every 2 minutes to prevent users from
+// refreshes every 90 seconds to prevent users from
 // saving a token for later.
 // The token is displayed on the screen as a QR code.
 // As soon as the first request is made,

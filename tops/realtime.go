@@ -66,6 +66,8 @@ type realtimeMessage struct {
 }
 
 func realtimeNotify(app core.App, subscription string, action string, topsRecord TopsRecord) error {
+	// The '/*' suffix is added because the pocketbase client SDK subscribes to 'collection_name/*'
+	// when using its subscribe function. With this, this function can be passed just the collection name.
 	subscription += "/*"
 	actionData := realtimeMessage{
 		Record: topsRecord.ToMap(),
