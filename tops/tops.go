@@ -373,3 +373,10 @@ func BulkSetPlayerStatus(app core.App, players []*Player, status PlayerStatus) e
 
 	return bulkSetPlayerStatus(app, players, status)
 }
+
+func CreateTestPlayers(app core.App, amount int) error {
+	defer tops.endUnitOfWork()
+	tops.startUnitOfWork()
+
+	return createTestPlayers(app, amount)
+}
