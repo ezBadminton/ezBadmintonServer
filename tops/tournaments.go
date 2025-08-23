@@ -1122,7 +1122,8 @@ func (s *TournamentStore) markMatchSheetsAsPrinted(app core.App, matchData []*Ma
 	for _, m := range matchData {
 		tournamentMatch := s.matches[m.Id]
 		tournamentMatch.matchData = m
-		go realtimeNotify(app, "tournament_matches", core.ModelEventTypeUpdate, tournamentMatch)
+		// TODO handle unit of work
+		go realtimeNotify(app, "tournament_matches", core.ModelEventTypeUpdate, tournamentMatch, "")
 	}
 	return nil
 }

@@ -67,18 +67,7 @@ func setBulkPlayerStatus(e *core.RequestEvent) error {
 		return e.BadRequestError(err.Error(), err)
 	}
 
-	app := e.App
-	err = app.RunInTransaction(func(txApp core.App) error {
-		e.App = txApp
-		for _, player := range players {
-			player.SetStatus(status)
-			if err := e.App.Save(player); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	e.App = app
+	err = tops.BulkSetPlayerStatus(e.App, players, status)
 	if err != nil {
 		return e.InternalServerError("something went wrong", err)
 	}
