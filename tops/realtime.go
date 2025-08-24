@@ -30,7 +30,7 @@ func (l *realtimeNotificationList) AddRealtimeNotification(
 	topsRecord TopsRecord,
 	priority int,
 ) {
-	unitOfWork := tops.unitOfWorkId
+	unitOfWork := tops.addWorkItem()
 	trigger := func() {
 		realtimeNotify(app, subscription, action, topsRecord, unitOfWork)
 	}
@@ -67,6 +67,8 @@ type realtimeMessage struct {
 }
 
 func realtimeNotify(app core.App, subscription string, action string, topsRecord TopsRecord, unitOfWork string) error {
+	defer tops.removeWorkItem(unitOfWork)
+
 	// The '/*' suffix is added because the pocketbase client SDK subscribes to 'collection_name/*'
 	// when using its subscribe function. With this, this function can be passed just the collection name.
 	subscription += "/*"

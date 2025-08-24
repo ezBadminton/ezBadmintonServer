@@ -23,14 +23,31 @@ import (
 type UnitOfWorkManager struct {
 	mu sync.RWMutex
 
-	app          core.App
-	unitOfWorkId string
+	messages chan unitOfWorkMessage
+
+	app                core.App
+	unitOfWorkId       string
+	unitOfWorkCounters map[string]int
+}
+
+type unitOfWorkMessage struct {
+	startUnitOfWork bool
+	endUnitOfWork   bool
+	addItem         bool
+	removeIteam     bool
+	unitOfWorkId    string
 }
 
 func newUnitOfWorkManager(app core.App) *UnitOfWorkManager {
-	m := &UnitOfWorkManager{app: app}
+	m := &UnitOfWorkManager{
+		app:                app,
+		unitOfWorkCounters: make(map[string]int),
+		messages:           make(chan unitOfWorkMessage, 1),
+	}
 
 	app.OnRecordEnrich().BindFunc(m.enrichUnitOfWork)
+
+	go m.workItemRoutine()
 
 	return m
 }
@@ -38,13 +55,71 @@ func newUnitOfWorkManager(app core.App) *UnitOfWorkManager {
 func (m *UnitOfWorkManager) startUnitOfWork() {
 	m.mu.Lock()
 	m.unitOfWorkId = newUnitOfWorkId()
+	unitOfWorkMessage := unitOfWorkMessage{
+		startUnitOfWork: true,
+		unitOfWorkId:    m.unitOfWorkId,
+	}
+	m.messages <- unitOfWorkMessage
 }
 
 func (m *UnitOfWorkManager) endUnitOfWork() {
-	endingUnitOfWork := m.unitOfWorkId
+	defer m.mu.Unlock()
+
+	unitOfWorkMessage := unitOfWorkMessage{
+		endUnitOfWork: true,
+		unitOfWorkId:  m.unitOfWorkId,
+	}
+	m.messages <- unitOfWorkMessage
 	m.unitOfWorkId = ""
-	m.mu.Unlock()
-	realtimeEndUnitOfWork(m.app, endingUnitOfWork)
+}
+
+func (m *UnitOfWorkManager) workItemRoutine() {
+	for workItem := range m.messages {
+		if workItem.unitOfWorkId == "" {
+			continue
+		}
+		unitOfWorkId := workItem.unitOfWorkId
+		if workItem.startUnitOfWork {
+			m.unitOfWorkCounters[unitOfWorkId] = 0
+		} else if workItem.endUnitOfWork {
+			counter, ok := m.unitOfWorkCounters[unitOfWorkId]
+			if ok && counter == 0 {
+				delete(m.unitOfWorkCounters, unitOfWorkId)
+				go realtimeEndUnitOfWork(m.app, unitOfWorkId)
+			}
+		} else if workItem.addItem {
+			m.unitOfWorkCounters[unitOfWorkId] += 1
+		} else if workItem.removeIteam {
+			m.unitOfWorkCounters[unitOfWorkId] -= 1
+			if m.unitOfWorkCounters[unitOfWorkId] == 0 {
+				delete(m.unitOfWorkCounters, unitOfWorkId)
+				realtimeEndUnitOfWork(m.app, unitOfWorkId)
+			}
+		}
+	}
+}
+
+func (m *UnitOfWorkManager) addWorkItem() string {
+	if m.unitOfWorkId == "" {
+		return ""
+	}
+	workItemMessage := unitOfWorkMessage{
+		addItem:      true,
+		unitOfWorkId: m.unitOfWorkId,
+	}
+	m.messages <- workItemMessage
+	return m.unitOfWorkId
+}
+
+func (m *UnitOfWorkManager) removeWorkItem(unitOfWorkId string) {
+	if unitOfWorkId == "" {
+		return
+	}
+	workItemMessage := unitOfWorkMessage{
+		removeIteam:  true,
+		unitOfWorkId: unitOfWorkId,
+	}
+	m.messages <- workItemMessage
 }
 
 func (m *UnitOfWorkManager) enrichUnitOfWork(e *core.RecordEnrichEvent) error {
