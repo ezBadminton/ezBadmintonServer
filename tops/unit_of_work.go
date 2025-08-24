@@ -32,9 +32,8 @@ type UnitOfWorkManager struct {
 
 type unitOfWorkMessage struct {
 	startUnitOfWork bool
-	endUnitOfWork   bool
 	addItem         bool
-	removeIteam     bool
+	removeItem      bool
 	unitOfWorkId    string
 }
 
@@ -46,6 +45,16 @@ func newUnitOfWorkManager(app core.App) *UnitOfWorkManager {
 	}
 
 	app.OnRecordEnrich().BindFunc(m.enrichUnitOfWork)
+
+	app.OnRecordCreate().BindFunc(m.onCrud)
+	app.OnRecordUpdate().BindFunc(m.onCrud)
+	app.OnRecordDelete().BindFunc(m.onCrud)
+
+	app.OnRecordAfterCreateError().BindFunc(m.onCrudError)
+	app.OnRecordAfterUpdateError().BindFunc(m.onCrudError)
+	app.OnRecordAfterDeleteError().BindFunc(m.onCrudError)
+
+	app.OnRealtimeMessageSend().BindFunc(m.onRealtimeMessage)
 
 	go m.workItemRoutine()
 
@@ -64,12 +73,6 @@ func (m *UnitOfWorkManager) startUnitOfWork() {
 
 func (m *UnitOfWorkManager) endUnitOfWork() {
 	defer m.mu.Unlock()
-
-	unitOfWorkMessage := unitOfWorkMessage{
-		endUnitOfWork: true,
-		unitOfWorkId:  m.unitOfWorkId,
-	}
-	m.messages <- unitOfWorkMessage
 	m.unitOfWorkId = ""
 }
 
@@ -81,19 +84,13 @@ func (m *UnitOfWorkManager) workItemRoutine() {
 		unitOfWorkId := workItem.unitOfWorkId
 		if workItem.startUnitOfWork {
 			m.unitOfWorkCounters[unitOfWorkId] = 0
-		} else if workItem.endUnitOfWork {
-			counter, ok := m.unitOfWorkCounters[unitOfWorkId]
-			if ok && counter == 0 {
-				delete(m.unitOfWorkCounters, unitOfWorkId)
-				go realtimeEndUnitOfWork(m.app, unitOfWorkId)
-			}
 		} else if workItem.addItem {
 			m.unitOfWorkCounters[unitOfWorkId] += 1
-		} else if workItem.removeIteam {
+		} else if workItem.removeItem {
 			m.unitOfWorkCounters[unitOfWorkId] -= 1
 			if m.unitOfWorkCounters[unitOfWorkId] == 0 {
 				delete(m.unitOfWorkCounters, unitOfWorkId)
-				realtimeEndUnitOfWork(m.app, unitOfWorkId)
+				go realtimeEndUnitOfWork(m.app, unitOfWorkId)
 			}
 		}
 	}
@@ -116,7 +113,7 @@ func (m *UnitOfWorkManager) removeWorkItem(unitOfWorkId string) {
 		return
 	}
 	workItemMessage := unitOfWorkMessage{
-		removeIteam:  true,
+		removeItem:   true,
 		unitOfWorkId: unitOfWorkId,
 	}
 	m.messages <- workItemMessage
@@ -136,6 +133,46 @@ func (m *UnitOfWorkManager) addUnitOfWorkToRecord(record *core.Record) {
 	}
 	record.Set("unitOfWork", m.unitOfWorkId)
 	record.WithCustomData(true)
+}
+
+func (m *UnitOfWorkManager) onCrud(e *core.RecordEvent) error {
+	if m.unitOfWorkId != "" {
+		e.Record.Set("unitOfWork", m.unitOfWorkId)
+		e.Record.WithCustomData(true)
+		m.addWorkItem()
+	}
+	return e.Next()
+}
+
+func (m *UnitOfWorkManager) onCrudError(e *core.RecordErrorEvent) error {
+	unitOfWorkId := e.Record.GetString("unitOfWork")
+	if unitOfWorkId != "" {
+		m.removeWorkItem(unitOfWorkId)
+	}
+	return e.Next()
+}
+
+func (m *UnitOfWorkManager) onRealtimeMessage(e *core.RealtimeMessageEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	go m.registerOutgoingUnitOfWorkMessage(e.Message.Data)
+	return nil
+}
+
+// registerOutgoingUnitOfWorkMessage has to unmarshal all messages to check for
+// records with the unitOfWork field set. There is no other way to do this at the
+// moment. The OnRecordEnrich hook is "too early" as it is not synchronous with
+// the actual message sending, but we do need the exact time of sending.
+func (m *UnitOfWorkManager) registerOutgoingUnitOfWorkMessage(message []byte) {
+	data := struct {
+		Record unitOfWorkData `json:"record"`
+	}{}
+	json.Unmarshal(message, &data)
+	unitOfWorkId := data.Record.UnitOfWorkId
+	if unitOfWorkId != "" {
+		m.removeWorkItem(unitOfWorkId)
+	}
 }
 
 func newUnitOfWorkId() string {
