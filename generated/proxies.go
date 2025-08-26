@@ -507,6 +507,14 @@ func (p *Competition) SetTieBreakers(tieBreakers []*TieBreaker) {
 	p.SetExpand(e)
 }
 
+func (p *Competition) RngSeed() int {
+	return p.GetInt("rngSeed")
+}
+
+func (p *Competition) SetRngSeed(rngSeed int) {
+	p.Set("rngSeed", rngSeed)
+}
+
 func (p *Competition) QualificationOverride() []*Team {
 	rels := p.ExpandedAll("qualificationOverride")
 	proxies := make([]*Team, len(rels))
@@ -530,12 +538,12 @@ func (p *Competition) SetQualificationOverride(qualificationOverride []*Team) {
 	p.SetExpand(e)
 }
 
-func (p *Competition) RngSeed() int {
-	return p.GetInt("rngSeed")
+func (p *Competition) StartingFee() int {
+	return p.GetInt("startingFee")
 }
 
-func (p *Competition) SetRngSeed(rngSeed int) {
-	p.Set("rngSeed", rngSeed)
+func (p *Competition) SetStartingFee(startingFee int) {
+	p.Set("startingFee", startingFee)
 }
 
 func (p *Competition) Created() types.DateTime {
@@ -1153,6 +1161,37 @@ func (p *TournamentEvent) SetPlayerRestTime(playerRestTime int) {
 	p.Set("playerRestTime", playerRestTime)
 }
 
+func (p *TournamentEvent) StartingFeeMassDiscounts() []*StartingFeeMassDiscount {
+	rels := p.ExpandedAll("startingFeeMassDiscounts")
+	proxies := make([]*StartingFeeMassDiscount, len(rels))
+	for i := range len(rels) {
+		proxies[i] = &StartingFeeMassDiscount{}
+		proxies[i].Record = rels[i]
+	}
+	return proxies
+}
+
+func (p *TournamentEvent) SetStartingFeeMassDiscounts(startingFeeMassDiscounts []*StartingFeeMassDiscount) {
+	records := make([]*core.Record, len(startingFeeMassDiscounts))
+	ids := make([]string, len(startingFeeMassDiscounts))
+	for i, r := range startingFeeMassDiscounts {
+		records[i] = r.Record
+		ids[i] = r.Record.Id
+	}
+	p.Record.Set("startingFeeMassDiscounts", ids)
+	e := p.Expand()
+	e["startingFeeMassDiscounts"] = records
+	p.SetExpand(e)
+}
+
+func (p *TournamentEvent) FeeCurrency() string {
+	return p.GetString("feeCurrency")
+}
+
+func (p *TournamentEvent) SetFeeCurrency(feeCurrency string) {
+	p.Set("feeCurrency", feeCurrency)
+}
+
 func (p *TournamentEvent) Created() types.DateTime {
 	return p.GetDateTime("created")
 }
@@ -1423,5 +1462,117 @@ func (p *TieBreaker) Updated() types.DateTime {
 }
 
 func (p *TieBreaker) SetUpdated(updated types.DateTime) {
+	p.Set("updated", updated)
+}
+
+type StartingFeePayment struct {
+	core.BaseRecordProxy
+}
+
+func (p *StartingFeePayment) CollectionName() string {
+	return "starting_fee_payments"
+}
+
+func (p *StartingFeePayment) Player() *Player {
+	var proxy *Player
+	if rel := p.ExpandedOne("player"); rel != nil {
+		proxy = &Player{}
+		proxy.Record = rel
+	}
+	return proxy
+}
+
+func (p *StartingFeePayment) SetPlayer(player *Player) {
+	var id string
+	if player != nil {
+		id = player.Id
+	}
+	p.Record.Set("player", id)
+	e := p.Expand()
+	if player != nil {
+		e["player"] = player.Record
+	} else {
+		delete(e, "player")
+	}
+	p.SetExpand(e)
+}
+
+func (p *StartingFeePayment) Amount() int {
+	return p.GetInt("amount")
+}
+
+func (p *StartingFeePayment) SetAmount(amount int) {
+	p.Set("amount", amount)
+}
+
+func (p *StartingFeePayment) MassDiscount() int {
+	return p.GetInt("massDiscount")
+}
+
+func (p *StartingFeePayment) SetMassDiscount(massDiscount int) {
+	p.Set("massDiscount", massDiscount)
+}
+
+func (p *StartingFeePayment) DiscountPercent() int {
+	return p.GetInt("discountPercent")
+}
+
+func (p *StartingFeePayment) SetDiscountPercent(discountPercent int) {
+	p.Set("discountPercent", discountPercent)
+}
+
+func (p *StartingFeePayment) Created() types.DateTime {
+	return p.GetDateTime("created")
+}
+
+func (p *StartingFeePayment) SetCreated(created types.DateTime) {
+	p.Set("created", created)
+}
+
+func (p *StartingFeePayment) Updated() types.DateTime {
+	return p.GetDateTime("updated")
+}
+
+func (p *StartingFeePayment) SetUpdated(updated types.DateTime) {
+	p.Set("updated", updated)
+}
+
+type StartingFeeMassDiscount struct {
+	core.BaseRecordProxy
+}
+
+func (p *StartingFeeMassDiscount) CollectionName() string {
+	return "starting_fee_mass_discounts"
+}
+
+func (p *StartingFeeMassDiscount) MinRegistrations() int {
+	return p.GetInt("minRegistrations")
+}
+
+func (p *StartingFeeMassDiscount) SetMinRegistrations(minRegistrations int) {
+	p.Set("minRegistrations", minRegistrations)
+}
+
+func (p *StartingFeeMassDiscount) DiscountAmount() int {
+	return p.GetInt("discountAmount")
+}
+
+func (p *StartingFeeMassDiscount) SetDiscountAmount(discountAmount int) {
+	p.Set("discountAmount", discountAmount)
+}
+
+func (p *StartingFeeMassDiscount) Created() types.DateTime {
+	return p.GetDateTime("created")
+}
+
+func (p *StartingFeeMassDiscount) SetCreated(created types.DateTime) {
+	p.Set("created", created)
+}
+
+func (p *StartingFeeMassDiscount) Updated() types.DateTime {
+	return p.GetDateTime("updated")
+}
+
+func (p *StartingFeeMassDiscount) SetUpdated(updated types.DateTime) {
 	p.Set("updated", updated)
 }

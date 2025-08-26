@@ -139,8 +139,9 @@ type Competition struct {
 	draw                   []*Team
 	matches                []*MatchData
 	tieBreakers            []*TieBreaker
-	qualificationOverride  []*Team
 	rngSeed                int
+	qualificationOverride  []*Team
+	startingFee            int
 	created                types.DateTime
 	updated                types.DateTime
 }
@@ -293,15 +294,17 @@ func (_ *AgeGroup) Disable(settings *TournamentEvent) {
 type TournamentEvent struct {
 	// collection-name: tournaments
 	// system: id
-	Id                    string
-	title                 string
-	useAgeGroups          bool
-	usePlayingLevels      bool
-	dontReprintGameSheets bool
-	printQrCodes          bool
-	playerRestTime        int
-	created               types.DateTime
-	updated               types.DateTime
+	Id                       string
+	title                    string
+	useAgeGroups             bool
+	usePlayingLevels         bool
+	dontReprintGameSheets    bool
+	printQrCodes             bool
+	playerRestTime           int
+	startingFeeMassDiscounts []*StartingFeeMassDiscount
+	feeCurrency              string
+	created                  types.DateTime
+	updated                  types.DateTime
 }
 
 type TournamentModeSettings struct {
@@ -334,4 +337,26 @@ type TieBreaker struct {
 	tieBreakerRanking []*Team
 	created           types.DateTime
 	updated           types.DateTime
+}
+
+type StartingFeePayment struct {
+	// collection-name: starting_fee_payments
+	// system: id
+	Id              string
+	player          *Player
+	amount          int
+	massDiscount    int
+	discountPercent int
+	created         types.DateTime
+	updated         types.DateTime
+}
+
+type StartingFeeMassDiscount struct {
+	// collection-name: starting_fee_mass_discounts
+	// system: id
+	Id               string
+	minRegistrations int
+	discountAmount   int
+	created          types.DateTime
+	updated          types.DateTime
 }

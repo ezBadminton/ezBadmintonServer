@@ -44,7 +44,7 @@ type namedStore struct {
 }
 
 func InitStores(app core.App) error {
-	collectionNames := make([]string, 0, 14)
+	collectionNames := make([]string, 0, 17)
 	var err error
 
 	done := make(chan struct{})
@@ -52,7 +52,7 @@ func InitStores(app core.App) error {
 	storeCh := make(chan namedStore)
 
 	var wg sync.WaitGroup
-	wg.Add(15) // !NB Update this when adding/removing stores
+	wg.Add(17) // !NB Update this when adding/removing stores
 
 	go initStoreWg[TournamentOrganizer](app, &wg, errCh, storeCh)
 	go initStoreWg[InfoscreenUser](app, &wg, errCh, storeCh)
@@ -68,6 +68,8 @@ func InitStores(app core.App) error {
 	go initStoreWg[Team](app, &wg, errCh, storeCh)
 	go initStoreWg[TieBreaker](app, &wg, errCh, storeCh)
 	go initStoreWg[TournamentModeSettings](app, &wg, errCh, storeCh)
+	go initStoreWg[StartingFeePayment](app, &wg, errCh, storeCh)
+	go initStoreWg[StartingFeeMassDiscount](app, &wg, errCh, storeCh)
 	go initStoreWg[TournamentEvent](app, &wg, errCh, storeCh)
 
 	go func() {

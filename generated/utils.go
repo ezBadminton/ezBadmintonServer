@@ -8,7 +8,7 @@ import (
 )
 
 type Proxy interface {
-	Users | PlayingLevel | Club | Player | Competition | Team | Gymnasium | Court | MatchData | MatchSet | TournamentOrganizer | InfoscreenUser | AgeGroup | TournamentEvent | TournamentModeSettings | TieBreaker
+	Users | PlayingLevel | Club | Player | Competition | Team | Gymnasium | Court | MatchData | MatchSet | TournamentOrganizer | InfoscreenUser | AgeGroup | TournamentEvent | TournamentModeSettings | TieBreaker | StartingFeePayment | StartingFeeMassDiscount
 }
 
 // This interface constrains a type parameter of
@@ -161,9 +161,19 @@ var Relations = map[string]map[string][]RelationField{
 			{"sets", true},
 		},
 	},
+	"tournaments": {
+		"starting_fee_mass_discounts": {
+			{"startingFeeMassDiscounts", true},
+		},
+	},
 	"tie_breakers": {
 		"teams": {
 			{"tieBreakerRanking", true},
+		},
+	},
+	"starting_fee_payments": {
+		"players": {
+			{"player", false},
 		},
 	},
 }
