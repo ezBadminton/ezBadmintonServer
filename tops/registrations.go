@@ -52,6 +52,7 @@ func newRegistrationStore(
 	withdrawalManager *WithdrawalManager,
 	competitionManager *CompetitionManager,
 	qualificationOverrideManager *QualificationOverrideManager,
+	startingFeeManager *StartingFeeManager,
 ) *RegistrationStore {
 	teamStore, _ := store.FindRecordStore[Team]()
 
@@ -78,6 +79,8 @@ func newRegistrationStore(
 	competitionManager.onDelete.BindFunc(s.handleCompetitonDeletion)
 
 	qualificationOverrideManager.onUpdate.BindFunc(s.verifyQualificationOverride)
+
+	startingFeeManager.onPayment.BindFunc(s.handleStartingFeePayment)
 
 	return s
 }
@@ -409,6 +412,16 @@ func (s *RegistrationStore) verifyQualificationOverride(e *QualificationOverride
 			return errors.New("can not add a withdrawn team to the qualifications")
 		}
 	}
+	return e.Next()
+}
+
+func (s *RegistrationStore) handleStartingFeePayment(e *StartingFeePaymentEvent) error {
+	registrations := s.byPlayer[e.Player.Id]
+	registeredCompetitions := make([]*Competition, 0, len(registrations))
+	for _, registration := range registrations {
+		registeredCompetitions = append(registeredCompetitions, registration.Competition)
+	}
+	e.Registrations = registeredCompetitions
 	return e.Next()
 }
 

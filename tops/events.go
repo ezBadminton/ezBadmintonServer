@@ -252,10 +252,7 @@ func (e *TieBreakerEvent) saveNewTieBreaker() error {
 }
 
 func (e *TieBreakerEvent) saveUpdatedTieBreaker() error {
-	if err := e.App.Save(e.TieBreaker); err != nil {
-		return err
-	}
-	return e.Next()
+	return saveEventData(e.App, e, e.TieBreaker)
 }
 
 func (e *TieBreakerEvent) saveDeletedTieBreaker() error {
@@ -594,6 +591,31 @@ func newQualificationOverrideEvent(app core.App, competition *Competition, chang
 		CompetitionEvent: newCompetitionEvent(app, competition),
 		ChangedTeams:     changedTeams,
 	}
+}
+
+type StartingFeePaymentEvent struct {
+	BaseEvent
+
+	App             core.App
+	Player          *Player
+	Amount          int
+	DiscountPercent int
+	Registrations   []*Competition
+	Payment         *StartingFeePayment
+}
+
+func newStartingFeePaymentEvent(app core.App, player *Player, amount int, discountPercent int) *StartingFeePaymentEvent {
+	return &StartingFeePaymentEvent{
+		BaseEvent:       newBaseEvent(),
+		App:             app,
+		Player:          player,
+		Amount:          amount,
+		DiscountPercent: discountPercent,
+	}
+}
+
+func (e *StartingFeePaymentEvent) savePayment() error {
+	return saveEventData(e.App, e, e.Payment)
 }
 
 func saveEventData(app core.App, e hook.Resolver, dataProxy core.RecordProxy) error {

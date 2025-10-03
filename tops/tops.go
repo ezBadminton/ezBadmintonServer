@@ -25,6 +25,7 @@ type TournamentOperations struct {
 	categorizationManager         *CategorizationManager
 	tournamentModeSettingsManager *TournamentModeSettingsManager
 	competitionManager            *CompetitionManager
+	startingFeeManager            *StartingFeeManager
 }
 
 func InitTournamentOperations(app core.App) {
@@ -37,10 +38,17 @@ func InitTournamentOperations(app core.App) {
 	tournamentModeSettingsManager := newTournamentModeSettingsManager()
 	competitionManager := newCompetitionManager()
 	playerTracker := newPlayerTracker()
+	startingFeeManager := newStartingFeeManager(app)
 	matchManager := newMatchManager(withdrawalManager)
 	scheduler := newMatchScheduler(app)
 	categorizationManager := newCategorizationManager(eventSettingsManager)
-	registrationStore := newRegistrationStore(app, withdrawalManager, competitionManager, qualificationOverrideManager)
+	registrationStore := newRegistrationStore(
+		app,
+		withdrawalManager,
+		competitionManager,
+		qualificationOverrideManager,
+		startingFeeManager,
+	)
 	drawManager := newDrawManager(registrationStore, tournamentModeSettingsManager)
 	tournamentStore := newTournamentStore(
 		app,
@@ -79,6 +87,7 @@ func InitTournamentOperations(app core.App) {
 		categorizationManager:         categorizationManager,
 		tournamentModeSettingsManager: tournamentModeSettingsManager,
 		competitionManager:            competitionManager,
+		startingFeeManager:            startingFeeManager,
 	}
 }
 
@@ -379,4 +388,25 @@ func CreateTestPlayers(app core.App, amount int) error {
 	tops.startUnitOfWork()
 
 	return createTestPlayers(app, amount)
+}
+
+func SetStartingFees(competitions []*Competition, startingFee int) error {
+	defer tops.endUnitOfWork()
+	tops.startUnitOfWork()
+
+	return tops.startingFeeManager.setStartingFees(competitions, startingFee)
+}
+
+func PayStartingFee(player *Player, amount, discountPercent int) error {
+	defer tops.endUnitOfWork()
+	tops.startUnitOfWork()
+
+	return tops.startingFeeManager.payFee(player, amount, discountPercent)
+}
+
+func UpdateOrCreateMassDiscount(minRegistrations, amount int) error {
+	defer tops.endUnitOfWork()
+	tops.startUnitOfWork()
+
+	return tops.startingFeeManager.updateOrCreateMassDiscount(minRegistrations, amount)
 }
