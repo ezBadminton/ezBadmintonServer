@@ -28,10 +28,12 @@ type UnitOfWorkManager struct {
 	app                core.App
 	unitOfWorkId       string
 	unitOfWorkCounters map[string]int
+	runningUnitsOfWork map[string]any
 }
 
 type unitOfWorkMessage struct {
 	startUnitOfWork bool
+	endUnitOfWork   bool
 	addItem         bool
 	removeItem      bool
 	unitOfWorkId    string
@@ -41,6 +43,7 @@ func newUnitOfWorkManager(app core.App) *UnitOfWorkManager {
 	m := &UnitOfWorkManager{
 		app:                app,
 		unitOfWorkCounters: make(map[string]int),
+		runningUnitsOfWork: make(map[string]any),
 		messages:           make(chan unitOfWorkMessage, 1),
 	}
 
@@ -52,9 +55,8 @@ func newUnitOfWorkManager(app core.App) *UnitOfWorkManager {
 
 	app.OnRecordAfterCreateError().BindFunc(m.onCrudError)
 	app.OnRecordAfterUpdateError().BindFunc(m.onCrudError)
-	app.OnRecordAfterDeleteError().BindFunc(m.onCrudError)
 
-	app.OnRealtimeMessageSend().BindFunc(m.onRealtimeMessage)
+	app.OnRealtimeMessagesSent().BindFunc(m.onRealtimeMessagesSent)
 
 	go m.workItemRoutine()
 
@@ -73,6 +75,11 @@ func (m *UnitOfWorkManager) startUnitOfWork() {
 
 func (m *UnitOfWorkManager) endUnitOfWork() {
 	defer m.mu.Unlock()
+	unitOfWorkMessage := unitOfWorkMessage{
+		endUnitOfWork: true,
+		unitOfWorkId:  m.unitOfWorkId,
+	}
+	m.messages <- unitOfWorkMessage
 	m.unitOfWorkId = ""
 }
 
@@ -84,11 +91,24 @@ func (m *UnitOfWorkManager) workItemRoutine() {
 		unitOfWorkId := workItem.unitOfWorkId
 		if workItem.startUnitOfWork {
 			m.unitOfWorkCounters[unitOfWorkId] = 0
+			m.runningUnitsOfWork[unitOfWorkId] = struct{}{}
+		} else if workItem.endUnitOfWork {
+			delete(m.runningUnitsOfWork, unitOfWorkId)
+			// When a unit of work ends while the counter is still greater than 0, the end message is not sent
+			// as it will hit 0 later when all work items have been sent out by other routines.
+			// The removeItem branch of this if-else block will handle that.
+			if m.unitOfWorkCounters[unitOfWorkId] == 0 {
+				delete(m.unitOfWorkCounters, unitOfWorkId)
+				go realtimeEndUnitOfWork(m.app, unitOfWorkId)
+			}
 		} else if workItem.addItem {
 			m.unitOfWorkCounters[unitOfWorkId] += 1
 		} else if workItem.removeItem {
 			m.unitOfWorkCounters[unitOfWorkId] -= 1
-			if m.unitOfWorkCounters[unitOfWorkId] == 0 {
+			_, ok := m.runningUnitsOfWork[unitOfWorkId]
+			// When the counter hits 0 before the unit of work ended, the end message is not sent
+			// as there might me more messages coming
+			if !ok && m.unitOfWorkCounters[unitOfWorkId] == 0 {
 				delete(m.unitOfWorkCounters, unitOfWorkId)
 				go realtimeEndUnitOfWork(m.app, unitOfWorkId)
 			}
@@ -152,27 +172,12 @@ func (m *UnitOfWorkManager) onCrudError(e *core.RecordErrorEvent) error {
 	return e.Next()
 }
 
-func (m *UnitOfWorkManager) onRealtimeMessage(e *core.RealtimeMessageEvent) error {
-	if err := e.Next(); err != nil {
-		return err
-	}
-	go m.registerOutgoingUnitOfWorkMessage(e.Message.Data)
-	return nil
-}
-
-// registerOutgoingUnitOfWorkMessage has to unmarshal all messages to check for
-// records with the unitOfWork field set. There is no other way to do this at the
-// moment. The OnRecordEnrich hook is "too early" as it is not synchronous with
-// the actual message sending, but we do need the exact time of sending.
-func (m *UnitOfWorkManager) registerOutgoingUnitOfWorkMessage(message []byte) {
-	data := struct {
-		Record unitOfWorkData `json:"record"`
-	}{}
-	json.Unmarshal(message, &data)
-	unitOfWorkId := data.Record.UnitOfWorkId
-	if unitOfWorkId != "" {
+func (m *UnitOfWorkManager) onRealtimeMessagesSent(e *core.RealtimeMessagesSentEvent) error {
+	unitOfWorkId, ok := e.Record.Get("unitOfWork").(string)
+	if ok && unitOfWorkId != "" {
 		m.removeWorkItem(unitOfWorkId)
 	}
+	return e.Next()
 }
 
 func newUnitOfWorkId() string {
