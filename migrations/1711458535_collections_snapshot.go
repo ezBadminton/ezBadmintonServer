@@ -2628,8 +2628,8 @@ func init() {
 				"viewRule": "@request.auth.collectionName = \"tournament_organizer\" || @request.auth.id = id"
 			},
 			{
-				"createRule": null,
-				"deleteRule": null,
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -2717,16 +2717,16 @@ func init() {
 				],
 				"id": "pbc_391371630",
 				"indexes": [],
-				"listRule": null,
+				"listRule": "@request.auth.id != \"\"",
 				"name": "starting_fee_payments",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
-				"viewRule": null
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
 			},
 			{
-				"createRule": null,
-				"deleteRule": null,
+				"createRule": "@request.auth.id != \"\"",
+				"deleteRule": "@request.auth.id != \"\"",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -2789,12 +2789,12 @@ func init() {
 				],
 				"id": "pbc_2122568942",
 				"indexes": [],
-				"listRule": null,
+				"listRule": "@request.auth.id != \"\"",
 				"name": "starting_fee_mass_discounts",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
-				"viewRule": null
+				"updateRule": "@request.auth.id != \"\"",
+				"viewRule": "@request.auth.id != \"\""
 			}
 		]`
 

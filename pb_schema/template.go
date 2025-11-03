@@ -117,7 +117,12 @@ type Player struct {
 	firstName string
 	lastName  string
 	notes     string
-	// select: PlayerStatus(notAttending, attending, injured, forfeited, disqualified)
+	// select: PlayerStatus
+	// - notAttending
+	// - attending
+	// - injured
+	// - forfeited
+	// - disqualified
 	status  int
 	club    *Club
 	created types.DateTime
@@ -129,7 +134,11 @@ type Competition struct {
 	// system: id
 	Id       string
 	teamSize int
-	// select: GenderCategory(female, male, mixed, any)
+	// select: GenderCategory
+	// - female
+	// - male
+	// - mixed
+	// - any
 	genderCategory         int
 	ageGroup               *AgeGroup
 	playingLevel           *PlayingLevel
@@ -252,7 +261,9 @@ type AgeGroup struct {
 	// system: id
 	Id  string
 	age int
-	// select: AgeGroupType(over, under)
+	// select: AgeGroupType
+	// - over
+	// - under
 	type_   int
 	created types.DateTime
 	updated types.DateTime
@@ -311,11 +322,25 @@ type TournamentModeSettings struct {
 	// collection-name: tournament_mode_settings
 	// system: id
 	Id string
-	// select: TournamentType(RoundRobin, SingleElimination, GroupKnockout, DoubleElimination, SingleEliminationWithConsolation)
+	// select: TournamentType
+	// - RoundRobin
+	// - SingleElimination
+	// - GroupKnockout
+	// - DoubleElimination
+	// - SingleEliminationWithConsolation
 	type_ int
-	// select: SeedingMode(random, single, tiered)[RandomSeeds, SingleSeeds, TieredSeeds]
+	// select: SeedingMode
+	// - random
+	// > RandomSeeds
+	// - single
+	// > SingleSeeds
+	// - tiered
+	// > TieredSeeds
 	seedingMode int
-	// select: KnockOutMode(single, double, consolation)
+	// select: KnockOutMode
+	// - single
+	// - double
+	// - consolation
 	knockOutMode         int
 	passes               int
 	numGroups            int
