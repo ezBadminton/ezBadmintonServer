@@ -2,7 +2,7 @@ module github.com/ezBadminton/ezBadmintonServer
 
 go 1.24.9
 
-replace github.com/pocketbase/pocketbase => github.com/snonky/pocketbase v0.31.0-tracked-realtime-merge
+replace github.com/pocketbase/pocketbase => github.com/snonky/pocketbase v0.32.0-tracked-realtime
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
@@ -45,7 +45,7 @@ require (
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.39.1 // indirect
+	modernc.org/sqlite v1.40.0 // indirect
 )
 
 replace github.com/ezBadminton/gotournament => ../gotournament
