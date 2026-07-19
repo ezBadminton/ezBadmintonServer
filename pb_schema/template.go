@@ -337,3 +337,17 @@ type TieBreaker struct {
 	created           types.DateTime
 	updated           types.DateTime
 }
+
+type CertificateTemplate struct {
+	// collection-name: certificate_templates
+	// system: id
+	Id              string
+	title           string
+	backgroundImage string
+	// JSON-encoded list of field position definitions
+	// (variable name, x/y position, font size, alignment, etc.),
+	// interpreted by the client when rendering a certificate PDF.
+	fields  string
+	created types.DateTime
+	updated types.DateTime
+}
