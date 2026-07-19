@@ -1461,3 +1461,51 @@ func (p *TieBreaker) Updated() types.DateTime {
 func (p *TieBreaker) SetUpdated(updated types.DateTime) {
 	p.Set("updated", updated)
 }
+
+type CertificateTemplate struct {
+	core.BaseRecordProxy
+}
+
+func (p *CertificateTemplate) CollectionName() string {
+	return "certificate_templates"
+}
+
+func (p *CertificateTemplate) Title() string {
+	return p.GetString("title")
+}
+
+func (p *CertificateTemplate) SetTitle(title string) {
+	p.Set("title", title)
+}
+
+func (p *CertificateTemplate) BackgroundImage() string {
+	return p.GetString("backgroundImage")
+}
+
+func (p *CertificateTemplate) SetBackgroundImage(backgroundImage string) {
+	p.Set("backgroundImage", backgroundImage)
+}
+
+func (p *CertificateTemplate) Fields() string {
+	return p.GetString("fields")
+}
+
+func (p *CertificateTemplate) SetFields(fields string) {
+	p.Set("fields", fields)
+}
+
+func (p *CertificateTemplate) Created() types.DateTime {
+	return p.GetDateTime("created")
+}
+
+func (p *CertificateTemplate) SetCreated(created types.DateTime) {
+	p.Set("created", created)
+}
+
+func (p *CertificateTemplate) Updated() types.DateTime {
+	return p.GetDateTime("updated")
+}
+
+func (p *CertificateTemplate) SetUpdated(updated types.DateTime) {
+	p.Set("updated", updated)
+}

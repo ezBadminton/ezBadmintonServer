@@ -8,7 +8,7 @@ import (
 )
 
 type Proxy interface {
-	Users | PlayingLevel | Club | Player | Competition | Team | Gymnasium | Court | MatchData | MatchSet | TournamentOrganizer | InfoscreenUser | AgeGroup | TournamentEvent | TournamentModeSettings | TieBreaker
+	Users | PlayingLevel | Club | Player | Competition | Team | Gymnasium | Court | MatchData | MatchSet | TournamentOrganizer | InfoscreenUser | AgeGroup | TournamentEvent | TournamentModeSettings | TieBreaker | CertificateTemplate
 }
 
 // This interface constrains a type parameter of
